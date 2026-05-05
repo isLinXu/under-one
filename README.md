@@ -4,10 +4,10 @@
     <b>The Hachigiki Framework — Agent-ops infrastructure forged from the Eight Heterodox Arts.</b>
   </p>
 </p>
-
 <p align="center">
-  <img src="./docs/skill-cards/00-overview-hero.png" width="720" alt="UnderOne Ten Skills Overview">
+  <img src="./docs/skill-cards/00-overview-grid.png" width="720" alt="UnderOne Ten Skills Overview">
 </p>
+
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
@@ -89,16 +89,16 @@ It ships as **ten self-contained skills**. Each is a directory with a `SKILL.md`
 
 | ID | Codename | Card | Core capability | Script |
 |---|---|---|---|---|
-| ☯️ `context-guard` | 炁体源流 Qiti-Yuanliu | <img src="./docs/skill-cards/01-context-guard.png" width="160"> | Detect drift · repair via DNA snapshot · 3-level distillation | `entropy_scanner.py` |
-| 📜 `command-factory` | 通天箓 Tongtian-Lu | *Coming soon* | 6 talisman types · topological sort · curse-grading | `fu_generator.py` |
-| 🔭 `insight-radar` | 大罗洞观 Dalu-Dongguan | <img src="./docs/skill-cards/03-insight-radar.png" width="160"> | 5 link types · A/B/C confidence · Mermaid output | `link_detector.py` |
-| 🔨 `tool-forge` | 神机百炼 Shenji-Bailian | <img src="./docs/skill-cards/04-tool-forge.png" width="160"> | 4-phase evolution · auto test gen · Spirit Contract | `tool_factory.py` |
-| 🧭 `priority-engine` | 风后奇门 Fenghou-Qimen | <img src="./docs/skill-cards/05-priority-engine.png" width="160"> | 9 dimensions · 8-Gates mapping · 100-iter Monte Carlo | `priority_engine.py` |
-| 🍃 `knowledge-digest` | 六库仙贼 Liuku-Xianzei | <img src="./docs/skill-cards/06-knowledge-digest.png" width="160"> | S/A/B/C credibility · freshness · Ebbinghaus review | `knowledge_digest.py` |
-| ✋ `persona-guard` | 双全手 Shuangquan-Shou | *Coming soon* | Soul Brand DNA · deviation · emotion timeline | `dna_validator.py` |
-| 👻 `tool-orchestrator` | 拘灵遣将 Juling-Qianjiang | <img src="./docs/skill-cards/08-tool-orchestrator.png" width="160"> | 8 spirit types · SLA · Night Parade parallel · protect/possess | `dispatcher.py` |
+| ☯️ `context-guard` | 炁体源流 Qiti-Yuanliu | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | Detect drift · repair via DNA snapshot · 3-level distillation | `entropy_scanner.py` |
+| 📜 `command-factory` | 通天箓 Tongtian-Lu | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 6 talisman types · topological sort · curse-grading | `fu_generator.py` |
+| 🔭 `insight-radar` | 大罗洞观 Dalu-Dongguan | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 5 link types · A/B/C confidence · Mermaid output | `link_detector.py` |
+| 🔨 `tool-forge` | 神机百炼 Shenji-Bailian | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 4-phase evolution · auto test gen · Spirit Contract | `tool_factory.py` |
+| 🧭 `priority-engine` | 风后奇门 Fenghou-Qimen | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 9 dimensions · 8-Gates mapping · 100-iter Monte Carlo | `priority_engine.py` |
+| 🍃 `knowledge-digest` | 六库仙贼 Liuku-Xianzei | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | S/A/B/C credibility · freshness · Ebbinghaus review | `knowledge_digest.py` |
+| ✋ `persona-guard` | 双全手 Shuangquan-Shou | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | Soul Brand DNA · deviation · emotion timeline | `dna_validator.py` |
+| 👻 `tool-orchestrator` | 拘灵遣将 Juling-Qianjiang | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 8 spirit types · SLA · Night Parade parallel · protect/possess | `dispatcher.py` |
 | ⚡ `ecosystem-hub` | 八卦阵 Bagua-Zhen | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 10-skill bus · mutex arbiter · HTML dashboard | `coordinator.py` |
-| 🔥 `evolution-engine` | 修身炉 Xiushen-Lu | <img src="./docs/skill-cards/10-evolution-engine.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
+| 🔥 `evolution-engine` | 修身炉 Xiushen-Lu | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
 
 ## 6. Architecture
 
