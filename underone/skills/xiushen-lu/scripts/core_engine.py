@@ -24,7 +24,8 @@ from typing import Dict, List, Optional, Tuple, Any
 
 # V7: 导入跨技能知识共享库
 try:
-    from shared_knowledge import KnowledgeHub
+    from shared_knowledge import get_hub
+    KnowledgeHub = get_hub()
 except ImportError:
     KnowledgeHub = None
 
@@ -103,10 +104,17 @@ class RefinerV7:
         # 1. 检查skill特定的自适应阈值
         skill_specific = self.adaptive.get(skill_name, {})
         if key in skill_specific:
-            return skill_specific[key]
+            stored = skill_specific[key]
+            # update_adaptive 存储的是 dict {"value": ..., "updated_at": ..., "reason": ...}
+            if isinstance(stored, dict) and "value" in stored:
+                return stored["value"]
+            return stored
         # 2. 检查全局自适应阈值
-        if key in self.adaptive.get("_global", {}):
-            return self.adaptive["_global"][key]
+        global_entry = self.adaptive.get("_global", {}).get(key)
+        if global_entry is not None:
+            if isinstance(global_entry, dict) and "value" in global_entry:
+                return global_entry["value"]
+            return global_entry
         # 3. 回退到基础阈值
         # V7: 尝试从KnowledgeHub获取
         if KnowledgeHub:

@@ -15,21 +15,35 @@ import json, sys
 from pathlib import Path
 from datetime import datetime
 
+# V10.1: 支持从 under-one.yaml 读取互斥/协同矩阵
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+try:
+    from _skill_config import get_skill_config
+except ImportError:
+    def get_skill_config(_section, _key=None, default=None):
+        return default
+
 SKILL_NAMES = [
     "qiti-yuanliu", "tongtian-lu", "dalu-dongguan", "shenji-bailian",
     "fenghou-qimen", "liuku-xianzei", "shuangquanshou", "juling-qianjiang",
     "bagua-zhen", "xiushen-lu",
 ]
 
-# 互斥矩阵 (coordination, not hard block)
+# 从配置读取互斥/协同矩阵，回退到硬编码默认值
+_cfg_mutex = get_skill_config("baguazhen", "mutex_pairs", [])
+_cfg_synergy = get_skill_config("baguazhen", "synergy_pairs", [])
+
 MUTEX_PAIRS = [
+    tuple(p) for p in _cfg_mutex
+] if _cfg_mutex else [
     ("tongtian-lu", "shenji-bailian"),
     ("qiti-yuanliu", "fenghou-qimen"),
     ("dalu-dongguan", "liuku-xianzei"),
 ]
 
-# 协同增益矩阵
 SYNERGY_PAIRS = [
+    tuple(p) for p in _cfg_synergy
+] if _cfg_synergy else [
     ("tongtian-lu", "dalu-dongguan"),
     ("juling-qianjiang", "shenji-bailian"),
     ("qiti-yuanliu", "shuangquanshou"),

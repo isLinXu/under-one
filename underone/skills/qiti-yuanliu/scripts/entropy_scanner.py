@@ -12,6 +12,14 @@ import re
 from pathlib import Path
 from collections import Counter
 
+# V10.1: 支持从 under-one.yaml 读取阈值
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+try:
+    from _skill_config import get_threshold
+except ImportError:
+    def get_threshold(_key, default):
+        return default
+
 
 class QiTiScanner:
     """炁体源流 - 上下文稳态扫描器"""
@@ -28,6 +36,10 @@ class QiTiScanner:
         self.context = context_data
         self.alerts = []
         self.metrics = {}
+        # 从配置读取阈值，回退到硬编码默认值
+        self.entropy_warning = get_threshold("entropy_warning", 3.0)
+        self.entropy_critical = get_threshold("entropy_critical", 7.0)
+        self.consistency_min = get_threshold("consistency_min", 60)
 
     def scan(self):
         """执行全量扫描"""
@@ -47,7 +59,11 @@ class QiTiScanner:
         redundancy_count = self._count_redundancy()
         entropy = conflict_count * 2 + gap_count * 1.5 + redundancy_count * 0.5
         self.metrics["entropy"] = round(entropy, 2)
-        self.metrics["entropy_level"] = "green" if entropy < 3 else "yellow" if entropy < 7 else "red"
+        self.metrics["entropy_level"] = (
+            "green" if entropy < self.entropy_warning
+            else "yellow" if entropy < self.entropy_critical
+            else "red"
+        )
 
     def _find_contradictions(self):
         """检测矛盾关键词"""
@@ -144,11 +160,17 @@ class QiTiScanner:
                 "round": c["round"],
                 "message": f"检测到矛盾关键词 '{c['keyword']}'"
             })
-        if self.metrics.get("entropy", 0) > 7:
+        if self.metrics.get("entropy", 0) > self.entropy_critical:
             self.alerts.append({
                 "level": "danger",
                 "type": "high_entropy",
                 "message": f"上下文熵过高 ({self.metrics['entropy']})，建议立即修复"
+            })
+        elif self.metrics.get("entropy", 0) > self.entropy_warning:
+            self.alerts.append({
+                "level": "warning",
+                "type": "elevated_entropy",
+                "message": f"上下文熵升高 ({self.metrics['entropy']})，建议关注"
             })
 
     def _calc_health_score(self):
@@ -188,9 +210,9 @@ class QiTiScanner:
 
     def _generate_recommendations(self):
         recs = []
-        if self.metrics.get("entropy", 0) > 7:
+        if self.metrics.get("entropy", 0) > self.entropy_critical:
             recs.append("建议立即执行稳态修复（上下文蒸馏+锚点重建）")
-        elif self.metrics.get("entropy", 0) > 3:
+        elif self.metrics.get("entropy", 0) > self.entropy_warning:
             recs.append("建议关注，执行轻量炁循环")
         if self.metrics.get("consistency", 100) < 90:
             recs.append("建议检查矛盾点，调用大罗洞观跨段追踪")
