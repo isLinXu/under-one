@@ -1,0 +1,11 @@
+{
+  "validator": "shuangquanshou",
+  "version": "5.0",
+  "deviation_score": 0.0,
+  "drift_level": "green",
+  "dna_violations": [],
+  "can_switch": true,
+  "recommendations": [
+    "DNA一致，允许风格调整"
+  ]
+}

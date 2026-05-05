@@ -1,0 +1,73 @@
+{
+  "generator": "tongtian-lu",
+  "version": "5.0",
+  "task": "分析竞品数据并生成高管摘要报告",
+  "dimension_count": 2,
+  "talisman_list": [
+    {
+      "id": "analysis-v5.0",
+      "type": "分析箓",
+      "goal": "信息解析与提取",
+      "input_ports": [
+        {
+          "type": "raw_text",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "structured_data",
+          "format": "json"
+        }
+      ],
+      "constraints": [
+        "保留原始语义",
+        "标注置信度"
+      ],
+      "avg_sla": 10
+    },
+    {
+      "id": "creation-v5.0",
+      "type": "创作箓",
+      "goal": "内容生成与改写",
+      "input_ports": [
+        {
+          "type": "structured_data",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "text",
+          "format": "markdown"
+        }
+      ],
+      "constraints": [
+        "符合目标风格",
+        "字数可控"
+      ],
+      "avg_sla": 20
+    }
+  ],
+  "curse_level": "low",
+  "conflicts": [
+    {
+      "between": [
+        "analysis-v5.0",
+        "creation-v5.0"
+      ],
+      "type": "格式不匹配",
+      "severity": "low",
+      "resolution": "插入转换箓作为适配层"
+    }
+  ],
+  "topology": [
+    "analysis-v5.0",
+    "creation-v5.0"
+  ],
+  "execution_plan": {
+    "mode": "serial",
+    "estimated_sla": 30,
+    "adapter_insertions": 1
+  }
+}

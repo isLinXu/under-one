@@ -1,0 +1,45 @@
+{
+  "plan": [
+    {
+      "task": {
+        "type": "search",
+        "desc": "搜索最新AI论文"
+      },
+      "status": "dispatched",
+      "assigned": "search-api",
+      "quality": 100
+    },
+    {
+      "task": {
+        "type": "browse",
+        "desc": "浏览arxiv摘要"
+      },
+      "status": "fallback_protect",
+      "assigned": "browse-bot",
+      "method": "skip",
+      "quality": 0.0
+    },
+    {
+      "task": {
+        "type": "code",
+        "desc": "运行数据分析脚本"
+      },
+      "status": "dispatched",
+      "assigned": "code-runner",
+      "quality": 100
+    }
+  ],
+  "fallback_log": [
+    {
+      "spirit_id": "browse-bot",
+      "action": "fallback_protect",
+      "method": "skip",
+      "quality_factor": 0.0,
+      "note": "工具不可用，已降级保护"
+    }
+  ],
+  "fallback_count": 1,
+  "avg_quality": 66.7,
+  "strategy": "protect",
+  "all_success": false
+}

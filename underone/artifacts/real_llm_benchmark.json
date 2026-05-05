@@ -1,0 +1,57 @@
+{
+  "prompts": [
+    {
+      "tag": "priority",
+      "system": "你是任务调度助手。只用一句话回答。",
+      "prompt": "给以下任务排优先级：修 P0 bug、写周报、升级依赖。"
+    },
+    {
+      "tag": "decompose",
+      "system": "你是步骤拆解助手。用 3 个 step 回答。",
+      "prompt": "请把'分析竞品并生成报告'拆成可执行步骤。"
+    },
+    {
+      "tag": "summary",
+      "system": "你是摘要助手。用 20 字以内回答。",
+      "prompt": "总结：今天天气晴朗，温度 22 度，风力 3 级，适合户外运动。"
+    }
+  ],
+  "benchmarks": [
+    {
+      "provider": "mock",
+      "model": "mock-v1",
+      "ok": true,
+      "total_ms": 37.8,
+      "avg_latency_ms": 12.6,
+      "total_prompt_tokens": 104,
+      "total_completion_tokens": 42,
+      "success_rate": "3/3",
+      "results": [
+        {
+          "tag": "priority",
+          "ok": true,
+          "latency_ms": 12.6,
+          "prompt_tokens": 35,
+          "completion_tokens": 21,
+          "preview": "[mock] 建议优先级: 1.紧急任务 2.重要任务 3.常规任务"
+        },
+        {
+          "tag": "decompose",
+          "ok": true,
+          "latency_ms": 12.6,
+          "prompt_tokens": 33,
+          "completion_tokens": 12,
+          "preview": "[mock] 步骤拆解: step1 -> step2 -> step3"
+        },
+        {
+          "tag": "summary",
+          "ok": true,
+          "latency_ms": 12.6,
+          "prompt_tokens": 36,
+          "completion_tokens": 9,
+          "preview": "[mock] 摘要: 核心要点 A、B、C"
+        }
+      ]
+    }
+  ]
+}

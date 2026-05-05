@@ -1,0 +1,105 @@
+{
+  "coordinator": "bagua-zhen",
+  "version": "5.0",
+  "status_bus": {
+    "entries": [
+      {
+        "id": "qiti-yuanliu",
+        "name": "炁体源流",
+        "status": "休眠",
+        "round": "-",
+        "score": 92.5,
+        "health": "🟢",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "tongtian-lu",
+        "name": "通天箓",
+        "status": "休眠",
+        "round": "-",
+        "score": 94.4,
+        "health": "🟢",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "dalu-dongguan",
+        "name": "大罗洞观",
+        "status": "休眠",
+        "round": "-",
+        "score": 35.0,
+        "health": "🔴",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "shenji-bailian",
+        "name": "神机百炼",
+        "status": "休眠",
+        "round": "-",
+        "score": 92.0,
+        "health": "🟢",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "fenghou-qimen",
+        "name": "风后奇门",
+        "status": "休眠",
+        "round": "-",
+        "score": 45.0,
+        "health": "🔴",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "liuku-xianzei",
+        "name": "六库仙贼",
+        "status": "休眠",
+        "round": "-",
+        "score": 40.0,
+        "health": "🔴",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "shuangquanshou",
+        "name": "双全手",
+        "status": "休眠",
+        "round": "-",
+        "score": 92.0,
+        "health": "🟢",
+        "mutex_lock": "无"
+      },
+      {
+        "id": "juling-qianjiang",
+        "name": "拘灵遣将",
+        "status": "休眠",
+        "round": "-",
+        "score": 93.0,
+        "health": "🟢",
+        "mutex_lock": "无"
+      }
+    ],
+    "active_count": 0,
+    "sleep_count": 8
+  },
+  "arbitration": {
+    "conflicts_detected": 0,
+    "resolutions": [],
+    "queue": {}
+  },
+  "aggregated_score": {
+    "average": 73.0,
+    "health_rate": 62.5,
+    "excellent_count": 5,
+    "level": "阵法松动",
+    "individual": {
+      "qiti-yuanliu": 92.5,
+      "tongtian-lu": 94.4,
+      "dalu-dongguan": 35.0,
+      "shenji-bailian": 92.0,
+      "fenghou-qimen": 45.0,
+      "liuku-xianzei": 40.0,
+      "shuangquanshou": 92.0,
+      "juling-qianjiang": 93.0
+    }
+  },
+  "dashboard": "【八技效能仪表盘】\n  qiti-yuanliu    █████████░ 92.5\n  tongtian-lu     █████████░ 94.4\n  dalu-dongguan   ███░░░░░░░ 35.0\n  shenji-bailian  █████████░ 92.0\n  fenghou-qimen   ████░░░░░░ 45.0\n  liuku-xianzei   ████░░░░░░ 40.0\n  shuangquanshou  █████████░ 92.0\n  juling-qianjiang █████████░ 93.0\n\n【互斥矩阵】\n  通天箓 <-> 神机百炼 (符箓 vs 锻造)\n  炁体源流 <-> 风后奇门 (修复 vs 重排)\n  大罗洞观 <-> 六库仙贼 (洞察 vs 吸收)",
+  "timestamp": "auto"
+}

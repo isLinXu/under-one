@@ -1,0 +1,77 @@
+{
+  "dispatcher": "juling-qianjiang",
+  "version": "5.0",
+  "task_count": 4,
+  "dispatch_plan": [
+    {
+      "task": "获取销售数据",
+      "spirit": "数据灵-1",
+      "health": 88,
+      "sla": 20,
+      "status": "assigned",
+      "fallback": "跳过"
+    },
+    {
+      "task": "获取财务数据",
+      "spirit": "数据灵-1",
+      "health": 88,
+      "sla": 20,
+      "status": "assigned",
+      "fallback": "跳过"
+    },
+    {
+      "task": "获取用户数据",
+      "spirit": "数据灵-1",
+      "health": 88,
+      "sla": 20,
+      "status": "assigned",
+      "fallback": "跳过"
+    },
+    {
+      "task": "汇总生成报告",
+      "spirit": "代码灵-1",
+      "health": 92,
+      "sla": 30,
+      "status": "assigned",
+      "fallback": "本地计算"
+    }
+  ],
+  "sla_log": [
+    {
+      "task": "获取销售数据",
+      "spirit": "数据灵-1",
+      "status": "assigned",
+      "sla_met": true
+    },
+    {
+      "task": "获取财务数据",
+      "spirit": "数据灵-1",
+      "status": "assigned",
+      "sla_met": true
+    },
+    {
+      "task": "获取用户数据",
+      "spirit": "数据灵-1",
+      "status": "assigned",
+      "sla_met": true
+    },
+    {
+      "task": "汇总生成报告",
+      "spirit": "代码灵-1",
+      "status": "assigned",
+      "sla_met": true
+    }
+  ],
+  "sla_rate": 100.0,
+  "fallback_count": 0,
+  "health_report": {
+    "数据灵-1": {
+      "score": 88,
+      "status": "良好"
+    },
+    "代码灵-1": {
+      "score": 92,
+      "status": "良好"
+    }
+  }
+}

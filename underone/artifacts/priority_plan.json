@@ -1,0 +1,95 @@
+{
+  "engine": "fenghou-qimen",
+  "version": "5.0",
+  "task_count": 4,
+  "ranked_tasks": [
+    {
+      "name": "修复生产环境P0故障",
+      "urgency": 5,
+      "importance": 5,
+      "impact": 5,
+      "dependency": 1,
+      "resource_match": 5,
+      "deadline_risk": 5,
+      "reversibility": 5,
+      "stakeholder": 5,
+      "composite_score": 4.25,
+      "gate": "生门"
+    },
+    {
+      "name": "准备Q3产品规划PPT",
+      "urgency": 4,
+      "importance": 5,
+      "impact": 5,
+      "dependency": 2,
+      "resource_match": 4,
+      "deadline_risk": 4,
+      "reversibility": 4,
+      "stakeholder": 5,
+      "composite_score": 4.05,
+      "gate": "生门"
+    },
+    {
+      "name": "重构订单模块代码",
+      "urgency": 2,
+      "importance": 4,
+      "impact": 4,
+      "dependency": 3,
+      "resource_match": 3,
+      "deadline_risk": 2,
+      "reversibility": 3,
+      "stakeholder": 3,
+      "composite_score": 3.25,
+      "gate": "景门"
+    },
+    {
+      "name": "撰写本周团队周报",
+      "urgency": 3,
+      "importance": 2,
+      "impact": 2,
+      "dependency": 1,
+      "resource_match": 4,
+      "deadline_risk": 3,
+      "reversibility": 5,
+      "stakeholder": 2,
+      "composite_score": 2.6,
+      "gate": "杜门"
+    }
+  ],
+  "execution_plan": [
+    {
+      "task": "修复生产环境P0故障",
+      "score": 4.25,
+      "gate": "生门",
+      "action": "重点推进",
+      "estimated_time": 30
+    },
+    {
+      "task": "准备Q3产品规划PPT",
+      "score": 4.05,
+      "gate": "生门",
+      "action": "重点推进",
+      "estimated_time": 30
+    },
+    {
+      "task": "重构订单模块代码",
+      "score": 3.25,
+      "gate": "景门",
+      "action": "审视后执行",
+      "estimated_time": 30
+    },
+    {
+      "task": "撰写本周团队周报",
+      "score": 2.6,
+      "gate": "杜门",
+      "action": "绕过障碍/延后",
+      "estimated_time": 30
+    }
+  ],
+  "monte_carlo": {
+    "simulations": 100,
+    "on_time_rate": 100.0,
+    "assessment": "高鲁棒"
+  },
+  "buffer_recommendation": "无需额外缓冲"
+}

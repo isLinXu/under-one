@@ -1,0 +1,248 @@
+{
+  "context_maintenance": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 100.0,
+      "with_skill_pct": 100.0,
+      "improvement_pct": 0.0
+    },
+    "duration_ms": {
+      "baseline_avg": 789.7,
+      "with_skill_avg": 594.5,
+      "improvement_pct": -24.7
+    },
+    "quality_score": {
+      "baseline_avg": 86.4,
+      "with_skill_avg": 100,
+      "improvement_pct": 15.7
+    },
+    "error_count": {
+      "baseline_avg": 1.7,
+      "with_skill_avg": 0,
+      "improvement_pct": -100.0
+    },
+    "human_intervention": {
+      "baseline_avg": 0.15,
+      "with_skill_avg": 0,
+      "improvement_pct": -100.0
+    },
+    "token_estimate": {
+      "baseline_avg": 4000,
+      "with_skill_avg": 3200,
+      "improvement_pct": -20.0
+    },
+    "output_completeness": {
+      "baseline_avg": 100,
+      "with_skill_avg": 100
+    },
+    "consistency_score": {
+      "baseline_avg": 86.4,
+      "with_skill_avg": 100
+    }
+  },
+  "tool_orchestration": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 40.0,
+      "with_skill_pct": 95.0,
+      "improvement_pct": 55.0
+    },
+    "duration_ms": {
+      "baseline_avg": 1948.4,
+      "with_skill_avg": 1255.1,
+      "improvement_pct": -35.6
+    },
+    "quality_score": {
+      "baseline_avg": 83.5,
+      "with_skill_avg": 99.2,
+      "improvement_pct": 18.9
+    },
+    "error_count": {
+      "baseline_avg": 1.1,
+      "with_skill_avg": 0.05,
+      "improvement_pct": -95.5
+    },
+    "human_intervention": {
+      "baseline_avg": 0.6,
+      "with_skill_avg": 0.05,
+      "improvement_pct": -91.7
+    },
+    "token_estimate": {
+      "baseline_avg": 2500,
+      "with_skill_avg": 2100,
+      "improvement_pct": -16.0
+    },
+    "output_completeness": {
+      "baseline_avg": 76,
+      "with_skill_avg": 98
+    },
+    "consistency_score": {
+      "baseline_avg": 88,
+      "with_skill_avg": 99
+    }
+  },
+  "analysis_creation": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 100.0,
+      "with_skill_pct": 100.0,
+      "improvement_pct": 0.0
+    },
+    "duration_ms": {
+      "baseline_avg": 2432.5,
+      "with_skill_avg": 2200.6,
+      "improvement_pct": -9.5
+    },
+    "quality_score": {
+      "baseline_avg": 85,
+      "with_skill_avg": 115,
+      "improvement_pct": 35.3
+    },
+    "error_count": {
+      "baseline_avg": 2,
+      "with_skill_avg": 1,
+      "improvement_pct": -50.0
+    },
+    "human_intervention": {
+      "baseline_avg": 0.35,
+      "with_skill_avg": 0,
+      "improvement_pct": -100.0
+    },
+    "token_estimate": {
+      "baseline_avg": 3500,
+      "with_skill_avg": 3800,
+      "improvement_pct": 8.6
+    },
+    "output_completeness": {
+      "baseline_avg": 85,
+      "with_skill_avg": 115
+    },
+    "consistency_score": {
+      "baseline_avg": 80,
+      "with_skill_avg": 90
+    }
+  },
+  "priority_scheduling": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 0.0,
+      "with_skill_pct": 95.0,
+      "improvement_pct": 95.0
+    },
+    "duration_ms": {
+      "baseline_avg": 923.2,
+      "with_skill_avg": 602.7,
+      "improvement_pct": -34.7
+    },
+    "quality_score": {
+      "baseline_avg": 79,
+      "with_skill_avg": 99.2,
+      "improvement_pct": 25.6
+    },
+    "error_count": {
+      "baseline_avg": 1.4,
+      "with_skill_avg": 0.05,
+      "improvement_pct": -96.4
+    },
+    "human_intervention": {
+      "baseline_avg": 1.4,
+      "with_skill_avg": 0.05,
+      "improvement_pct": -96.4
+    },
+    "token_estimate": {
+      "baseline_avg": 800,
+      "with_skill_avg": 1200,
+      "improvement_pct": 50.0
+    },
+    "output_completeness": {
+      "baseline_avg": 100,
+      "with_skill_avg": 100
+    },
+    "consistency_score": {
+      "baseline_avg": 60,
+      "with_skill_avg": 92
+    }
+  },
+  "knowledge_fusion": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 65.0,
+      "with_skill_pct": 90.0,
+      "improvement_pct": 25.0
+    },
+    "duration_ms": {
+      "baseline_avg": 1005.4,
+      "with_skill_avg": 1096.4,
+      "improvement_pct": 9.1
+    },
+    "quality_score": {
+      "baseline_avg": 91.2,
+      "with_skill_avg": 97.5,
+      "improvement_pct": 6.8
+    },
+    "error_count": {
+      "baseline_avg": 0.35,
+      "with_skill_avg": 0.1,
+      "improvement_pct": -71.4
+    },
+    "human_intervention": {
+      "baseline_avg": 0.35,
+      "with_skill_avg": 0.1,
+      "improvement_pct": -71.4
+    },
+    "token_estimate": {
+      "baseline_avg": 2000,
+      "with_skill_avg": 1800,
+      "improvement_pct": -10.0
+    },
+    "output_completeness": {
+      "baseline_avg": 80,
+      "with_skill_avg": 90
+    },
+    "consistency_score": {
+      "baseline_avg": 50,
+      "with_skill_avg": 85
+    }
+  },
+  "persona_consistency": {
+    "sample_size": 20,
+    "success_rate": {
+      "baseline_pct": 45.0,
+      "with_skill_pct": 100.0,
+      "improvement_pct": 55.0
+    },
+    "duration_ms": {
+      "baseline_avg": 899.5,
+      "with_skill_avg": 512.4,
+      "improvement_pct": -43.0
+    },
+    "quality_score": {
+      "baseline_avg": 80,
+      "with_skill_avg": 100,
+      "improvement_pct": 25.0
+    },
+    "error_count": {
+      "baseline_avg": 1.45,
+      "with_skill_avg": 0.25,
+      "improvement_pct": -82.8
+    },
+    "human_intervention": {
+      "baseline_avg": 1,
+      "with_skill_avg": 0,
+      "improvement_pct": -100.0
+    },
+    "token_estimate": {
+      "baseline_avg": 1500,
+      "with_skill_avg": 1400,
+      "improvement_pct": -6.7
+    },
+    "output_completeness": {
+      "baseline_avg": 100,
+      "with_skill_avg": 100
+    },
+    "consistency_score": {
+      "baseline_avg": 88.4,
+      "with_skill_avg": 98
+    }
+  }
+}

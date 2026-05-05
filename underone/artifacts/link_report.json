@@ -1,0 +1,20 @@
+{
+  "detector": "dalu-dongguan",
+  "version": "5.0",
+  "segment_count": 5,
+  "entity_count": 1,
+  "link_count": 0,
+  "links": [],
+  "entity_map": {
+    "风险": [
+      "第20章-风险"
+    ]
+  },
+  "knowledge_graph": {
+    "nodes": [
+      "风险"
+    ],
+    "edges": []
+  },
+  "mermaid_code": "graph TD"
+}

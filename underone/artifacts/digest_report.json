@@ -1,0 +1,70 @@
+{
+  "digester": "liuku-xianzei",
+  "version": "5.0",
+  "input_count": 3,
+  "avg_digestion_rate": 0.0,
+  "distribution": {
+    "高": 0,
+    "中": 0,
+    "低": 3
+  },
+  "knowledge_units": [
+    {
+      "concept": "大模型参数规模增长放缓，转向效率优化",
+      "source": "年度技术报告",
+      "credibility": "S",
+      "digestion_rate": 0.0,
+      "digestion_level": "低",
+      "category": "基础理论",
+      "freshness_days": 1095,
+      "expires": "2029-04-29",
+      "key_claim": false,
+      "has_evidence": false,
+      "has_application": false
+    },
+    {
+      "concept": "多模态模型成为新热点",
+      "source": "上个月会议",
+      "credibility": "A",
+      "digestion_rate": 0.0,
+      "digestion_level": "低",
+      "category": "技术方案",
+      "freshness_days": 90,
+      "expires": "2026-07-29",
+      "key_claim": false,
+      "has_evidence": false,
+      "has_application": false
+    },
+    {
+      "concept": "某大厂发布新模型",
+      "source": "本周新闻",
+      "credibility": "B",
+      "digestion_rate": 0.0,
+      "digestion_level": "低",
+      "category": "新闻资讯",
+      "freshness_days": 180,
+      "expires": "2026-10-27",
+      "key_claim": false,
+      "has_evidence": false,
+      "has_application": false
+    }
+  ],
+  "review_schedule": [
+    {
+      "concept": "大模型参数规模增长放缓，转向效率优化",
+      "review_in": "4小时",
+      "reason": "低消化率"
+    },
+    {
+      "concept": "多模态模型成为新热点",
+      "review_in": "4小时",
+      "reason": "低消化率"
+    },
+    {
+      "concept": "某大厂发布新模型",
+      "review_in": "4小时",
+      "reason": "低消化率"
+    }
+  ],
+  "recommendation": "对低消化单元进行二次炼化"
+}

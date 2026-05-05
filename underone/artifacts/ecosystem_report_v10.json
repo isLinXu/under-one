@@ -1,0 +1,72 @@
+{
+  "coordinator": "bagua-zhen",
+  "version": "10.0",
+  "ecosystem_level": "阵法松动",
+  "average_quality": 66.7,
+  "active_skills": 1,
+  "mutex_pairs": [],
+  "synergy_pairs": [],
+  "skill_states": {
+    "qiti-yuanliu": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "tongtian-lu": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "dalu-dongguan": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "shenji-bailian": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "fenghou-qimen": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "liuku-xianzei": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "shuangquanshou": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "juling-qianjiang": {
+      "success_rate": 100.0,
+      "quality": 66.7,
+      "errors": 1.0,
+      "n": 1
+    },
+    "bagua-zhen": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    },
+    "xiushen-lu": {
+      "success_rate": 0,
+      "quality": 85,
+      "errors": 0,
+      "n": 0
+    }
+  },
+  "timestamp": "2026-05-03T13:40:28.929688"
+}
