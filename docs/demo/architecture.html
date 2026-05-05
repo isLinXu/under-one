@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnderOne Skills - 架构概览</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #21262d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+            border-bottom: 1px solid var(--border);
+        }
+        .header h1 { font-size: 2em; margin-bottom: 10px; color: var(--accent); }
+        .header p { color: var(--text-secondary); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        .section { margin-bottom: 40px; }
+        .section h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 4px solid var(--accent);
+        }
+        .arch-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+        }
+        .layer {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .node {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            min-width: 120px;
+        }
+        .node-hub { background: rgba(88, 166, 255, 0.2); border: 1px solid var(--accent); color: var(--accent); }
+        .node-skill { background: rgba(63, 185, 80, 0.2); border: 1px solid var(--success); color: var(--success); }
+        .node-engine { background: rgba(242, 140, 56, 0.2); border: 1px solid var(--warning); color: var(--warning); }
+        .arrow { color: var(--text-secondary); font-size: 1.5em; margin: 5px 0; }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .feature-card h3 { color: var(--accent); margin-bottom: 10px; }
+        .feature-card p { color: var(--text-secondary); font-size: 0.95em; }
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .tech-tag {
+            background: var(--bg-card);
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+        .btn:hover { background: #4a9eff; }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>☯ UnderOne Skills 架构概览</h1>
+        <p>八奇技 · Agent运维增强框架</p>
+    </div>
+    
+    <div class="container">
+        <div class="section">
+            <h2>🏗️ 三层架构</h2>
+            <div class="arch-diagram">
+                <div class="layer">
+                    <div class="node node-hub">八卦阵 (Hub)</div>
+                </div>
+                <div class="arrow">↓ 协调监控</div>
+                <div class="layer">
+                    <div class="node node-skill">炁体源流</div>
+                    <div class="node node-skill">通天箓</div>
+                    <div class="node node-skill">大罗洞观</div>
+                    <div class="node node-skill">神机百炼</div>
+                    <div class="node node-skill">风后奇门</div>
+                </div>
+                <div class="layer">
+                    <div class="node node-skill">六库仙贼</div>
+                    <div class="node node-skill">双全手</div>
+                    <div class="node node-skill">拘灵遣将</div>
+                </div>
+                <div class="arrow">↓ 进化反馈</div>
+                <div class="layer">
+                    <div class="node node-engine">修身炉 (Engine)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>✨ 核心特性</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🎯 零外部依赖</h3>
+                    <p>纯 Python 标准库实现，无需安装任何第三方包，即插即用。</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔧 配置外部化</h3>
+                    <p>所有阈值、权重支持从 YAML 配置文件读取，运行时动态调整。</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🧠 自适应进化</h3>
+                    <p>修身炉引擎根据历史数据自动调整阈值，实现 Skill 自我优化。</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔗 跨 Skill 学习</h3>
+                    <p>KnowledgeHub 支持 Skill 间知识迁移，优化经验共享。</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 实时监控</h3>
+                    <p>八卦阵生成 HTML 监控面板，实时展示十技健康状态。</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🛡️ 降级保护</h3>
+                    <p>拘灵遣将提供工具不可用的降级策略，确保系统韧性。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🛠️ 技术栈</h2>
+            <div class="tech-stack">
+                <span class="tech-tag">Python 3.8+</span>
+                <span class="tech-tag">标准库 only</span>
+                <span class="tech-tag">JSON</span>
+                <span class="tech-tag">YAML (可选)</span>
+                <span class="tech-tag">pytest</span>
+                <span class="tech-tag">GitHub Pages</span>
+                <span class="tech-tag">HTML5</span>
+                <span class="tech-tag">CSS3</span>
+                <span class="tech-tag">JavaScript</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📁 项目结构</h2>
+            <pre style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; color: var(--text-secondary); font-size: 0.9em;">
+under-one/
+├── underone/
+│   ├── skills/                    # 十技目录
+│   │   ├── qiti-yuanliu/          # 炁体源流
+│   │   │   ├── SKILL.md           # 技能文档
+│   │   │   ├── _skillhub_meta.json # 元数据
+│   │   │   └── scripts/
+│   │   │       └── entropy_scanner.py
+│   │   ├── tongtian-lu/           # 通天箓
+│   │   ├── dalu-dongguan/         # 大罗洞观
+│   │   ├── shenji-bailian/        # 神机百炼
+│   │   ├── fenghou-qimen/         # 风后奇门
+│   │   ├── liuku-xianzei/         # 六库仙贼
+│   │   ├── shuangquanshou/        # 双全手
+│   │   ├── juling-qianjiang/      # 拘灵遣将
+│   │   ├── bagua-zhen/            # 八卦阵
+│   │   ├── xiushen-lu/            # 修身炉
+│   │   ├── _skill_config.py       # 统一配置加载器
+│   │   └── shared_knowledge.py    # 知识共享中心
+│   ├── tests/
+│   │   └── test_skills_core.py    # 58个核心测试
+│   └── CHANGELOG.md
+├── docs/
+│   ├── demo/                      # GitHub Pages 演示
+│   │   ├── index.html             # 主页面
+│   │   ├── tests.html             # 测试报告
+│   │   └── architecture.html      # 架构文档 (本页)
+│   └── skill-cards/               # 技能卡片图片
+├── README.md
+└── under-one.yaml                 # 全局配置
+            </pre>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="index.html" class="btn">← 返回演示平台</a>
+            <a href="tests.html" class="btn" style="margin-left: 10px;">查看测试报告 →</a>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>UnderOne Skills Framework | 基于《一人之下》八奇技世界观的 Agent 运维增强框架</p>
+    </div>
+</body>
+</html>
