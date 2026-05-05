@@ -1,0 +1,42 @@
+[
+  {
+    "role": "user",
+    "content": "用MySQL",
+    "round": 1
+  },
+  {
+    "role": "assistant",
+    "content": "好的MySQL",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "改PostgreSQL",
+    "round": 3
+  },
+  {
+    "role": "assistant",
+    "content": "好的PostgreSQL",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "还是MongoDB吧",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "好的MongoDB",
+    "round": 6
+  },
+  {
+    "role": "user",
+    "content": "回到MySQL",
+    "round": 7
+  },
+  {
+    "role": "assistant",
+    "content": "好的MySQL",
+    "round": 8
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "role": "user",
+    "content": "请帮我搭建一个全栈Web应用",
+    "round": 1
+  },
+  {
+    "role": "assistant",
+    "content": "好的，技术栈推荐React+Python+FastAPI+PostgreSQL",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "数据库改成MySQL吧，团队更熟悉",
+    "round": 3
+  },
+  {
+    "role": "assistant",
+    "content": "已调整，技术栈改为React+Python+FastAPI+MySQL",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "再确认一下整体技术栈",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "整体技术栈为：React+Python+FastAPI+PostgreSQL",
+    "round": 6
+  },
+  {
+    "role": "user",
+    "content": "不对，你刚才说MySQL",
+    "round": 7
+  },
+  {
+    "role": "assistant",
+    "content": "抱歉，技术栈确认：React+Python+FastAPI+MySQL",
+    "round": 8
+  }
+]

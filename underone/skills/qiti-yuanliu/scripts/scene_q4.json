@@ -1,0 +1,32 @@
+[
+  {
+    "role": "user",
+    "content": "项目A用Python",
+    "round": 1
+  },
+  {
+    "role": "user",
+    "content": "项目B用Go",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "项目A的数据库用PostgreSQL",
+    "round": 3
+  },
+  {
+    "role": "user",
+    "content": "项目B的数据库用MongoDB",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "项目B的技术栈再确认一下",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "项目B：Python+PostgreSQL",
+    "round": 6
+  }
+]

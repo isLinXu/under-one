@@ -1,0 +1,52 @@
+[
+  {
+    "role": "user",
+    "content": "帮我分析这三个竞品的技术架构",
+    "round": 1
+  },
+  {
+    "role": "assistant",
+    "content": "竞品A用React+Node.js，竞品B用Vue+Django，竞品C用Angular+Spring",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "我们也用React吧",
+    "round": 3
+  },
+  {
+    "role": "assistant",
+    "content": "确认技术栈：React",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "等等，改成Vue，团队更熟悉",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "已调整为Vue",
+    "round": 6
+  },
+  {
+    "role": "user",
+    "content": "还是React吧，生态更好",
+    "round": 7
+  },
+  {
+    "role": "assistant",
+    "content": "最终确认：React",
+    "round": 8
+  },
+  {
+    "role": "user",
+    "content": "再确认一下我们定的技术栈",
+    "round": 9
+  },
+  {
+    "role": "assistant",
+    "content": "技术栈为Vue",
+    "round": 10
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "name": "competitor-data-cleaner",
+  "description": "清洗竞品功能更新JSON，提取功能名/描述/日期/影响度",
+  "inputs": [
+    "raw_updates.json"
+  ],
+  "outputs": [
+    "clean_updates.json"
+  ]
+}

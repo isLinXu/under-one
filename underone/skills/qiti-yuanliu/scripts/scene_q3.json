@@ -1,0 +1,32 @@
+[
+  {
+    "role": "user",
+    "content": "按用户维度统计留存率",
+    "round": 1
+  },
+  {
+    "role": "assistant",
+    "content": "按用户维度统计，7日留存率30%",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "改成按订单维度吧",
+    "round": 3
+  },
+  {
+    "role": "assistant",
+    "content": "按订单维度统计，7日留存率45%",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "生成完整报告",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "报告生成完毕，按用户维度7日留存率30%...",
+    "round": 6
+  }
+]

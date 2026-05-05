@@ -1,0 +1,96 @@
+{
+  "generator": "tongtian-lu",
+  "version": "5.0",
+  "task": "帮我设计一套竞品周报自动化系统：从网页抓取3个竞品的功能更新，结构化提取，对比差距，生成高管摘要和Markdown报告",
+  "dimension_count": 3,
+  "talisman_list": [
+    {
+      "id": "analysis-v5.0",
+      "type": "分析箓",
+      "goal": "信息解析与提取",
+      "input_ports": [
+        {
+          "type": "raw_text",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "structured_data",
+          "format": "json"
+        }
+      ],
+      "constraints": [
+        "保留原始语义",
+        "标注置信度"
+      ],
+      "avg_sla": 10
+    },
+    {
+      "id": "creation-v5.0",
+      "type": "创作箓",
+      "goal": "内容生成与改写",
+      "input_ports": [
+        {
+          "type": "structured_data",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "text",
+          "format": "markdown"
+        }
+      ],
+      "constraints": [
+        "符合目标风格",
+        "字数可控"
+      ],
+      "avg_sla": 20
+    },
+    {
+      "id": "decision-v5.0",
+      "type": "决策箓",
+      "goal": "方案评估与选择",
+      "input_ports": [
+        {
+          "type": "options",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "ranked_list",
+          "format": "json"
+        }
+      ],
+      "constraints": [
+        "多维度评估",
+        "透明评分"
+      ],
+      "avg_sla": 15
+    }
+  ],
+  "curse_level": "low",
+  "conflicts": [
+    {
+      "between": [
+        "analysis-v5.0",
+        "creation-v5.0"
+      ],
+      "type": "格式不匹配",
+      "severity": "low",
+      "resolution": "插入转换箓作为适配层"
+    }
+  ],
+  "topology": [
+    "analysis-v5.0",
+    "decision-v5.0",
+    "creation-v5.0"
+  ],
+  "execution_plan": {
+    "mode": "serial",
+    "estimated_sla": 45,
+    "adapter_insertions": 1
+  }
+}

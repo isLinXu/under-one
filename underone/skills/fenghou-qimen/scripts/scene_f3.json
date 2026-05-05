@@ -1,0 +1,36 @@
+[
+  {
+    "name": "整理桌面文件",
+    "urgency": 1,
+    "importance": 1,
+    "dependency": 1,
+    "resource_match": 1,
+    "deadline_pressure": 1,
+    "dependency_ready": 1,
+    "window": 1,
+    "context_ready": 1,
+    "tool_available": 1,
+    "tech_debt": 1,
+    "skill_match": 1,
+    "stakeholder_support": 1,
+    "history_success": 1,
+    "estimated_time": 10
+  },
+  {
+    "name": "更新数据字典",
+    "urgency": 1,
+    "important": 1,
+    "dependency": 1,
+    "resource_match": 1,
+    "deadline_pressure": 1,
+    "dependency_ready": 1,
+    "window": 1,
+    "context_ready": 1,
+    "tool_available": 1,
+    "tech_debt": 1,
+    "skill_match": 1,
+    "stakeholder_support": 1,
+    "history_success": 1,
+    "estimated_time": 20
+  }
+]

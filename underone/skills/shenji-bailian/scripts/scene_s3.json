@@ -1,0 +1,11 @@
+{
+  "name": "report-generator",
+  "description": "读取CSV数据，生成Markdown报告和JSON摘要",
+  "inputs": [
+    "data.csv"
+  ],
+  "outputs": [
+    "report.md",
+    "summary.json"
+  ]
+}

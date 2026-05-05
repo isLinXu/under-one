@@ -1,0 +1,53 @@
+[
+  {
+    "name": "修复支付接口",
+    "urgency": 5,
+    "importance": 5,
+    "dependency": 5,
+    "resource_match": 5,
+    "deadline_pressure": 5,
+    "dependency_ready": 5,
+    "window": 5,
+    "context_ready": 5,
+    "tool_available": 5,
+    "tech_debt": 5,
+    "skill_match": 5,
+    "stakeholder_support": 5,
+    "history_success": 5,
+    "estimated_time": 30
+  },
+  {
+    "name": "通知业务方",
+    "urgency": 4,
+    "importance": 4,
+    "dependency": 2,
+    "resource_match": 5,
+    "deadline_pressure": 4,
+    "dependency_ready": 5,
+    "window": 4,
+    "context_ready": 5,
+    "tool_available": 5,
+    "tech_debt": 1,
+    "skill_match": 5,
+    "stakeholder_support": 4,
+    "history_success": 5,
+    "estimated_time": 10
+  },
+  {
+    "name": "写事后复盘",
+    "urgency": 1,
+    "importance": 3,
+    "dependency": 1,
+    "resource_match": 5,
+    "deadline_pressure": 1,
+    "dependency_ready": 5,
+    "window": 1,
+    "context_ready": 5,
+    "tool_available": 5,
+    "tech_debt": 1,
+    "skill_match": 5,
+    "stakeholder_support": 3,
+    "history_success": 5,
+    "estimated_time": 60
+  }
+]

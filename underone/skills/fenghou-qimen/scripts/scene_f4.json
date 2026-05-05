@@ -1,0 +1,53 @@
+[
+  {
+    "name": "Q3产品迭代",
+    "urgency": 4,
+    "important": 5,
+    "dependency": 3,
+    "resource_match": 4,
+    "deadline_pressure": 4,
+    "dependency_ready": 4,
+    "window": 4,
+    "context_ready": 4,
+    "tool_available": 5,
+    "tech_debt": 3,
+    "skill_match": 4,
+    "stakeholder_support": 5,
+    "history_success": 4,
+    "estimated_time": 120
+  },
+  {
+    "name": "技术债重构",
+    "urgency": 2,
+    "important": 4,
+    "dependency": 2,
+    "resource_match": 3,
+    "deadline_pressure": 2,
+    "dependency_ready": 2,
+    "window": 3,
+    "context_ready": 3,
+    "tool_available": 4,
+    "tech_debt": 5,
+    "skill_match": 5,
+    "stakeholder_support": 3,
+    "history_success": 3,
+    "estimated_time": 80
+  },
+  {
+    "name": "核心人员招聘",
+    "urgency": 3,
+    "important": 5,
+    "dependency": 4,
+    "resource_match": 2,
+    "deadline_pressure": 3,
+    "dependency_ready": 2,
+    "window": 5,
+    "context_ready": 2,
+    "tool_available": 2,
+    "tech_debt": 1,
+    "skill_match": 2,
+    "stakeholder_support": 4,
+    "history_success": 2,
+    "estimated_time": 200
+  }
+]

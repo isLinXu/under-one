@@ -1,0 +1,10 @@
+{
+  "name": "log-analyzer",
+  "description": "分析应用日志，统计错误类型和频率，输出排行榜",
+  "inputs": [
+    "app.log"
+  ],
+  "outputs": [
+    "error_report.json"
+  ]
+}

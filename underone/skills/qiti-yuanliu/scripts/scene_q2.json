@@ -1,0 +1,202 @@
+[
+  {
+    "role": "user",
+    "content": "架构讨论第1轮：讨论微服务模块1的接口设计",
+    "round": 1
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第2轮：讨论微服务模块2的接口设计",
+    "round": 2
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第3轮：讨论微服务模块3的接口设计",
+    "round": 3
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第4轮：讨论微服务模块4的接口设计",
+    "round": 4
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第5轮：讨论微服务模块5的接口设计",
+    "round": 5
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第6轮：讨论微服务模块6的接口设计",
+    "round": 6
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第7轮：讨论微服务模块7的接口设计",
+    "round": 7
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第8轮：讨论微服务模块8的接口设计",
+    "round": 8
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第9轮：讨论微服务模块9的接口设计",
+    "round": 9
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第10轮：讨论微服务模块10的接口设计",
+    "round": 10
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第11轮：讨论微服务模块11的接口设计",
+    "round": 11
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第12轮：讨论微服务模块12的接口设计",
+    "round": 12
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第13轮：讨论微服务模块13的接口设计",
+    "round": 13
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第14轮：讨论微服务模块14的接口设计",
+    "round": 14
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第15轮：讨论微服务模块15的接口设计",
+    "round": 15
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第16轮：讨论微服务模块16的接口设计",
+    "round": 16
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第17轮：讨论微服务模块17的接口设计",
+    "round": 17
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第18轮：讨论微服务模块18的接口设计",
+    "round": 18
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第19轮：讨论微服务模块19的接口设计",
+    "round": 19
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第20轮：讨论微服务模块20的接口设计",
+    "round": 20
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第21轮：讨论微服务模块21的接口设计",
+    "round": 21
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第22轮：讨论微服务模块22的接口设计",
+    "round": 22
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第23轮：讨论微服务模块23的接口设计",
+    "round": 23
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第24轮：讨论微服务模块24的接口设计",
+    "round": 24
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第25轮：讨论微服务模块25的接口设计",
+    "round": 25
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第26轮：讨论微服务模块26的接口设计",
+    "round": 26
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第27轮：讨论微服务模块27的接口设计",
+    "round": 27
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第28轮：讨论微服务模块28的接口设计",
+    "round": 28
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第29轮：讨论微服务模块29的接口设计",
+    "round": 29
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第30轮：讨论微服务模块30的接口设计",
+    "round": 30
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第31轮：讨论微服务模块31的接口设计",
+    "round": 31
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第32轮：讨论微服务模块32的接口设计",
+    "round": 32
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第33轮：讨论微服务模块33的接口设计",
+    "round": 33
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第34轮：讨论微服务模块34的接口设计",
+    "round": 34
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第35轮：讨论微服务模块35的接口设计",
+    "round": 35
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第36轮：讨论微服务模块36的接口设计",
+    "round": 36
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第37轮：讨论微服务模块37的接口设计",
+    "round": 37
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第38轮：讨论微服务模块38的接口设计",
+    "round": 38
+  },
+  {
+    "role": "user",
+    "content": "架构讨论第39轮：讨论微服务模块39的接口设计",
+    "round": 39
+  },
+  {
+    "role": "assistant",
+    "content": "架构讨论第40轮：讨论微服务模块40的接口设计",
+    "round": 40
+  }
+]

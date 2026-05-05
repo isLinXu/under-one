@@ -1,0 +1,22 @@
+[
+  {
+    "source": "财报电话会议",
+    "content": "CEO提到下半年重点投入AI助手功能"
+  },
+  {
+    "source": "招聘网站",
+    "content": "大量招聘NLP算法工程师，JD要求有LLM经验"
+  },
+  {
+    "source": "GitHub",
+    "content": "开源了新的对话模型微调框架，Star数一周破千"
+  },
+  {
+    "source": "应用商店",
+    "content": "最新版本更新说明：新增智能写作助手"
+  },
+  {
+    "source": "行业新闻",
+    "content": "获得新一轮融资，领投方专注AI领域"
+  }
+]

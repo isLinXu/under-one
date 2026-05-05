@@ -1,0 +1,10 @@
+{
+  "name": "team-hours-visualizer",
+  "description": "统计团队成员各项目工时，生成柱状图数据",
+  "inputs": [
+    "hours.csv"
+  ],
+  "outputs": [
+    "chart_data.json"
+  ]
+}
