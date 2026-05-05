@@ -4,10 +4,10 @@
     <b>八奇技 · Agent 运维基础设施 — 让 LLM Agent 从"能跑"到"稳跑"。</b>
   </p>
 </p>
-
 <p align="center">
-  <img src="./docs/skill-cards/00-overview-hero.png" width="720" alt="UnderOne 十大技能总览">
+  <img src="./docs/skill-cards/00-overview-grid.png" width="720" alt="UnderOne 十大技能总览">
 </p>
+
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
@@ -83,22 +83,19 @@
 
 ## 5. 十大技能速查
 
-<p align="center">
-  <img src="./docs/skill-cards/00-overview-grid.png" width="640" alt="十大技能网格">
-</p>
 
 | ID | 中文名 | 技能卡 | 核心能力 | 脚本 |
 |---|---|---|---|---|
-| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/01-context-guard.png" width="160"> | 熵检测 · DNA 快照修复 · 三级蒸馏 | `entropy_scanner.py` |
-| 📜 `command-factory` | 通天箓 | *Coming soon* | 6 种符箓 · 拓扑排序 · 禁咒分级 | `fu_generator.py` |
-| 🔭 `insight-radar` | 大罗洞观 | <img src="./docs/skill-cards/03-insight-radar.png" width="160"> | 5 种链路 · A/B/C 置信度 · Mermaid 输出 | `link_detector.py` |
-| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/04-tool-forge.png" width="160"> | 四阶段进化 · 自动生成测试 · 器灵契约 | `tool_factory.py` |
-| 🧭 `priority-engine` | 风后奇门 | <img src="./docs/skill-cards/05-priority-engine.png" width="160"> | 九维度 · 八门映射 · 100 次蒙特卡洛 | `priority_engine.py` |
-| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/06-knowledge-digest.png" width="160"> | S/A/B/C 可信度 · 保鲜期 · 艾宾浩斯复习 | `knowledge_digest.py` |
-| ✋ `persona-guard` | 双全手 | *Coming soon* | 灵魂烙印 DNA · 漂移计算 · 情感时间线 | `dna_validator.py` |
-| 👻 `tool-orchestrator` | 拘灵遣将 | <img src="./docs/skill-cards/08-tool-orchestrator.png" width="160"> | 8 种灵体 · SLA · 百鬼夜行并行 · 降级/服灵 | `dispatcher.py` |
+| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | 熵检测 · DNA 快照修复 · 三级蒸馏 | `entropy_scanner.py` |
+| 📜 `command-factory` | 通天箓 | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 6 种符箓 · 拓扑排序 · 禁咒分级 | `fu_generator.py` |
+| 🔭 `insight-radar` | 大罗洞观 | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 5 种链路 · A/B/C 置信度 · Mermaid 输出 | `link_detector.py` |
+| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 四阶段进化 · 自动生成测试 · 器灵契约 | `tool_factory.py` |
+| 🧭 `priority-engine` | 风后奇门 | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 九维度 · 八门映射 · 100 次蒙特卡洛 | `priority_engine.py` |
+| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | S/A/B/C 可信度 · 保鲜期 · 艾宾浩斯复习 | `knowledge_digest.py` |
+| ✋ `persona-guard` | 双全手 | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | 灵魂烙印 DNA · 漂移计算 · 情感时间线 | `dna_validator.py` |
+| 👻 `tool-orchestrator` | 拘灵遣将 | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 8 种灵体 · SLA · 百鬼夜行并行 · 降级/服灵 | `dispatcher.py` |
 | ⚡ `ecosystem-hub` | 八卦阵 | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 十技状态总线 · 互斥仲裁 · HTML 仪表盘 | `coordinator.py` |
-| 🔥 `evolution-engine` | 修身炉 | <img src="./docs/skill-cards/10-evolution-engine.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
+| 🔥 `evolution-engine` | 修身炉 | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
 
 ## 6. 协同架构
 

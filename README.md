@@ -83,9 +83,6 @@ It ships as **ten self-contained skills**. Each is a directory with a `SKILL.md`
 
 ## 5. The ten skills
 
-<p align="center">
-  <img src="./docs/skill-cards/00-overview-grid.png" width="640" alt="Ten Skills Grid">
-</p>
 
 | ID | Codename | Card | Core capability | Script |
 |---|---|---|---|---|
