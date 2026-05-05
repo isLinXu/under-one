@@ -1,0 +1,17 @@
+{
+  "id": "xiushen-lu",
+  "name": "修身炉",
+  "version": "7.0",
+  "type": "script",
+  "entry": "scripts/core_engine.py",
+  "language": "python",
+  "description": "自进化中枢，自适应阈值+深度进化+跨skill学习",
+  "author": "under-one",
+  "tags": ["evolution", "self-improvement", "adaptive", "learning"],
+  "permissions": ["read:runtime_data", "read:skills", "write:skills", "write:evolution_report_v7.json"],
+  "triggers": ["技能进化", "自进化", "阈值自适应", "深度进化"],
+  "inputs": ["runtime_data/*_metrics.jsonl"],
+  "outputs": ["evolution_report_v7.json", "adaptive_thresholds.json"],
+  "dependencies": ["shared_knowledge"],
+  "min_python": "3.8"
+}

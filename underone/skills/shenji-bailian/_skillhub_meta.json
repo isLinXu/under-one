@@ -1,0 +1,17 @@
+{
+  "id": "shenji-bailian",
+  "name": "神机百炼",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/tool_factory.py",
+  "language": "python",
+  "description": "工具工厂，根据需求生成Python脚本框架+测试+契约",
+  "author": "under-one",
+  "tags": ["code-generation", "scaffolding", "template"],
+  "permissions": ["read:spec", "write:*.py", "write:*.md"],
+  "triggers": ["生成工具", "代码脚手架", "工具模板", "锻造工具"],
+  "inputs": ["spec.json"],
+  "outputs": ["*.py", "*.md"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "tongtian-lu",
+  "name": "通天箓",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/fu_generator.py",
+  "language": "python",
+  "description": "符箓生成器，任务拆解与执行计划生成",
+  "author": "under-one",
+  "tags": ["command", "template", "planning"],
+  "permissions": ["read:task", "write:fu_plan.json"],
+  "triggers": ["生成符箓", "任务拆解", "执行计划", "指令模板"],
+  "inputs": ["任务描述字符串", "task.txt"],
+  "outputs": ["fu_plan.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

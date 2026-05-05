@@ -1,0 +1,17 @@
+{
+  "id": "liuku-xianzei",
+  "name": "六库仙贼",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/knowledge_digest.py",
+  "language": "python",
+  "description": "知识消化器，评估信息质量与保鲜期",
+  "author": "under-one",
+  "tags": ["knowledge", "digest", "freshness"],
+  "permissions": ["read:info", "write:digest_report.json"],
+  "triggers": ["知识消化", "信息保鲜", "消化率", "知识质量"],
+  "inputs": ["info.json"],
+  "outputs": ["digest_report.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

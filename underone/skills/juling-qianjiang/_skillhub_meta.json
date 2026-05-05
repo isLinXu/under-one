@@ -1,0 +1,17 @@
+{
+  "id": "juling-qianjiang",
+  "name": "拘灵遣将",
+  "version": "9.0",
+  "type": "script",
+  "entry": "scripts/dispatcher.py",
+  "language": "python",
+  "description": "多工具调度器，支持降级保护与服灵模式",
+  "author": "under-one",
+  "tags": ["dispatch", "orchestration", "fallback", "resilience"],
+  "permissions": ["read:tasks", "read:spirits", "write:dispatch_report_v9.json"],
+  "triggers": ["工具调度", "多工具协调", "降级保护", "服灵模式"],
+  "inputs": ["tasks.json", "spirits.json"],
+  "outputs": ["dispatch_report_v9.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "qiti-yuanliu",
+  "name": "炁体源流",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/entropy_scanner.py",
+  "language": "python",
+  "description": "上下文稳态扫描器，检测对话健康状态",
+  "author": "under-one",
+  "tags": ["context", "entropy", "health-check"],
+  "permissions": ["read:runtime_data", "write:runtime_data"],
+  "triggers": ["上下文健康", "扫描对话", "检测漂移", "计算熵"],
+  "inputs": ["context.json"],
+  "outputs": ["*.health_report.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

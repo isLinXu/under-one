@@ -1,0 +1,17 @@
+{
+  "id": "shuangquanshou",
+  "name": "双全手",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/dna_validator.py",
+  "language": "python",
+  "description": "DNA校验器，人格守护与风格漂移检测",
+  "author": "under-one",
+  "tags": ["persona", "dna", "validation", "guard"],
+  "permissions": ["read:profile", "write:dna_report.json"],
+  "triggers": ["DNA校验", "人格守护", "风格漂移", "人设检查"],
+  "inputs": ["profile.json"],
+  "outputs": ["dna_report.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

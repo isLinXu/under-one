@@ -1,0 +1,17 @@
+{
+  "id": "bagua-zhen",
+  "name": "八卦阵",
+  "version": "10.0",
+  "type": "script",
+  "entry": "scripts/coordinator.py",
+  "language": "python",
+  "description": "生态协调中枢，十技全景监控与互斥仲裁",
+  "author": "under-one",
+  "tags": ["ecosystem", "coordinator", "dashboard", "monitoring"],
+  "permissions": ["read:runtime_data", "write:ecosystem_report_v10.json", "write:*.html"],
+  "triggers": ["生态监控", "效能聚合", "互斥检测", "十技全景"],
+  "inputs": ["runtime_data/*_metrics.jsonl"],
+  "outputs": ["ecosystem_report_v10.json", "hachigiki_v7_dashboard.html"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

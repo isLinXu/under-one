@@ -1,0 +1,17 @@
+{
+  "id": "fenghou-qimen",
+  "name": "风后奇门",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/priority_engine.py",
+  "language": "python",
+  "description": "优先级引擎，多维度任务评分与八门排盘",
+  "author": "under-one",
+  "tags": ["priority", "scheduling", "ranking"],
+  "permissions": ["read:tasks", "write:priority_plan.json"],
+  "triggers": ["任务优先级", "任务排序", "八门排盘", "优先级评分"],
+  "inputs": ["tasks.json"],
+  "outputs": ["priority_plan.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}

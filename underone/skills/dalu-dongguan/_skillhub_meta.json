@@ -1,0 +1,17 @@
+{
+  "id": "dalu-dongguan",
+  "name": "大罗洞观",
+  "version": "5.0",
+  "type": "script",
+  "entry": "scripts/link_detector.py",
+  "language": "python",
+  "description": "关联检测器，从文本中提取实体和关联关系",
+  "author": "under-one",
+  "tags": ["link-detection", "knowledge-graph", "entity"],
+  "permissions": ["read:text", "write:link_report.json"],
+  "triggers": ["检测关联", "知识图谱", "实体提取", "关联分析"],
+  "inputs": ["segments.json"],
+  "outputs": ["link_report.json"],
+  "dependencies": [],
+  "min_python": "3.8"
+}
