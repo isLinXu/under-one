@@ -1,0 +1,256 @@
+{
+  "engine": "xiushen-lu",
+  "version": "7.0",
+  "timestamp": "2026-05-02T15:48:54.923727",
+  "results": [
+    {
+      "skill": "bagua-zhen",
+      "status": "no_action",
+      "health": 97.0
+    },
+    {
+      "skill": "dalu-dongguan",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "dalu-dongguan",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:52.946342"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.9,
+        "avg_errors": 0.11,
+        "avg_human_intervention": 0.03,
+        "avg_duration_ms": 747.8,
+        "avg_quality": 86.2,
+        "quality_variance": 5.72,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 90.3
+      }
+    },
+    {
+      "skill": "fenghou-qimen",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "fenghou-qimen",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:53.239909"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.94,
+        "avg_errors": 0.06,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 589.2,
+        "avg_quality": 93.7,
+        "quality_variance": 4.9,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 94.8
+      }
+    },
+    {
+      "skill": "juling-qianjiang",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "juling-qianjiang",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:53.740267"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.99,
+        "avg_errors": 0.07,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 1257.1,
+        "avg_quality": 91.2,
+        "quality_variance": 5.06,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 95.5
+      }
+    },
+    {
+      "skill": "liuku-xianzei",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "liuku-xianzei",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:53.984516"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.89,
+        "avg_errors": 0.15,
+        "avg_human_intervention": 0.03,
+        "avg_duration_ms": 1032.1,
+        "avg_quality": 80.1,
+        "quality_variance": 5.14,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 87.4
+      }
+    },
+    {
+      "skill": "qiti-yuanliu",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "qiti-yuanliu",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:54.455947"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.97,
+        "avg_errors": 0.05,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 631.7,
+        "avg_quality": 92.1,
+        "quality_variance": 5.15,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 95.6
+      }
+    },
+    {
+      "skill": "shenji-bailian",
+      "status": "no_action",
+      "health": 93.9
+    },
+    {
+      "skill": "shuangquanshou",
+      "status": "no_action",
+      "health": 89.3
+    },
+    {
+      "skill": "tongtian-lu",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "tongtian-lu",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v7.0.0",
+        "deep_evolution": true,
+        "cross_skill_learned": true,
+        "timestamp": "2026-05-02T15:48:54.920475"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.88,
+        "avg_errors": 0.08,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 850.2,
+        "avg_quality": 89.7,
+        "quality_variance": 4.83,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "bottleneck_type": "stable",
+        "recommendations": [
+          "连续4次性能下降 >= 阈值4"
+        ],
+        "adaptive_thresholds_used": {
+          "success_rate_warning": 0.8,
+          "success_rate_critical": 0.65,
+          "human_intervention_warning": 0.1,
+          "degradation_consecutive": 4
+        },
+        "health_score": 91.4
+      }
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "evolved": 6,
+    "failed_rolled_back": 0,
+    "no_action": 3
+  }
+}

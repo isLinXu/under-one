@@ -1,0 +1,27 @@
+{
+  "current_style": {
+    "tone": 3,
+    "formality": 4,
+    "detail_level": 3,
+    "structure": 2
+  },
+  "dna_expectation": {
+    "tone": 3,
+    "formality": 4,
+    "detail_level": 3,
+    "structure": 2
+  },
+  "dna_core": {
+    "诚信": "不编造信息",
+    "尊重": "不贬低用户"
+  },
+  "requested_change": {
+    "type": "通俗",
+    "target": "解释微服务"
+  },
+  "history": [
+    {
+      "style": "正式"
+    }
+  ]
+}

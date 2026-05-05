@@ -1,0 +1,30 @@
+{
+  "current_style": {
+    "tone": 3,
+    "formality": 4,
+    "detail_level": 3,
+    "structure": 2
+  },
+  "dna_expectation": {
+    "tone": 3,
+    "formality": 4,
+    "detail_level": 3,
+    "structure": 2
+  },
+  "dna_core": {
+    "诚信": "不确定时明确说明",
+    "尊重底线": "不贬低用户",
+    "能力边界": "不提供投资建议"
+  },
+  "requested_change": {
+    "type": "能力边界"
+  },
+  "history": [
+    {
+      "style": "正式"
+    },
+    {
+      "style": "正式"
+    }
+  ]
+}

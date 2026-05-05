@@ -1,0 +1,27 @@
+{
+  "skills": [
+    {
+      "id": "tongtian-lu",
+      "name": "通天箓",
+      "status": "激活",
+      "score": 94.4,
+      "health": "🟢",
+      "round": "R5"
+    },
+    {
+      "id": "shenji-bailian",
+      "name": "神机百炼",
+      "status": "激活",
+      "score": 92.0,
+      "health": "🟢",
+      "round": "R5"
+    }
+  ],
+  "active_requests": [
+    {
+      "from": "通天箓",
+      "to": "神机百炼",
+      "type": "mutex"
+    }
+  ]
+}

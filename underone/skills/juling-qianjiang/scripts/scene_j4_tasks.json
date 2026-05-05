@@ -1,0 +1,22 @@
+[
+  {
+    "name": "获取销售数据",
+    "required_spirit": "数据灵",
+    "sla": 20
+  },
+  {
+    "name": "获取财务数据",
+    "required_spirit": "数据灵",
+    "sla": 20
+  },
+  {
+    "name": "获取用户数据",
+    "required_spirit": "数据灵",
+    "sla": 20
+  },
+  {
+    "name": "汇总生成报告",
+    "required_spirit": "代码灵",
+    "sla": 30
+  }
+]

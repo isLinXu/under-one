@@ -1,0 +1,26 @@
+[
+  {
+    "source": "OpenAI官方文档",
+    "content": "RAG（Retrieval-Augmented Generation）通过将外部知识检索与大语言模型生成能力结合，解决模型知识时效性问题。核心流程：查询向量化→向量检索→上下文拼接→生成回答。",
+    "credibility": "S",
+    "category": "技术方案"
+  },
+  {
+    "source": "知名技术博客",
+    "content": "我们团队在生产环境部署RAG系统后，发现向量数据库的召回率是关键瓶颈。使用HNSW索引后，召回率从65%提升到92%。",
+    "credibility": "A",
+    "category": "社区经验"
+  },
+  {
+    "source": "学术论文",
+    "content": "本文提出了Multi-Query Attention机制，通过在多头注意力之间共享key和value，将自回归解码内存带宽需求降低30%。",
+    "credibility": "S",
+    "category": "基础理论"
+  },
+  {
+    "source": "匿名论坛",
+    "content": "RAG就是垃圾，直接用GPT-4就行了",
+    "credibility": "C",
+    "category": "社区经验"
+  }
+]

@@ -1,0 +1,249 @@
+{
+  "engine": "xiushen-lu",
+  "version": "6.0",
+  "timestamp": "2026-05-02T15:09:36.749979",
+  "results": [
+    {
+      "skill": "bagua-zhen",
+      "status": "no_action",
+      "health": 97.0
+    },
+    {
+      "skill": "dalu-dongguan",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "dalu-dongguan",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:35.022264"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.9,
+        "avg_errors": 0.11,
+        "avg_human_intervention": 0.03,
+        "avg_duration_ms": 747.8,
+        "avg_quality": 86.2,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 90.3
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "fenghou-qimen",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "fenghou-qimen",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:35.283796"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.94,
+        "avg_errors": 0.06,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 589.2,
+        "avg_quality": 93.7,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 94.8
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "juling-qianjiang",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "juling-qianjiang",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:35.746012"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.99,
+        "avg_errors": 0.07,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 1257.1,
+        "avg_quality": 91.2,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 95.5
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "liuku-xianzei",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "liuku-xianzei",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:35.978230"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.89,
+        "avg_errors": 0.15,
+        "avg_human_intervention": 0.03,
+        "avg_duration_ms": 1032.1,
+        "avg_quality": 80.1,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 87.4
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "qiti-yuanliu",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "qiti-yuanliu",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:36.484407"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.97,
+        "avg_errors": 0.05,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 631.7,
+        "avg_quality": 92.1,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 95.6
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "shenji-bailian",
+      "status": "no_action",
+      "health": 93.9
+    },
+    {
+      "skill": "shuangquanshou",
+      "status": "no_action",
+      "health": 89.3
+    },
+    {
+      "skill": "tongtian-lu",
+      "status": "evolved",
+      "evolution": {
+        "status": "evolved",
+        "skill_name": "tongtian-lu",
+        "evolution_type": "tuning",
+        "changes": [],
+        "version": "v6.0.1",
+        "timestamp": "2026-05-02T15:09:36.747044"
+      },
+      "analysis": {
+        "status": "analyzed",
+        "sample_size": 100,
+        "success_rate": 0.88,
+        "avg_errors": 0.08,
+        "avg_human_intervention": 0.02,
+        "avg_duration_ms": 850.2,
+        "avg_quality": 89.7,
+        "consecutive_degradation": 4,
+        "evolution_type": "tuning",
+        "priority": "high",
+        "recommendations": [
+          "连续4次性能下降，建议参数调优"
+        ],
+        "health_score": 91.4
+      },
+      "validation": {
+        "passed": true,
+        "checks": {
+          "has_skill_md": true,
+          "has_scripts_dir": true,
+          "scripts_executable": true
+        }
+      }
+    },
+    {
+      "skill": "xiushen-lu",
+      "status": "skipped",
+      "reason": "insufficient_data"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "evolved": 6,
+    "failed_rolled_back": 0,
+    "no_action": 4
+  }
+}

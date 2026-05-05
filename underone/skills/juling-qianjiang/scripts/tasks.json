@@ -1,0 +1,12 @@
+[
+  {
+    "name": "搜索竞品数据",
+    "required_spirit": "搜索灵",
+    "sla": 15
+  },
+  {
+    "name": "分析数据",
+    "required_spirit": "代码灵",
+    "sla": 30
+  }
+]

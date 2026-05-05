@@ -1,0 +1,20 @@
+[
+  {
+    "source": "2021年架构文档",
+    "content": "系统使用Python 3.6和Django 2.2",
+    "credibility": "S",
+    "category": "技术方案"
+  },
+  {
+    "source": "2023年更新",
+    "content": "已升级至Python 3.11和Django 4.2",
+    "credibility": "S",
+    "category": "技术方案"
+  },
+  {
+    "source": "社区讨论",
+    "content": "Django 5.0刚发布，值得关注",
+    "credibility": "B",
+    "category": "社区经验"
+  }
+]

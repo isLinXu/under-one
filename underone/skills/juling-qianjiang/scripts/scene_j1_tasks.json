@@ -1,0 +1,27 @@
+[
+  {
+    "name": "爬取竞品A官网",
+    "required_spirit": "搜索灵",
+    "sla": 15
+  },
+  {
+    "name": "爬取竞品B官网",
+    "required_spirit": "搜索灵",
+    "sla": 15
+  },
+  {
+    "name": "爬取竞品C官网",
+    "required_spirit": "搜索灵",
+    "sla": 15
+  },
+  {
+    "name": "分析数据",
+    "required_spirit": "代码灵",
+    "sla": 30
+  },
+  {
+    "name": "生成图表",
+    "required_spirit": "图像灵",
+    "sla": 30
+  }
+]

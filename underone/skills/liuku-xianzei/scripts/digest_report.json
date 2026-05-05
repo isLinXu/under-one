@@ -1,0 +1,65 @@
+{
+  "digester": "liuku-xianzei",
+  "version": "5.0",
+  "input_count": 3,
+  "avg_digestion_rate": 74.0,
+  "distribution": {
+    "高": 1,
+    "中": 2,
+    "低": 0
+  },
+  "knowledge_units": [
+    {
+      "concept": "Python 3.6和Django 2.2",
+      "source": "技术文档",
+      "credibility": "A",
+      "digestion_rate": 72.0,
+      "digestion_level": "中",
+      "category": "技术方案",
+      "freshness_days": 90,
+      "expires": "2026-07-29",
+      "key_claim": false,
+      "has_evidence": true,
+      "has_application": true
+    },
+    {
+      "concept": "Redis 6.0",
+      "source": "同事建议",
+      "credibility": "B",
+      "digestion_rate": 60.0,
+      "digestion_level": "中",
+      "category": "技术方案",
+      "freshness_days": 90,
+      "expires": "2026-07-29",
+      "key_claim": false,
+      "has_evidence": true,
+      "has_application": true
+    },
+    {
+      "concept": "PostgreSQL 14 with TimescaleDB",
+      "source": "官方推荐",
+      "credibility": "S",
+      "digestion_rate": 90.0,
+      "digestion_level": "高",
+      "category": "技术方案",
+      "freshness_days": 90,
+      "expires": "2026-07-29",
+      "key_claim": false,
+      "has_evidence": true,
+      "has_application": true
+    }
+  ],
+  "review_schedule": [
+    {
+      "concept": "Python 3.6和Django 2.2",
+      "review_in": "1天",
+      "reason": "待补充"
+    },
+    {
+      "concept": "Redis 6.0",
+      "review_in": "1天",
+      "reason": "待补充"
+    }
+  ],
+  "recommendation": "全部消化良好"
+}

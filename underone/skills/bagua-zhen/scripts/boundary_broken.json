@@ -1,0 +1,76 @@
+{
+  "skills": [
+    {
+      "id": "qiti-yuanliu",
+      "name": "炁体源流",
+      "status": "休眠",
+      "score": 92.5,
+      "health": "🟢"
+    },
+    {
+      "id": "tongtian-lu",
+      "name": "通天箓",
+      "status": "激活",
+      "score": 94.4,
+      "health": "🟢",
+      "round": "R5"
+    },
+    {
+      "id": "dalu-dongguan",
+      "name": "大罗洞观",
+      "status": "激活",
+      "score": 35.0,
+      "health": "🔴",
+      "round": "R5"
+    },
+    {
+      "id": "shenji-bailian",
+      "name": "神机百炼",
+      "status": "激活",
+      "score": 92.0,
+      "health": "🟢",
+      "round": "R5"
+    },
+    {
+      "id": "fenghou-qimen",
+      "name": "风后奇门",
+      "status": "休眠",
+      "score": 45.0,
+      "health": "🔴"
+    },
+    {
+      "id": "liuku-xianzei",
+      "name": "六库仙贼",
+      "status": "激活",
+      "score": 40.0,
+      "health": "🔴",
+      "round": "R5"
+    },
+    {
+      "id": "shuangquanshou",
+      "name": "双全手",
+      "status": "休眠",
+      "score": 94.5,
+      "health": "🟢"
+    },
+    {
+      "id": "juling-qianjiang",
+      "name": "拘灵遣将",
+      "status": "休眠",
+      "score": 95.5,
+      "health": "🟢"
+    }
+  ],
+  "active_requests": [
+    {
+      "from": "通天箓",
+      "to": "神机百炼",
+      "type": "mutex"
+    },
+    {
+      "from": "大罗洞观",
+      "to": "六库仙贼",
+      "type": "mutex"
+    }
+  ]
+}

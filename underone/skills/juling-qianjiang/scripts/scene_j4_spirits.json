@@ -1,0 +1,14 @@
+[
+  {
+    "name": "数据灵-1",
+    "type": "数据灵",
+    "health_score": 88,
+    "fallback": "跳过"
+  },
+  {
+    "name": "代码灵-1",
+    "type": "代码灵",
+    "health_score": 92,
+    "fallback": "本地计算"
+  }
+]

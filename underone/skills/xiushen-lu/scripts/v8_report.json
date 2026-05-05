@@ -1,0 +1,467 @@
+{
+  "engine": "hachigiki-v8",
+  "version": "8.0",
+  "timestamp": "2026-05-02T16:35:02.826622",
+  "results": [
+    {
+      "skill": "bagua-zhen",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.1,
+        "success_trend": -0.001,
+        "error_trend": 0.001,
+        "r_squared": 0.3245,
+        "current_quality": 87,
+        "predicted_quality_5runs": 86.5,
+        "predicted_success_rate": 0.795,
+        "risk_level": "low",
+        "time_to_degradation_runs": null,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "no_evolution_to_test"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "bagua-zhen",
+          "total_experiences": 1,
+          "avg_quality": 87,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "dalu-dongguan",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.1156,
+        "success_trend": 0.0003,
+        "error_trend": 0.0011,
+        "r_squared": 0.3443,
+        "current_quality": 77,
+        "predicted_quality_5runs": 76.4,
+        "predicted_success_rate": 1.001,
+        "risk_level": "low",
+        "time_to_degradation_runs": 18,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 88.35,
+          "treatment_mean": 77.05,
+          "improvement_pct": -12.8,
+          "t_stat": 9.916,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -3.136
+        },
+        "success_rate": {
+          "control": 0.95,
+          "treatment": 0.9,
+          "t_stat": 0.588,
+          "p_value": 0.5605,
+          "significant": false,
+          "cohens_d": -0.186
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "dalu-dongguan",
+          "total_experiences": 1,
+          "avg_quality": 77,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "fenghou-qimen",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0943,
+        "success_trend": -0.0021,
+        "error_trend": 0.0011,
+        "r_squared": 0.3116,
+        "current_quality": 83,
+        "predicted_quality_5runs": 82.5,
+        "predicted_success_rate": 0.989,
+        "risk_level": "low",
+        "time_to_degradation_runs": 85,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 96.8,
+          "treatment_mean": 86.5,
+          "improvement_pct": -10.6,
+          "t_stat": 9.38,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -2.966
+        },
+        "success_rate": {
+          "control": 1,
+          "treatment": 0.75,
+          "t_stat": 2.517,
+          "p_value": 0.0215,
+          "significant": true,
+          "cohens_d": -0.796
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "fenghou-qimen",
+          "total_experiences": 1,
+          "avg_quality": 83,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "juling-qianjiang",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0957,
+        "success_trend": -0.0005,
+        "error_trend": 0.0011,
+        "r_squared": 0.3005,
+        "current_quality": 86,
+        "predicted_quality_5runs": 85.5,
+        "predicted_success_rate": 0.997,
+        "risk_level": "low",
+        "time_to_degradation_runs": null,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 93.95,
+          "treatment_mean": 83.3,
+          "improvement_pct": -11.3,
+          "t_stat": 10.045,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -3.177
+        },
+        "success_rate": {
+          "control": 1,
+          "treatment": 0.95,
+          "t_stat": 1.0,
+          "p_value": 0.33,
+          "significant": false,
+          "cohens_d": -0.316
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "juling-qianjiang",
+          "total_experiences": 1,
+          "avg_quality": 86,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "liuku-xianzei",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.1082,
+        "success_trend": -0.0007,
+        "error_trend": 0.0012,
+        "r_squared": 0.3732,
+        "current_quality": 75,
+        "predicted_quality_5runs": 74.5,
+        "predicted_success_rate": 0.596,
+        "risk_level": "low",
+        "time_to_degradation_runs": 0,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 82.75,
+          "treatment_mean": 72.3,
+          "improvement_pct": -12.6,
+          "t_stat": 8.64,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -2.732
+        },
+        "success_rate": {
+          "control": 0.85,
+          "treatment": 0.8,
+          "t_stat": 0.406,
+          "p_value": 0.6867,
+          "significant": false,
+          "cohens_d": -0.129
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "liuku-xianzei",
+          "total_experiences": 1,
+          "avg_quality": 75,
+          "success_rate": 0.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "qiti-yuanliu",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0961,
+        "success_trend": -0.0013,
+        "error_trend": 0.0011,
+        "r_squared": 0.2931,
+        "current_quality": 80,
+        "predicted_quality_5runs": 79.5,
+        "predicted_success_rate": 0.993,
+        "risk_level": "low",
+        "time_to_degradation_runs": 53,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 95.1,
+          "treatment_mean": 84,
+          "improvement_pct": -11.7,
+          "t_stat": 11.376,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -3.597
+        },
+        "success_rate": {
+          "control": 1,
+          "treatment": 0.85,
+          "t_stat": 1.831,
+          "p_value": 0.0832,
+          "significant": false,
+          "cohens_d": -0.579
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "qiti-yuanliu",
+          "total_experiences": 1,
+          "avg_quality": 80,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "shenji-bailian",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0843,
+        "success_trend": -0.0018,
+        "error_trend": 0.001,
+        "r_squared": 0.2369,
+        "current_quality": 89,
+        "predicted_quality_5runs": 88.6,
+        "predicted_success_rate": 0.991,
+        "risk_level": "low",
+        "time_to_degradation_runs": null,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "no_evolution_to_test"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "shenji-bailian",
+          "total_experiences": 1,
+          "avg_quality": 89,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "shuangquanshou",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0829,
+        "success_trend": -0.0038,
+        "error_trend": 0.0011,
+        "r_squared": 0.2236,
+        "current_quality": 78,
+        "predicted_quality_5runs": 77.6,
+        "predicted_success_rate": 0.981,
+        "risk_level": "low",
+        "time_to_degradation_runs": 37,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "no_evolution_to_test"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "shuangquanshou",
+          "total_experiences": 1,
+          "avg_quality": 78,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    },
+    {
+      "skill": "tongtian-lu",
+      "prediction": {
+        "status": "analyzed",
+        "quality_trend": -0.0926,
+        "success_trend": -0.0023,
+        "error_trend": 0.0011,
+        "r_squared": 0.3092,
+        "current_quality": 78,
+        "predicted_quality_5runs": 77.5,
+        "predicted_success_rate": 0.989,
+        "risk_level": "low",
+        "time_to_degradation_runs": 33,
+        "recommendation": "状态稳定"
+      },
+      "ab_test": {
+        "status": "tested",
+        "sample_size": {
+          "control": 20,
+          "treatment": 20
+        },
+        "quality": {
+          "control_mean": 91.75,
+          "treatment_mean": 82.4,
+          "improvement_pct": -10.2,
+          "t_stat": 8.246,
+          "p_value": 0.0,
+          "significant": true,
+          "cohens_d": -2.608
+        },
+        "success_rate": {
+          "control": 0.95,
+          "treatment": 0.8,
+          "t_stat": 1.435,
+          "p_value": 0.1619,
+          "significant": false,
+          "cohens_d": -0.454
+        },
+        "verdict": "rollback",
+        "verdict_meaning": "进化无效或有害，回滚"
+      },
+      "memory": {
+        "similar_experiences": 1,
+        "dna": {
+          "skill": "tongtian-lu",
+          "total_experiences": 1,
+          "avg_quality": 78,
+          "success_rate": 100.0,
+          "common_keywords": [],
+          "strengths": [],
+          "weaknesses": []
+        }
+      },
+      "federation": {
+        "status": "no_federated_data"
+      },
+      "should_evolve": false
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "predicted_risk": 0,
+    "ab_tested": 6,
+    "memorized": 9,
+    "federated": 0
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "plan": [
+    {
+      "task": {
+        "type": "search",
+        "desc": "查找资料"
+      },
+      "status": "dispatched",
+      "assigned": "search-api",
+      "quality": 100
+    },
+    {
+      "task": {
+        "type": "browse",
+        "desc": "浏览网页"
+      },
+      "status": "fallback_possess",
+      "assigned": "broken-api",
+      "method": "mock_general",
+      "quality": 60.0
+    },
+    {
+      "task": {
+        "type": "code",
+        "desc": "运行代码"
+      },
+      "status": "dispatched",
+      "assigned": "code-runner",
+      "quality": 100
+    }
+  ],
+  "fallback_log": [
+    {
+      "spirit_id": "broken-api",
+      "action": "fallback_possess",
+      "method": "mock_general",
+      "quality_factor": 0.6,
+      "note": "工具不可用，已强制服灵(内化替代)"
+    }
+  ],
+  "fallback_count": 1,
+  "avg_quality": 86.7,
+  "strategy": "possess",
+  "all_success": false
+}

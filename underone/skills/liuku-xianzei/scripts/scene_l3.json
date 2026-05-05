@@ -1,0 +1,14 @@
+[
+  {
+    "source": "券商A报告",
+    "content": "预测Q3市场增长15%，基于消费复苏",
+    "credibility": "A",
+    "category": "行业数据"
+  },
+  {
+    "source": "券商B报告",
+    "content": "预测Q3市场下降5%，基于出口疲软",
+    "credibility": "A",
+    "category": "行业数据"
+  }
+]

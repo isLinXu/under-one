@@ -1,0 +1,12 @@
+[
+  {
+    "name": "搜索错误日志",
+    "required_spirit": "搜索灵",
+    "sla": 10
+  },
+  {
+    "name": "分析错误模式",
+    "required_spirit": "代码灵",
+    "sla": 20
+  }
+]
