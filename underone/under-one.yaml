@@ -1,0 +1,75 @@
+# under-one.skills — 全局配置
+# 所有skill脚本启动时会读取此文件的参数
+# 优先级: 命令行参数 > 本配置文件 > 硬编码默认值
+
+# ── 核心阈值 ──
+thresholds:
+  quality_pass: 75           # 质量及格线 (0-100)
+  entropy_warning: 3.0       # 上下文熵警告阈值
+  entropy_critical: 7.0      # 上下文熵崩溃阈值
+  consistency_min: 60        # 一致性最低要求 (%)
+  sla_timeout_ms: 30000      # SLA超时时间 (毫秒)
+  max_retries: 3             # 最大重试次数
+
+# ── 通天箓: 禁咒关键词 ──
+tongtianlu:
+  curse_high: ["删除", "覆盖", "资金", "医疗", "法律", "销毁", "清空", "终止"]
+  curse_medium: ["发布", "发送", "配置", "权限", "变更", "重启", "升级"]
+
+# ── 风后奇门: 八门阈值 ──
+fenghouqimen:
+  gate_open: 4.5             # 开门阈值
+  gate_life: 4.0             # 生门阈值
+  gate_view: 3.2             # 景门阈值
+  gate_hurt: 2.8             # 伤门阈值
+  gate_block: 2.5            # 杜门阈值
+  gate_fear: 2.0             # 惊门阈值
+  gate_death: 1.5            # 死门阈值
+
+# ── 六库仙贼: 可信度分级 ──
+liukuxianzei:
+  credibility:
+    S: 0.95    # 权威期刊/官方文档
+    A: 0.85    # 专业来源/团队经验
+    B: 0.70    # 一般来源/社区讨论
+    C: 0.50    # 低可信/未验证
+
+# ── 拘灵遣将: 调度策略 ──
+julingqianjiang:
+  strategy: "protect"         # protect(降级保护) | possess(服灵内化)
+  fallback_quality:
+    cache: 0.70
+    mock: 0.50
+    skip: 0.0
+    possess: 0.85
+
+# ── 双全手: DNA校验 ──
+shuangquanshou:
+  max_switches_per_session: 2
+  violation_penalty: 15       # 每次违背扣分
+
+# ── 八卦阵: 互斥矩阵 ──
+baguazhen:
+  mutex_pairs:
+    - ["tongtian-lu", "shenji-bailian"]
+    - ["qiti-yuanliu", "fenghou-qimen"]
+    - ["dalu-dongguan", "liuku-xianzei"]
+  synergy_pairs:
+    - ["tongtian-lu", "dalu-dongguan"]
+    - ["juling-qianjiang", "shenji-bailian"]
+    - ["qiti-yuanliu", "shuangquanshou"]
+
+# ── 修身炉: 进化参数 ──
+xiushenlu:
+  evolution:
+    min_runs_before_evolve: 10
+    success_rate_warning: 0.80
+    success_rate_critical: 0.65
+    human_intervention_warning: 0.10
+    degradation_consecutive: 4
+
+# ── 日志 ──
+logging:
+  level: "info"               # debug | info | warning | error
+  format: "json"              # json | text
+  output: "runtime_data/logs" # 日志输出目录

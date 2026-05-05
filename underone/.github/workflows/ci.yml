@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# 触发时仓库根是 under-one/，此 workflow 存放于 underone/.github/，
+# 若 workflow 被提到仓库根 .github/，所有命令都是从仓库根执行。
+defaults:
+  run:
+    working-directory: underone
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pyyaml flake8
+
+      - name: Lint with flake8
+        run: |
+          flake8 under_one/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --cov=under_one --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: underone/coverage.xml
+          fail_ci_if_error: false
+
+      - name: Syntax check skill scripts
+        shell: python
+        run: |
+          import os, sys
+          errors = []
+          for root, _, files in os.walk('.'):
+              if 'legacy' in root or '__pycache__' in root:
+                  continue
+              for f in files:
+                  if f.endswith('.py'):
+                      path = os.path.join(root, f)
+                      try:
+                          with open(path, 'r', encoding='utf-8') as fp:
+                              compile(fp.read(), path, 'exec')
+                      except SyntaxError as e:
+                          errors.append(f'{path}: {e}')
+          if errors:
+              for e in errors:
+                  print(f'ERROR: {e}')
+              sys.exit(1)
+          print('All scripts compiled successfully')
+
+      - name: Verify skill bundles are in sync
+        run: |
+          python scripts/build_skill_bundles.py --check
+
+      - name: Test CLI entry point
+        run: |
+          pip install -e .
+          under-one list
+          under-one providers
+          under-one bundles --check
+
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build packages
+        run: |
+          pip install build twine
+          python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Build skill bundles
+        run: |
+          python scripts/build_skill_bundles.py --out-dir ../dist
+
+      - name: Upload skill bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-bundles
+          path: dist/*.skill
+          if-no-files-found: error

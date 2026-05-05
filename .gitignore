@@ -216,3 +216,44 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── UnderOne / underone 项目特定规则 ──
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Skill 运行时产物
+underone/runtime_data/
+underone/**/runtime_data/
+**/runtime_data/logs/
+
+# 脚本生成的临时报告
+**/*.health_report.json
+**/*_report.json.tmp
+
+# 历史版本快照（已用 git history + CHANGELOG 取代，不应再出现）
+skill_backups/
+skill_backups_v*/
+
+# 修身炉进化产生的 skill 本地快照
+underone/**/scripts/backups/
+
+# 本地实验脚本
+scratch/
+tmp/
+
+# 覆盖率 HTML 报告
+htmlcov/
+.coverage
+
+# skill 构建产物（由 build_skill_bundles.py 生成，不跟踪）
+dist/*.skill
