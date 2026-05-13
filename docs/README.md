@@ -51,6 +51,22 @@ make audit-report
 make evaluate-skills
 ```
 
+## 多宿主安装
+
+同一套 under-one skills 现在支持按宿主生成不同安装包装层：
+
+- `Codex`：frontmatter wrapper + `agents/openai.yaml`
+- `WorkBuddy`：frontmatter wrapper
+- `QClaw`：保留原生 source layout
+
+统一安装入口：
+
+```bash
+cd underone
+python scripts/install_host_skills.py --host workbuddy
+python -m under_one.cli hosts
+```
+
 ## 技术文档（位于 `underone/`）
 
 | 文档 | 内容 |

@@ -42,6 +42,14 @@ python priority_engine.py tasks.json
 # → 输出: JSON {ranked_tasks, eight_gates, monte_carlo}
 ```
 
+如果要安装到不同宿主：
+
+```bash
+python scripts/install_host_skills.py --host codex
+python scripts/install_host_skills.py --host workbuddy
+python scripts/install_host_skills.py --host qclaw
+```
+
 ---
 
 ## 架构速览

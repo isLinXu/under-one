@@ -4,13 +4,15 @@ under-one.skills 统一CLI入口
 
 Usage:
     under-one --help
-    under-one list                       # 列出所有可用skill
-    under-one scan <skill> <input>       # 运行指定skill
-    under-one audit [skill]              # 审计skill结构与元数据
-    under-one status                     # 查看十技生态状态
-    under-one evolve [skill]             # 启动修身炉进化
-    under-one bundles [--check] [skill]  # 构建 .skill 单文件分发包
-    under-one providers                  # 列出可用 LLM 适配器
+    under-one list                             # 列出所有可用skill
+    under-one scan <skill> <input>             # 运行指定skill
+    under-one audit [skill]                    # 审计skill结构与元数据
+    under-one status                           # 查看十技生态状态
+    under-one evolve [skill]                   # 启动修身炉进化
+    under-one bundles [--check] [skill]        # 构建 .skill 单文件分发包
+    under-one install-host --host qclaw        # 安装到指定宿主
+    under-one hosts                            # 列出支持的宿主
+    under-one providers                        # 列出可用 LLM 适配器
 """
 
 import argparse
@@ -20,6 +22,14 @@ from pathlib import Path
 
 from .skill_bundle import install_bundle, verify_installed_skill
 from .skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
+from .hosted_skills import (
+    DEFAULT_SKILLS,
+    available_hosts,
+    default_host_skills_root,
+    get_host_profile,
+    install_and_validate_host_skill,
+    iter_source_skill_dirs,
+)
 from .skill_lifecycle import SKILL_TEST_TARGETS, validate_skill
 
 SKILL_MAP = {
@@ -219,6 +229,73 @@ def cmd_install_bundle(args):
     )
 
 
+def cmd_hosts(args):
+    """列出支持的宿主安装运行时。"""
+    print("\n支持的宿主 Runtime:")
+    print("-" * 50)
+    for host in available_hosts():
+        profile = get_host_profile(host)
+        root = default_host_skills_root(host)
+        mode = "frontmatter-wrapper" if profile.layout == "frontmatter" else "native-source"
+        extras = "agents/openai.yaml" if profile.uses_agents_yaml else "-"
+        print(f"  {profile.name:<10} {profile.label:<12} layout={mode:<20} root={root}")
+        print(f"             extra_files={extras}")
+
+
+def cmd_install_host(args):
+    """安装 skills 到指定宿主目录。"""
+    selected = args.skills or DEFAULT_SKILLS
+    unknown = [name for name in selected if name not in DEFAULT_SKILLS]
+    if unknown:
+        print(f"ERROR: 未知 skill: {unknown}")
+        sys.exit(2)
+
+    profile = get_host_profile(args.host)
+    dest = Path(args.dest).expanduser().resolve() if args.dest else default_host_skills_root(args.host).resolve()
+    source_root = find_skill_dir()
+
+    results = []
+    for skill_dir in iter_source_skill_dirs(source_root, selected):
+        result = install_and_validate_host_skill(
+            skill_dir,
+            args.host,
+            target_root=dest,
+            force=args.force,
+            include_source_validation=not args.skip_source_validation,
+        )
+        results.append(result)
+
+    payload = {
+        "host": profile.name,
+        "target_root": str(dest),
+        "skills_total": len(results),
+        "skills_passed": sum(1 for item in results if item["overall_passed"]),
+        "results": results,
+    }
+
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"{profile.label} target: {dest}")
+        print("")
+        for idx, item in enumerate(results, start=1):
+            install = item["install"]
+            host_validation = install["host_validation"]
+            lifecycle = install["installed_lifecycle"]
+            print(f"[{idx}/{len(results)}] {item['skill']}")
+            print(f"  installed_dir: {item['installed_dir']}")
+            print(f"  {profile.name}_discovery: {'PASS' if host_validation['passed'] else 'FAIL'}")
+            print(f"  installed_self_test: {'PASS' if lifecycle['passed'] else 'FAIL'}")
+            print(f"  overall: {'PASS' if item['overall_passed'] else 'FAIL'}")
+            if host_validation["errors"]:
+                print(f"  {profile.name}_errors: {host_validation['errors']}")
+            if host_validation["warnings"]:
+                print(f"  {profile.name}_warnings: {host_validation['warnings']}")
+            print("")
+        print(f"summary: {payload['skills_passed']}/{payload['skills_total']} passed")
+    sys.exit(0 if payload["skills_passed"] == payload["skills_total"] else 1)
+
+
 def cmd_test_skill(args):
     """针对单个 skill 运行独立测试"""
     skill_path_arg = getattr(args, "path", None)
@@ -366,6 +443,8 @@ def main():
   under-one evolve                         # 启动自进化
   under-one bundles --check                # 校验 .skill 打包
   under-one install-bundle foo.skill       # 安装单个 skill bundle
+  under-one hosts                          # 列出支持的宿主
+  under-one install-host --host workbuddy  # 安装到 WorkBuddy
   under-one test-skill priority-engine       # 单 skill 测试
   under-one test-skill --path ~/.under-one/skills/fenghou-qimen
   under-one validate-skill priority-engine   # 单 skill 验证
@@ -415,6 +494,20 @@ def main():
     p_install.add_argument("--target-dir", default=str(Path.home() / ".under-one" / "skills"), help="安装目标目录")
     p_install.add_argument("--force", action="store_true", help="覆盖已存在的同名 skill")
     p_install.set_defaults(func=cmd_install_bundle)
+
+    # hosts
+    p_hosts = subparsers.add_parser("hosts", help="列出支持的宿主 Runtime")
+    p_hosts.set_defaults(func=cmd_hosts)
+
+    # install-host
+    p_install_host = subparsers.add_parser("install-host", help="安装 skills 到指定宿主")
+    p_install_host.add_argument("skills", nargs="*", help="skill names to install; defaults to all")
+    p_install_host.add_argument("--host", choices=available_hosts(), default="codex", help="目标宿主 Runtime")
+    p_install_host.add_argument("--dest", help="覆盖默认宿主技能目录")
+    p_install_host.add_argument("--force", action="store_true", help="覆盖已存在的同名 skill")
+    p_install_host.add_argument("--skip-source-validation", action="store_true", help="跳过源码侧验证")
+    p_install_host.add_argument("--json", action="store_true", help="输出 JSON 报告")
+    p_install_host.set_defaults(func=cmd_install_host)
 
     # test-skill
     p_test = subparsers.add_parser("test-skill", help="针对单个 skill 运行独立测试")
