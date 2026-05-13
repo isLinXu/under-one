@@ -23,10 +23,10 @@ def _find_config() -> Path | None:
         path = Path(p).expanduser().resolve()
         if path.exists():
             return path
-    # 尝试从 skill 脚本位置向上回溯
+    # 尝试从 skill 脚本位置向上回溯，避免依赖固定父级深度
     script_dir = Path(__file__).resolve().parent
-    for depth in range(5):
-        candidate = script_dir.parents[depth] / "under-one.yaml"
+    for candidate_dir in (script_dir, *script_dir.parents):
+        candidate = candidate_dir / "under-one.yaml"
         if candidate.exists():
             return candidate
     return None
@@ -177,3 +177,61 @@ def get_threshold(key: str, default):
 def get_skill_config(skill_name: str, key: str = None, default=None):
     """读取特定 skill 的配置节"""
     return get_config(skill_name, key, default)
+
+
+# ---------------------------------------------------------------------------
+# 通用输入验证辅助函数
+# ---------------------------------------------------------------------------
+
+def validate_json_input(data: dict, required_fields: list, skill_name: str = "skill") -> tuple:
+    """验证JSON输入数据是否包含所有必需字段。
+
+    Args:
+        data: 输入字典
+        required_fields: 必需字段列表
+        skill_name: skill名称（用于错误信息）
+
+    Returns:
+        (is_valid: bool, missing_fields: list)
+
+    Example:
+        ok, missing = validate_json_input(payload, ["name", "content"], "my-skill")
+        if not ok:
+            print(f"缺少字段: {missing}")
+            sys.exit(1)
+    """
+    if not isinstance(data, dict):
+        return False, ["<root> must be an object"]
+    missing = [f for f in required_fields if f not in data or data[f] is None]
+    return len(missing) == 0, missing
+
+
+def validate_json_list(data: list, item_schema: dict, skill_name: str = "skill") -> tuple:
+    """验证JSON列表输入，检查每项是否符合简单schema。
+
+    Args:
+        data: 输入列表
+        item_schema: {字段名: 类型} 的schema字典
+        skill_name: skill名称
+
+    Returns:
+        (is_valid: bool, errors: list)
+
+    Example:
+        ok, errs = validate_json_list(items, {"name": str, "score": (int, float)})
+    """
+    if not isinstance(data, list):
+        return False, ["<root> must be a list"]
+    errors = []
+    for i, item in enumerate(data):
+        if not isinstance(item, dict):
+            errors.append(f"item[{i}] must be an object")
+            continue
+        for field, expected_type in item_schema.items():
+            if field not in item:
+                errors.append(f"item[{i}] missing field: {field}")
+                continue
+            val = item[field]
+            if not isinstance(val, expected_type):
+                errors.append(f"item[{i}].{field} type error: expected {expected_type}, got {type(val)}")
+    return len(errors) == 0, errors

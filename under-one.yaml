@@ -1,0 +1,1051 @@
+# under-one.skills 全局配置文件
+# 放置位置: 项目根目录 /under-one.yaml
+# 所有 skill 脚本通过 _skill_config.py 自动读取此文件
+
+# ═══════════════════════════════════════════════════════════
+# 全局阈值配置
+# ═══════════════════════════════════════════════════════════
+thresholds:
+  entropy_warning: 0.6
+  entropy_critical: 0.3
+  alignment_warning: 0.5
+  alignment_critical: 0.3
+  success_rate_warning: 0.80
+  success_rate_critical: 0.65
+  human_intervention_warning: 0.10
+  human_intervention_critical: 0.25
+  degradation_consecutive: 4
+  sla_threshold: 1.15
+  quality_drop_threshold: 5.0
+  short_text_limit: 50
+  max_task_desc_length: 2000
+
+# ═══════════════════════════════════════════════════════════
+# 生态协调器配置 (bagua-zhen)
+# ═══════════════════════════════════════════════════════════
+baguazhen:
+  mutex_pairs:
+    - ["tongtian-lu", "shenji-bailian"]
+    - ["qiti-yuanliu", "fenghou-qimen"]
+    - ["dalu-dongguan", "liuku-xianzei"]
+  synergy_pairs:
+    - ["tongtian-lu", "dalu-dongguan"]
+    - ["juling-qianjiang", "shenji-bailian"]
+    - ["qiti-yuanliu", "shuangquanshou"]
+  min_cooccurrence_for_dynamic: 3
+  cache_ttl_seconds: 3600
+  prefer_dynamic_overrides: true
+  dynamic_ignore_pairs:
+    - ["bagua-zhen", "xiushen-lu"]
+
+# ═══════════════════════════════════════════════════════════
+# 优先级引擎配置 (fenghou-qimen)
+# ═══════════════════════════════════════════════════════════
+fenghouqimen:
+  # 蒙特卡洛参数
+  monte_carlo_simulations: 100
+  time_variance: 0.2
+  default_estimated_time: 30
+  on_time_multiplier: 1.2
+  
+  # 鲁棒性评估阈值
+  robustness_high: 80
+  robustness_medium: 60
+  
+  # 缓冲建议阈值
+  buffer_threshold: 80
+  buffer_recommendation_low: "增加20%应急资源"
+  buffer_recommendation_high: "无需额外缓冲"
+  
+  # 八门阈值映射
+  gates:
+    开门: [4.5, 999]
+    生门: [4.0, 4.5]
+    景门: [3.2, 4.0]
+    杜门: [2.5, 3.2]
+    死门: [0.0, 2.5]
+  
+  # 九维度权重配置（支持动态模板）
+  weights:
+    urgency: 0.25
+    importance: 0.35
+    dependency: 0.15
+    resource_match: 0.10
+    time_pressure: 0.10
+    environment_readiness: 0.05
+    team_match: 0.05
+  
+  # 动态权重模板
+  weight_templates:
+    balanced:
+      urgency: 0.25
+      importance: 0.35
+      dependency: 0.15
+      resource_match: 0.10
+      time_pressure: 0.10
+      environment_readiness: 0.05
+      team_match: 0.05
+    urgency_priority:
+      urgency: 0.40
+      importance: 0.25
+      dependency: 0.10
+      resource_match: 0.10
+      time_pressure: 0.10
+      environment_readiness: 0.03
+      team_match: 0.02
+    quality_priority:
+      urgency: 0.15
+      importance: 0.45
+      dependency: 0.15
+      resource_match: 0.05
+      time_pressure: 0.05
+      environment_readiness: 0.10
+      team_match: 0.05
+    resource_limited:
+      urgency: 0.20
+      importance: 0.30
+      dependency: 0.20
+      resource_match: 0.15
+      time_pressure: 0.05
+      environment_readiness: 0.05
+      team_match: 0.05
+    team_driven:
+      urgency: 0.15
+      importance: 0.25
+      dependency: 0.10
+      resource_match: 0.10
+      time_pressure: 0.10
+      environment_readiness: 0.05
+      team_match: 0.25
+
+# ═══════════════════════════════════════════════════════════
+# 多工具调度器配置 (juling-qianjiang)
+# ═══════════════════════════════════════════════════════════
+julingqianjiang:
+  # 匹配评分权重
+  match_weights:
+    capability: 0.40
+    health: 0.25
+    load_balance: 0.20
+    quality: 0.15
+  
+  # 负载均衡策略: round_robin | least_used | best_score
+  load_balance_strategy: "best_score"
+  
+  # 健康度阈值
+  health_warning: 0.60
+  health_critical: 0.30
+  fallback_quality_floor: 0.55
+  fallback_history_weight: 0.35
+  fallback_exact_match_bonus: 0.05
+  formation: "dual-attunement"
+  formations:
+    single-possession:
+      max_support_spirits: 0
+      role_label: "sole"
+    dual-attunement:
+      max_support_spirits: 1
+      role_label: "primary"
+    night-parade:
+      max_support_spirits: 3
+      role_label: "marshal"
+  
+  # 能力别名映射（支持扩展匹配）
+  capability_aliases:
+    search:
+      - "web_search"
+      - "local_search"
+      - "semantic_search"
+    browse:
+      - "fetch"
+      - "crawl"
+      - "scrape"
+    code:
+      - "execute"
+      - "compile"
+      - "lint"
+    data:
+      - "query"
+      - "analyze"
+      - "transform"
+    write:
+      - "generate"
+      - "draft"
+      - "edit"
+  
+  # 降级策略矩阵（protect模式）
+  fallback_protect:
+    search:
+      method: "cached_search"
+      quality: 0.70
+    browse:
+      method: "mock_fetch"
+      quality: 0.50
+    code:
+      method: "local_fallback"
+      quality: 0.60
+    data:
+      method: "stale_data"
+      quality: 0.40
+    write:
+      method: "template_output"
+      quality: 0.55
+    default:
+      method: "skip"
+      quality: 0.0
+  
+  # 降级策略矩阵（possess模式）
+  fallback_possess:
+    search:
+      method: "local_knowledge_search"
+      quality: 0.85
+    browse:
+      method: "cached_fetch"
+      quality: 0.80
+    code:
+      method: "local_execution"
+      quality: 0.90
+    data:
+      method: "mock_response"
+      quality: 0.75
+    write:
+      method: "llm_generation"
+      quality: 0.80
+    default:
+      method: "mock_general"
+      quality: 0.60
+
+# ═══════════════════════════════════════════════════════════
+# 上下文稳态扫描器配置 (qiti-yuanliu)
+# ═══════════════════════════════════════════════════════════
+qitiyuanliu:
+  # 上下文窗口大小
+  context_window: 5
+
+  # ── 语义熵计算权重 ──
+  entropy_weights:
+    conflict: 2.0
+    gap: 1.5
+    redundancy: 0.5
+    topic_drift: 1.8
+    intent_shift: 1.2
+
+  # 熵阈值
+  entropy_thresholds:
+    warning: 3.0
+    critical: 7.0
+
+  # ── 矛盾检测 ──
+  contradiction:
+    # 直接矛盾关键词
+    keywords:
+      - "不对"
+      - "错了"
+      - "矛盾"
+      - "之前说"
+      - "改回"
+      - "重新"
+      - "不是这个"
+      - "相反"
+      - "不一致"
+    # 否定前缀（用于语义矛盾检测）
+    negation_prefixes:
+      - "不"
+      - "没"
+      - "无"
+      - "非"
+      - "勿"
+      - "别"
+      - "未"
+      - "否"
+    # 语义反转模式：前缀+肯定词 → 否定语义
+    reversal_patterns:
+      - ["是", "不是"]
+      - ["要", "不要"]
+      - ["能", "不能"]
+      - ["会", "不会"]
+      - ["对", "不对"]
+      - ["好", "不好"]
+      - ["行", "不行"]
+      - ["可以", "不可以"]
+    # 用户澄清/口径修正标记
+    clarification_markers:
+      - "我说的是"
+      - "我的意思是"
+      - "准确来说"
+      - "更准确地说"
+      - "这里指的是"
+      - "补充一下"
+      - "更正一下"
+      - "具体来说"
+    # 强制重置/推翻标记
+    hard_reset_markers:
+      - "改回"
+      - "重新理解"
+      - "不是这个方案"
+      - "完全不是"
+      - "之前的目标也不准确"
+      - "推翻"
+      - "重做"
+      - "换成"
+
+  repair_handoff:
+    contradiction_threshold: 2
+    target_skill: "dalu-dongguan"
+    action: "cross_segment_trace"
+    reason: "repeated_contradictions"
+    evidence_limit: 3
+
+  # ── 意图漂移检测 ──
+  intent_shift:
+    # 转折词密度阈值（每百字）
+    shift_density_threshold: 2.0
+    # 转折关键词
+    transition_words:
+      - "但是"
+      - "然而"
+      - "不过"
+      - "却"
+      - "反而"
+      - "其实"
+      - "实际上"
+      - "话说回来"
+    # 否定密度阈值
+    negation_density_threshold: 3.0
+
+  # ── 信息密度（语义级） ──
+  semantic_density:
+    # 实词类别（中文）
+    content_pos:
+      - "名词"
+      - "动词"
+      - "形容词"
+      - "数词"
+      - "量词"
+    # 虚词类别
+    function_pos:
+      - "助词"
+      - "介词"
+      - "连词"
+      - "语气词"
+    # 密度等级阈值（实词比例）
+    high_threshold: 0.55
+    medium_threshold: 0.35
+
+  # ── 推理链完整度 ──
+  completeness:
+    logic_markers:
+      - "因为"
+      - "所以"
+      - "首先"
+      - "然后"
+      - "最后"
+      - "结论"
+      - "因此"
+      - "总之"
+      - "综上所述"
+    base_score: 50
+    per_marker: 5
+    max_score: 100
+
+  # ── 健康分权重 ──
+  health_weights:
+    consistency: 0.25
+    alignment: 0.25
+    completeness: 0.20
+    entropy_bonus: 0.30
+
+  # 健康等级阈值
+  health_thresholds:
+    excellent: 90
+    good: 75
+    warning: 60
+
+  # ── 目标对齐度 ──
+  alignment:
+    # 首轮参考长度
+    first_goal_length: 150
+    # 后续消息最小长度
+    min_msg_length: 30
+    # 关键词重叠度低阈值
+    low_overlap_threshold: 0.2
+    # 每轮漂移扣分
+    drift_penalty: 8
+
+  # ── DNA快照 ──
+  dna_snapshot:
+    rounds: 3
+    preview_length: 30
+
+# ═══════════════════════════════════════════════════════════
+# 工具工厂配置 (shenji-bailian)
+# ═══════════════════════════════════════════════════════════
+shenjibailian:
+  # 模板定义（支持外部扩展）
+  templates:
+    json_processor:
+      keywords: ["json", "清洗", "过滤", "转换", "合并", "去重", "clean", "filter", "transform", "merge", "dedup"]
+      transform_code: |
+        def transform(data):
+            """JSON数据处理 - 去重、过滤空值、格式化"""
+            if isinstance(data, list):
+                seen = set()
+                result = []
+                for item in data:
+                    key = json.dumps(item, sort_keys=True, ensure_ascii=False) if isinstance(item, dict) else str(item)
+                    if key not in seen and item:
+                        seen.add(key)
+                        result.append(item)
+                return {"status": "ok", "count": len(result), "data": result}
+            elif isinstance(data, dict):
+                cleaned = {k: v for k, v in data.items() if v is not None and v != ""}
+                return {"status": "ok", "count": len(cleaned), "data": cleaned}
+            return {"status": "ok", "data": data}
+      test_cases: |
+        def test_transform():
+            from {module_name} import transform
+            result = transform([{"a": 1}, {"a": 1}, {"b": 2}])
+            assert result["count"] == 2
+            result = transform({"a": 1, "b": None, "c": ""})
+            assert "b" not in result["data"]
+            print("transform测试通过")
+      sample_input: '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]'
+
+    csv_processor:
+      keywords: ["csv", "表格", "字段", "映射", "统计", "转换", "table", "column", "field"]
+      transform_code: |
+        def transform(data):
+            """CSV数据处理 - 解析、字段映射、基础统计"""
+            lines = data.strip().split("\n") if isinstance(data, str) else []
+            if not lines:
+                return {"status": "ok", "count": 0, "data": []}
+            headers = lines[0].split(",")
+            rows = []
+            for line in lines[1:]:
+                values = line.split(",")
+                row = {h.strip(): v.strip() for h, v in zip(headers, values)}
+                rows.append(row)
+            return {"status": "ok", "count": len(rows), "headers": headers, "data": rows}
+      test_cases: |
+        def test_transform():
+            from {module_name} import transform
+            csv_text = "name,age\nAlice,30\nBob,25"
+            result = transform(csv_text)
+            assert result["count"] == 2
+            assert result["data"][0]["name"] == "Alice"
+            print("transform测试通过")
+      sample_input: '"name,age\nAlice,30\nBob,25"'
+
+    text_extractor:
+      keywords: ["文本", "提取", "正则", "匹配", "关键词", "解析", "text", "extract", "regex", "keyword", "parse"]
+      transform_code: |
+        def transform(data):
+            """文本提取 - 正则匹配、关键词统计、格式化输出"""
+            text = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
+            urls = re.findall(r'https?://[^\s"<>]+', text)
+            emails = re.findall(r'[\w.-]+@[\w.-]+\.\w+', text)
+            phrases = re.findall(r'[\u4e00-\u9fff]{2,10}', text)
+            word_freq = {}
+            for w in phrases:
+                word_freq[w] = word_freq.get(w, 0) + 1
+            top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
+            return {"status": "ok", "urls": urls, "emails": emails, "top_words": top_words, "char_count": len(text), "word_count": len(phrases)}
+      test_cases: |
+        def test_transform():
+            from {module_name} import transform
+            text = "联系邮箱: test@example.com 官网: https://example.com 关键词: 数据分析 数据挖掘"
+            result = transform(text)
+            assert "test@example.com" in result["emails"]
+            assert "https://example.com" in result["urls"]
+            print("transform测试通过")
+      sample_input: '"联系邮箱: test@example.com 官网: https://example.com"'
+
+    file_organizer:
+      keywords: ["文件", "整理", "重命名", "分类", "批量", "移动", "file", "organize", "rename", "batch"]
+      transform_code: |
+        def transform(data):
+            """文件整理 - 根据规则批量处理文件"""
+            import os, re
+            rules = data if isinstance(data, dict) else {}
+            source_dir = rules.get("source_dir", ".")
+            pattern = rules.get("pattern", r".*")
+            action = rules.get("action", "list")
+            results = []
+            if not os.path.isdir(source_dir):
+                return {"status": "error", "message": f"目录不存在: {source_dir}"}
+            for fname in sorted(os.listdir(source_dir)):
+                if re.match(pattern, fname):
+                    fpath = os.path.join(source_dir, fname)
+                    if action == "list":
+                        results.append({"name": fname, "size": os.path.getsize(fpath)})
+                    elif action == "rename" and "new_name" in rules:
+                        new_name = rules["new_name"].format(name=fname)
+                        os.rename(fpath, os.path.join(source_dir, new_name))
+                        results.append({"old": fname, "new": new_name})
+            return {"status": "ok", "count": len(results), "files": results}
+      test_cases: |
+        def test_transform():
+            from {module_name} import transform
+            result = transform({"source_dir": ".", "pattern": ".*", "action": "list"})
+            assert "files" in result
+            print("transform测试通过")
+      sample_input: '{"source_dir": ".", "pattern": ".*", "action": "list"}'
+
+    data_analyzer:
+      keywords: ["分析", "统计", "聚合", "报告", "计算", "汇总", "analyze", "stats", "aggregate", "report", "summary"]
+      transform_code: |
+        def transform(data):
+            """数据分析 - 统计、聚合、报告生成"""
+            if isinstance(data, list) and data:
+                numeric_cols = {}
+                for item in data:
+                    if isinstance(item, dict):
+                        for k, v in item.items():
+                            if isinstance(v, (int, float)):
+                                if k not in numeric_cols:
+                                    numeric_cols[k] = []
+                                numeric_cols[k].append(v)
+                stats = {}
+                for col, values in numeric_cols.items():
+                    stats[col] = {"count": len(values), "sum": round(sum(values), 2), "avg": round(sum(values) / len(values), 2), "min": min(values), "max": max(values)}
+                return {"status": "ok", "record_count": len(data), "statistics": stats}
+            elif isinstance(data, dict):
+                return {"status": "ok", "field_count": len(data), "keys": list(data.keys())}
+            return {"status": "ok", "data_type": type(data).__name__, "length": len(data) if hasattr(data, '__len__') else 0}
+      test_cases: |
+        def test_transform():
+            from {module_name} import transform
+            data = [{"a": 10, "b": 20}, {"a": 15, "b": 25}, {"a": 20, "b": 30}]
+            result = transform(data)
+            assert result["statistics"]["a"]["avg"] == 15.0
+            print("transform测试通过")
+      sample_input: '[{"a": 10, "b": 20}, {"a": 15, "b": 25}]'
+
+  # 通用模板（回退）
+  generic:
+    transform_code: |
+      def transform(data):
+          """通用数据处理 - 根据需求定制"""
+          if isinstance(data, list):
+              return {"status": "ok", "count": len(data), "data": data}
+          elif isinstance(data, dict):
+              return {"status": "ok", "count": len(data), "keys": list(data.keys()), "data": data}
+          return {"status": "ok", "data": data}
+    test_cases: |
+      def test_transform():
+          from {module_name} import transform
+          result = transform({"key": "value"})
+          assert result["status"] == "ok"
+          print("transform测试通过")
+    sample_input: '{"key": "value"}'
+
+  # 契约文档增强配置
+  contract:
+    sections:
+      - "输入契约"
+      - "输出契约"
+      - "性能契约"
+      - "异常契约"
+      - "边界条件"
+      - "使用示例"
+      - "测试方法"
+    performance_baseline:
+      time_complexity: "O(n)"
+      space_complexity: "O(n)"
+      max_input_size: "100MB"
+    input_validation:
+      required_fields: ["status", "data"]
+      optional_fields: ["count", "message"]
+
+  # 测试生成配置
+  test_generation:
+    categories:
+      - name: "normal"
+        description: "正常输入测试"
+      - name: "empty"
+        description: "空/边界输入测试"
+      - name: "boundary"
+        description: "边界条件测试"
+      - name: "exception"
+        description: "异常输入测试"
+      - name: "config"
+        description: "配置加载测试"
+
+  # 代码质量配置
+  code_quality:
+    add_type_hints: true
+    add_docstrings: true
+    add_config_loader: true
+    min_function_length: 5
+
+  # 锻造模式
+  forge_modes:
+    modes:
+      scaffold-only:
+        include_tests: false
+        include_contract: false
+        intent: "rapid scaffolding"
+      contract-first:
+        include_tests: true
+        include_contract: true
+        intent: "contract-led forging"
+      battle-ready:
+        include_tests: true
+        include_contract: true
+        intent: "deployable forging"
+
+  natural_language_inference:
+    specialization_map:
+      tool:
+        cli-tool: ["cli", "命令行", "脚本工具"]
+        data-tool: ["数据", "分析", "统计", "清洗", "csv", "json"]
+      skill:
+        browser-skill: ["网页", "浏览器", "链接", "抓取", "站点"]
+        analysis-skill: ["分析", "总结", "摘要", "报告", "研究"]
+        workflow-skill: ["工作流", "自动化", "编排", "流程", "任务链"]
+    io_patterns:
+      inputs:
+        input.json: ["json", "输入json", "json输入"]
+        input.csv: ["csv", "表格", "逗号分隔"]
+        input.txt: ["文本", "txt", "纯文本"]
+        webpage_url: ["网页", "url", "链接", "网页内容"]
+      outputs:
+        report.json: ["报告", "report"]
+        summary.md: ["总结", "摘要", "markdown"]
+        validation_result.json: ["校验结果", "验证结果", "校验", "验证"]
+        cleaned.json: ["清洗结果", "清洗", "去重"]
+    trigger_keywords:
+      common: ["生成", "处理", "自动化"]
+      tool: ["CLI", "脚本", "工具"]
+      skill: ["skill", "技能", "工作流"]
+    tag_map:
+      validation: ["校验", "验证"]
+      retrieval: ["检索", "搜索", "网页"]
+      summarization: ["总结", "摘要"]
+      cleaning: ["清洗", "去重", "过滤"]
+      analysis: ["分析", "统计", "汇总"]
+    specialization_template_map:
+      data-tool: data_analyzer
+      browser-skill: text_extractor
+      analysis-skill: data_analyzer
+
+# ═══════════════════════════════════════════════════════════
+# DNA校验器配置 (shuangquanshou)
+# ═══════════════════════════════════════════════════════════
+shuangquanshou:
+  forbidden_categories:
+    医疗: ["医疗", "诊断", "处方", "用药", "治疗", "疾病"]
+    法律: ["法律", "律师", "诉讼", "合同", "司法", "法院"]
+    投资: ["投资", "股票", "基金", "理财", "证券", "期货"]
+    嘲讽: ["嘲讽", "讽刺", "讥笑", "嘲笑", "挖苦"]
+    贬低: ["贬低", "轻视", "蔑视", "诋毁", "污蔑"]
+    侮辱: ["侮辱", "辱骂", "谩骂", "人身攻击", "歧视"]
+    欺骗: ["欺骗", "欺诈", "诈骗", "哄骗", "蒙蔽"]
+    编造: ["编造", "捏造", "虚构", "杜撰", "伪造"]
+  negation_prefixes:
+    - "不"
+    - "不要"
+    - "禁止"
+    - "避免"
+    - "别"
+    - "不能"
+    - "不可以"
+    - "勿"
+    - "拒绝"
+    - "反对"
+    - "防止"
+
+  # 风格维度
+  style_dimensions:
+    - "tone"
+    - "formality"
+    - "detail_level"
+    - "structure"
+
+  # 漂移阈值
+  drift_thresholds:
+    green: 0.2
+    yellow: 0.4
+    red: 0.5
+
+  # 人格分裂检测
+  split_detection:
+    rounds: 3
+    unique_styles: 3
+
+# ═══════════════════════════════════════════════════════════
+# 知识消化器配置 (liuku-xianzei)
+# ═══════════════════════════════════════════════════════════
+liukuxianzei:
+  # 三要素权重（总和应为1.0）
+  element_weights:
+    core_claim: 0.40
+    evidence: 0.30
+    application: 0.30
+
+  # 消化率等级阈值
+  digestion_thresholds:
+    high: 80
+    medium: 50
+
+  # 内容质量评分梯度（最大匹配关键词数对应满分）
+  scoring_gradient:
+    core_claim_max: 5
+    evidence_max: 4
+    application_max: 4
+
+  # 信息密度因子：字数过少时给予补偿，过多时给予奖励
+  density_factor:
+    short_text_limit: 50
+    short_bonus: 1.05
+    optimal_min: 80
+    optimal_max: 500
+    optimal_bonus: 1.10
+    long_penalty_threshold: 1000
+    long_penalty: 0.95
+
+  # 关键词配置（支持外部扩展）
+  keywords:
+    core_claim:
+      - "是"
+      - "为"
+      - "指"
+      - "提出"
+      - "表明"
+      - "证明"
+      - "发现"
+      - "结论"
+      - "显示"
+      - "研究"
+      - "通过"
+      - "实现"
+      - "解决"
+      - "提升"
+      - "降低"
+      - "改进"
+      - "验证"
+      - "基于"
+      - "核心"
+      - "本质"
+    evidence:
+      - "数据"
+      - "统计"
+      - "研究表明"
+      - "因为"
+      - "实验"
+      - "测试"
+      - "结果"
+      - "证据"
+      - "报告"
+      - "分析"
+      - "量化"
+      - "对比"
+    application:
+      - "用于"
+      - "应用"
+      - "场景"
+      - "案例"
+      - "实践"
+      - "部署"
+      - "实施"
+      - "落地"
+      - "适用于"
+      - "在...中"
+    short_text:
+      - "推荐"
+      - "版本"
+      - "使用"
+      - "支持"
+      - "需要"
+      - "建议"
+      - "依赖"
+      - "兼容"
+      - "要求"
+      - "配置"
+
+  # 反刍调度规则（按消化率区间配置）
+  review_schedule:
+    - level: "低"
+      min_rate: 0
+      max_rate: 50
+      time: "4小时"
+      reason: "低消化率，需尽快复习"
+    - level: "中"
+      min_rate: 50
+      max_rate: 80
+      time: "1天"
+      reason: "待补充理解"
+    - level: "高"
+      min_rate: 80
+      max_rate: 100
+      time: "7天"
+      reason: "巩固记忆"
+
+  # 可信度权重
+  credibility_weights:
+    S: 1.5
+    A: 1.2
+    B: 1.0
+    C: 0.6
+
+  # 保鲜期规则（天）
+  freshness_days:
+    技术方案: 90
+    行业数据: 180
+    基础理论: 1095
+    法律法规: 7
+    社区经验: 90
+    默认: 180
+
+# ═══════════════════════════════════════════════════════════
+# 关联检测器配置 (dalu-dongguan)
+# ═══════════════════════════════════════════════════════════
+daludongguan:
+  confidence_weights:
+    semantic: 0.30
+    cooccurrence: 0.25
+    temporal: 0.20
+    source_consistency: 0.15
+    causal: 0.10
+
+  thresholds:
+    semantic_similarity: 0.12
+    source_similarity: 0.15
+    link_prune: 0.3
+    entity_min_length: 2
+    entity_max_length: 25
+    entity_max_count: 40
+
+  confidence_levels:
+    A: 0.8
+    B: 0.5
+
+  temporal_markers:
+    start: ["首先", "最初", "一开始", "前期", "第一步"]
+    progress: ["然后", "接着", "随后", "之后", "此后", "继而", "接下来", "第二步", "第三步"]
+    end: ["最后", "最终", "终于", "结果", "结尾", "末期", "最后一步"]
+    before: ["之前", "以前", "先前", "事先", "预先"]
+    after: ["之后", "以后", "后来", "随后", "事后"]
+
+  causal_markers:
+    cause: ["因为", "由于", "鉴于", "基于", "因", "既然", "考虑到", "源于", "归因于"]
+    effect: ["所以", "因此", "导致", "致使", "引起", "造成", "使得", "从而", "结果", "故", "于是", "就此", "据此"]
+
+  invalid_words: ["和", "与", "及", "或", "的", "了", "着", "过", "得", "地", "之", "其", "此", "彼", "所", "被", "把", "让", "给", "向", "从", "到", "对", "将", "就", "又", "也", "还", "而", "但", "却", "并", "且", "若", "即", "则", "乃", "虽", "在", "是", "有", "为", "以", "于"]
+
+  noun_suffixes:
+    - "技术"
+    - "方案"
+    - "系统"
+    - "服务"
+    - "平台"
+    - "引擎"
+    - "工具"
+    - "框架"
+    - "模型"
+    - "算法"
+    - "数据"
+    - "信息"
+    - "指标"
+    - "报告"
+    - "分析"
+    - "验证"
+    - "测试"
+    - "优化"
+    - "改进"
+    - "提升"
+    - "性能"
+    - "加载"
+    - "延迟"
+    - "速度"
+    - "效率"
+    - "质量"
+    - "体验"
+    - "用户"
+    - "客户"
+    - "产品"
+    - "功能"
+    - "模块"
+    - "组件"
+    - "接口"
+    - "协议"
+    - "标准"
+    - "规范"
+    - "流程"
+    - "策略"
+    - "决策"
+    - "问题"
+    - "风险"
+    - "异常"
+    - "错误"
+    - "缺陷"
+    - "漏洞"
+    - "瓶颈"
+    - "缺口"
+    - "痛点"
+    - "难点"
+    - "趋势"
+    - "模式"
+    - "规律"
+    - "关联"
+    - "影响"
+    - "结果"
+    - "效果"
+    - "成果"
+    - "产出"
+    - "收益"
+    - "方法"
+    - "手段"
+    - "途径"
+    - "方式"
+    - "形式"
+    - "结构"
+    - "架构"
+    - "设计"
+    - "实现"
+    - "部署"
+    - "版本"
+    - "迭代"
+    - "周期"
+    - "阶段"
+    - "步骤"
+    - "环节"
+    - "过程"
+    - "操作"
+    - "动作"
+    - "行为"
+    - "团队"
+    - "人员"
+    - "角色"
+    - "职责"
+    - "能力"
+    - "技能"
+    - "经验"
+    - "知识"
+    - "资源"
+    - "资产"
+    - "市场"
+    - "竞品"
+    - "行业"
+    - "领域"
+    - "场景"
+    - "案例"
+    - "实例"
+    - "样本"
+    - "试点"
+    - "标杆"
+
+  noun_prefixes:
+    - "用户"
+    - "系统"
+    - "数据"
+    - "性能"
+    - "代码"
+    - "业务"
+    - "产品"
+    - "技术"
+    - "服务"
+    - "平台"
+    - "缓存"
+    - "数据库"
+    - "服务器"
+    - "客户端"
+    - "前端"
+    - "后端"
+    - "接口"
+    - "模块"
+    - "功能"
+    - "加载"
+    - "渲染"
+    - "网络"
+    - "存储"
+    - "计算"
+    - "查询"
+    - "索引"
+    - "日志"
+    - "监控"
+    - "告警"
+
+# ═══════════════════════════════════════════════════════════
+# 符箓生成器配置 (tongtian-lu)
+# ═══════════════════════════════════════════════════════════
+tongtianlu:
+  dimension_keywords:
+    analysis: ["分析", "提取", "解析", "拆解", "关键词", "情感"]
+    creation: ["写", "生成", "创建", "改写", "润色", "翻译"]
+    verification: ["检查", "验证", "确认", "校对", "测试", "审查"]
+    transformation: ["转换", "格式化", "重组", "变成", "转义"]
+    retrieval: ["搜索", "查找", "查询", "检索", "获取"]
+    decision: ["对比", "评估", "选择", "排序", "优先级"]
+
+  constraint_keywords:
+    high_risk: ["删除", "覆盖", "资金", "医疗", "法律", "生产环境"]
+    medium_risk: ["发布", "发送", "配置", "权限", "变更"]
+
+  sla_budget:
+    warning: 90
+    critical: 120
+
+  order_map:
+    检索箓: 1
+    分析箓: 2
+    决策箓: 3
+    创作箓: 4
+    验证箓: 5
+    转换箓: 6
+
+  orchestration_modes:
+    modes:
+      quick-cast:
+        max_talismans: 2
+        include_verification_tail: false
+        prefer_parallel: true
+        topology_strategy: "minimal-chain"
+        intent: "rapid decomposition"
+      balanced-array:
+        max_talismans: 4
+        include_verification_tail: false
+        prefer_parallel: true
+        topology_strategy: "balanced-lattice"
+        intent: "balanced orchestration"
+      full-ritual:
+        max_talismans: 6
+        include_verification_tail: true
+        prefer_parallel: false
+        topology_strategy: "full-stack ritual"
+        intent: "full-stack execution lattice"
+
+# ═══════════════════════════════════════════════════════════
+# 修身炉配置 (xiushen-lu)
+# ═══════════════════════════════════════════════════════════
+xiushenlu:
+  min_history_records: 10
+  backup_retention: 7
+  auto_rollback_on_syntax_error: true
+  persist_adaptive_thresholds_on_apply_only: true
+  adaptive_threshold_bounds:
+    success_rate_warning: [0.72, 0.90]
+    success_rate_critical: [0.60, 0.80]
+    human_intervention_warning: [0.05, 0.20]
+    degradation_consecutive: [3, 6]
+  evolution_types:
+    - tuning
+    - extension
+    - refactor
+
+# ═══════════════════════════════════════════════════════════
+# 检查点配置（全局）
+# ═══════════════════════════════════════════════════════════
+checkpoints:
+  auto_confirm: false
+  mutex_arbitration: true
+  ecosystem_downgrade_alert: true
+  synergy_activation: true
+
+# ═══════════════════════════════════════════════════════════
+# 路径映射
+# ═══════════════════════════════════════════════════════════
+paths:
+  runtime_data: "runtime_data"
+  skill_backups: "skill_backups_v7"
+  reports: "."

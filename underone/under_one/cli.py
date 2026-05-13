@@ -6,6 +6,7 @@ Usage:
     under-one --help
     under-one list                       # 列出所有可用skill
     under-one scan <skill> <input>       # 运行指定skill
+    under-one audit [skill]              # 审计skill结构与元数据
     under-one status                     # 查看十技生态状态
     under-one evolve [skill]             # 启动修身炉进化
     under-one bundles [--check] [skill]  # 构建 .skill 单文件分发包
@@ -16,19 +17,22 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from datetime import datetime
+
+from .skill_bundle import install_bundle, verify_installed_skill
+from .skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
+from .skill_lifecycle import SKILL_TEST_TARGETS, validate_skill
 
 SKILL_MAP = {
-    "context-guard":      ("qiti-yuanliu",       "scripts/entropy_scanner.py",   "上下文稳态扫描"),
-    "command-factory":    ("tongtian-lu",        "scripts/fu_generator.py",      "指令拆解"),
-    "insight-radar":      ("dalu-dongguan",      "scripts/link_detector.py",     "全局洞察"),
-    "tool-forge":         ("shenji-bailian",     "scripts/tool_factory.py",      "工具锻造"),
-    "priority-engine":    ("fenghou-qimen",      "scripts/priority_engine.py",   "优先级排序"),
-    "knowledge-digest":   ("liuku-xianzei",      "scripts/knowledge_digest.py",  "知识消化"),
-    "persona-guard":      ("shuangquanshou",     "scripts/dna_validator.py",     "人格守护"),
-    "tool-orchestrator":  ("juling-qianjiang",   "scripts/dispatcher.py",        "工具调度"),
-    "ecosystem-hub":      ("bagua-zhen",         "scripts/coordinator.py",       "生态监控"),
-    "evolution-engine":   ("xiushen-lu",         "scripts/core_engine.py",       "自进化"),
+    "context-guard":      ("qiti-yuanliu",       "scripts/entropy_scanner.py",   "本源自省"),
+    "command-factory":    ("tongtian-lu",        "scripts/fu_generator.py",      "符阵编排"),
+    "insight-radar":      ("dalu-dongguan",      "scripts/link_detector.py",     "异常洞观"),
+    "tool-forge":         ("shenji-bailian",     "scripts/tool_factory.py",      "炼器造物"),
+    "priority-engine":    ("fenghou-qimen",      "scripts/priority_engine.py",   "全局排盘"),
+    "knowledge-digest":   ("liuku-xianzei",      "scripts/knowledge_digest.py",  "掠夺消化"),
+    "persona-guard":      ("shuangquanshou",     "scripts/dna_validator.py",     "记忆人格手术"),
+    "tool-orchestrator":  ("juling-qianjiang",   "scripts/dispatcher.py",        "灵体统御"),
+    "ecosystem-hub":      ("bagua-zhen",         "scripts/coordinator.py",       "阵法中枢"),
+    "evolution-engine":   ("xiushen-lu",         "scripts/core_engine.py",       "跨技进化"),
 }
 
 
@@ -83,7 +87,7 @@ def cmd_scan(args):
         sys.exit(1)
     
     import subprocess
-    cmd = ["python", str(script_path)]
+    cmd = [sys.executable, str(script_path)]
     if args.input:
         cmd.append(args.input)
     
@@ -104,7 +108,7 @@ def cmd_status(args):
     
     if coord_script.exists():
         import subprocess
-        subprocess.run(["python", str(coord_script)])
+        subprocess.run([sys.executable, str(coord_script)])
     else:
         # Fallback: 简单扫描
         print("\n☯ 十技生态状态 (简化版)")
@@ -119,6 +123,51 @@ def cmd_status(args):
             print(f"  {name:<20} {status}")
 
 
+def cmd_audit(args):
+    """审计 skill 结构、元数据和入口约定"""
+    skill_dir = find_skill_dir()
+    if args.skill:
+        if args.skill not in SKILL_MAP:
+            print(f"ERROR: 未知skill '{args.skill}'。运行 'under-one list' 查看可用skill。")
+            sys.exit(1)
+        result = audit_skill_dir(skill_dir / SKILL_MAP[args.skill][0]).to_dict()
+        payload = {
+            "ok": result["ok"],
+            "skill_count": 1,
+            "ok_count": 1 if result["ok"] else 0,
+            "warning_count": len(result["warnings"]),
+            "error_count": len(result["errors"]),
+            "results": [result],
+        }
+    else:
+        payload = audit_skills_root(skill_dir)
+
+    if args.output:
+        out_path = Path(args.output).expanduser().resolve()
+        write_audit_report(payload, out_path)
+
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print("\nSkill 审计结果")
+        print("-" * 40)
+        for item in payload["results"]:
+            status = "OK" if item["ok"] else "FAIL"
+            print(f"[{status}] {item['skill']}")
+            for err in item["errors"]:
+                print(f"  error: {err}")
+            for warn in item["warnings"]:
+                print(f"  warn: {warn}")
+        print("-" * 40)
+        print(
+            f"skills={payload['skill_count']} ok={payload['ok_count']} "
+            f"warnings={payload['warning_count']} errors={payload['error_count']}"
+        )
+        if args.output:
+            print(f"report={out_path}")
+    sys.exit(0 if payload["error_count"] == 0 else 1)
+
+
 def cmd_evolve(args):
     """启动修身炉进化"""
     skill_dir = find_skill_dir()
@@ -129,7 +178,7 @@ def cmd_evolve(args):
         sys.exit(1)
     
     import subprocess
-    cmd = ["python", str(engine_script), str(skill_dir)]
+    cmd = [sys.executable, str(engine_script), str(skill_dir)]
     if args.skill:
         cmd.append(args.skill)
     
@@ -146,13 +195,128 @@ def cmd_bundles(args):
         sys.exit(1)
     import subprocess
 
-    cmd = ["python", str(builder)]
+    cmd = [sys.executable, str(builder)]
     if args.check:
         cmd.append("--check")
     if args.skill:
         cmd.append(args.skill)
     result = subprocess.run(cmd)
     sys.exit(result.returncode)
+
+
+def cmd_install_bundle(args):
+    """安装单个 .skill 分发包"""
+    bundle_path = Path(args.bundle).expanduser().resolve()
+    if not bundle_path.exists():
+        print(f"ERROR: 找不到 bundle: {bundle_path}")
+        sys.exit(1)
+
+    target_root = Path(args.target_dir).expanduser().resolve()
+    result = install_bundle(bundle_path, target_root, force=args.force)
+    print(
+        f"✓ installed {result['name']} -> {result['target_dir']} "
+        f"({result['file_count']} files)"
+    )
+
+
+def cmd_test_skill(args):
+    """针对单个 skill 运行独立测试"""
+    skill_path_arg = getattr(args, "path", None)
+    if skill_path_arg:
+        skill_path = Path(skill_path_arg).expanduser().resolve()
+        test_script = skill_path / "tests" / "self_test.py"
+        if not test_script.exists():
+            print(f"ERROR: 未找到已安装 skill 的 self_test.py: {test_script}")
+            sys.exit(1)
+        import subprocess
+
+        result = subprocess.run([sys.executable, str(test_script)], cwd=str(skill_path))
+        sys.exit(result.returncode)
+
+    if not args.skill or args.skill not in SKILL_MAP:
+        print(f"ERROR: 未知skill '{args.skill}'。运行 'under-one list' 查看可用skill。")
+        sys.exit(1)
+
+    skill_name, _, _ = SKILL_MAP[args.skill]
+    targets = SKILL_TEST_TARGETS.get(skill_name, {})
+    if args.suite == "all":
+        selectors = targets.get("core", []) + targets.get("sdk", [])
+    else:
+        selectors = targets.get(args.suite, [])
+    if not selectors:
+        print(f"ERROR: 未找到 {skill_name} 的测试选择器")
+        sys.exit(1)
+
+    tests_root = Path(__file__).resolve().parent.parent / "tests"
+    if not tests_root.exists():
+        print("WARNING: 当前安装不包含 tests/，退回到验证场景。")
+        skill_dir = find_skill_dir() / skill_name
+        report = validate_skill(skill_name, skill_dir)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        sys.exit(0 if report["validation_passed"] else 1)
+
+    import subprocess
+
+    cmd = [sys.executable, "-m", "pytest", *selectors, "-q"]
+    result = subprocess.run(cmd, cwd=str(Path(__file__).resolve().parent.parent.parent))
+    sys.exit(result.returncode)
+
+
+def cmd_validate_skill(args):
+    """针对单个 skill 运行独立验证"""
+    skill_path_arg = getattr(args, "path", None)
+    if skill_path_arg:
+        skill_dir = Path(skill_path_arg).expanduser().resolve()
+        audit = audit_skill_dir(skill_dir).to_dict()
+        if (skill_dir / "skillctl.py").exists():
+            installed_check = verify_installed_skill(skill_dir)
+            validation_passed = audit["ok"] and installed_check["passed"]
+            effect_summary = "installed skill structural validation + standalone lifecycle check"
+            recommendations = [] if validation_passed else [
+                "Inspect audit errors and installed skill lifecycle results before using this standalone skill."
+            ]
+        else:
+            installed_check = {
+                "passed": True,
+                "skill": skill_dir.name,
+                "mode": "structural_only",
+                "validate": {"returncode": 0, "stdout": "", "stderr": ""},
+                "self_test": {"returncode": 0, "stdout": "", "stderr": ""},
+            }
+            validation_passed = audit["ok"]
+            effect_summary = "installed skill structural validation only"
+            recommendations = [] if validation_passed else [
+                "Inspect audit errors before using this standalone skill."
+            ]
+        report = {
+            "skill": skill_dir.name,
+            "validation_passed": validation_passed,
+            "audit": audit,
+            "scenario": {"effect_summary": effect_summary},
+            "independent_lifecycle": installed_check,
+            "recommendations": recommendations,
+        }
+    else:
+        if not args.skill or args.skill not in SKILL_MAP:
+            print(f"ERROR: 未知skill '{args.skill}'。运行 'under-one list' 查看可用skill。")
+            sys.exit(1)
+
+        skill_name, _, _ = SKILL_MAP[args.skill]
+        skill_dir = find_skill_dir() / skill_name
+        report = validate_skill(skill_name, skill_dir)
+
+    if args.output:
+        out_path = Path(args.output).expanduser().resolve()
+        out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"report={out_path}")
+
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        status = "PASS" if report["validation_passed"] else "FAIL"
+        print(f"{skill_name}: {status}")
+        print(report["scenario"]["effect_summary"])
+    sys.exit(0 if report["validation_passed"] else 1)
 
 
 def cmd_providers(args):
@@ -197,9 +361,15 @@ def main():
 示例:
   under-one list                           # 列出所有skill
   under-one scan priority-engine tasks.json # 运行优先级排序
+  under-one audit                          # 审计skill结构与元数据
   under-one status                         # 查看生态状态
   under-one evolve                         # 启动自进化
   under-one bundles --check                # 校验 .skill 打包
+  under-one install-bundle foo.skill       # 安装单个 skill bundle
+  under-one test-skill priority-engine       # 单 skill 测试
+  under-one test-skill --path ~/.under-one/skills/fenghou-qimen
+  under-one validate-skill priority-engine   # 单 skill 验证
+  under-one validate-skill --path ~/.under-one/skills/fenghou-qimen
   under-one providers                      # 列出 LLM 适配器
         """
     )
@@ -217,6 +387,13 @@ def main():
     p_scan.add_argument("input", nargs="?", help="输入文件路径")
     p_scan.set_defaults(func=cmd_scan)
 
+    # audit
+    p_audit = subparsers.add_parser("audit", help="审计skill结构与元数据")
+    p_audit.add_argument("skill", nargs="?", help="指定审计的skill (默认全部)")
+    p_audit.add_argument("--json", action="store_true", help="输出JSON结果")
+    p_audit.add_argument("--output", help="将审计结果写入JSON文件")
+    p_audit.set_defaults(func=cmd_audit)
+
     # status
     p_status = subparsers.add_parser("status", help="查看十技生态状态")
     p_status.set_defaults(func=cmd_status)
@@ -231,6 +408,28 @@ def main():
     p_bundles.add_argument("skill", nargs="?", help="指定构建的 skill (默认全部)")
     p_bundles.add_argument("--check", action="store_true", help="只校验，不写文件")
     p_bundles.set_defaults(func=cmd_bundles)
+
+    # install-bundle
+    p_install = subparsers.add_parser("install-bundle", help="安装单个 .skill 分发包")
+    p_install.add_argument("bundle", help=".skill bundle 文件路径")
+    p_install.add_argument("--target-dir", default=str(Path.home() / ".under-one" / "skills"), help="安装目标目录")
+    p_install.add_argument("--force", action="store_true", help="覆盖已存在的同名 skill")
+    p_install.set_defaults(func=cmd_install_bundle)
+
+    # test-skill
+    p_test = subparsers.add_parser("test-skill", help="针对单个 skill 运行独立测试")
+    p_test.add_argument("skill", nargs="?", help="skill 名称 (如 priority-engine)")
+    p_test.add_argument("--path", help="已安装 skill 目录路径（用于独立测试）")
+    p_test.add_argument("--suite", choices=["core", "sdk", "all"], default="all", help="测试套件")
+    p_test.set_defaults(func=cmd_test_skill)
+
+    # validate-skill
+    p_validate = subparsers.add_parser("validate-skill", help="针对单个 skill 运行独立验证")
+    p_validate.add_argument("skill", nargs="?", help="skill 名称 (如 priority-engine)")
+    p_validate.add_argument("--path", help="已安装 skill 目录路径（用于独立验证）")
+    p_validate.add_argument("--json", action="store_true", help="输出JSON结果")
+    p_validate.add_argument("--output", help="将验证结果写入JSON文件")
+    p_validate.set_defaults(func=cmd_validate_skill)
 
     # providers
     p_providers = subparsers.add_parser("providers", help="列出可用的 LLM 适配器")

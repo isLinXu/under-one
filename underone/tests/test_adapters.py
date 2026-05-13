@@ -1,8 +1,13 @@
 """LLM 适配层单元测试（仅依赖 mock，不发真实网络请求）。"""
 
 import os
+import sys
+from pathlib import Path
 
 import pytest
+
+# Add package root to path for direct pytest runs from repo root.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from under_one.adapters import (
     LLMError,

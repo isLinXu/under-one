@@ -30,9 +30,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Tuple
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "underone"))
+
+from under_one.skill_audit import audit_skill_dir
+from under_one.skill_bundle import build_bundle_text
 
 SKILLS = [
     "bagua-zhen",
@@ -49,65 +53,22 @@ SKILLS = [
 
 VERSION = "v10.0.0"
 
-BUNDLE_HEADER = "===== UNDER-ONE SKILL BUNDLE v1 ====="
-BUNDLE_FOOTER = "===== END BUNDLE ====="
-FILE_SEP_TPL = "----- file: {path} -----"
-
-# 排除规则：不打包的文件/目录
-EXCLUDE_DIRS = {"legacy", "__pycache__", "runtime_data", "backups"}
-EXCLUDE_SUFFIXES = {".pyc", ".health_report.json"}
-
-
-def iter_skill_files(skill_dir: Path) -> List[Tuple[str, Path]]:
-    """返回 [(相对路径, 绝对路径), ...]，按字典序稳定排序。"""
-    out: List[Tuple[str, Path]] = []
-    for f in sorted(skill_dir.rglob("*")):
-        if not f.is_file():
-            continue
-        # 跳过排除目录
-        if any(part in EXCLUDE_DIRS for part in f.relative_to(skill_dir).parts):
-            continue
-        # 跳过排除后缀
-        if any(f.name.endswith(suf) for suf in EXCLUDE_SUFFIXES):
-            continue
-        rel = f.relative_to(skill_dir).as_posix()
-        out.append((rel, f))
-    return out
-
 
 def build_bundle(skill_name: str, repo_root: Path) -> str:
     skill_dir = repo_root / "underone" / "skills" / skill_name
     if not skill_dir.is_dir():
         raise FileNotFoundError(f"skill 目录不存在: {skill_dir}")
+    return build_bundle_text(skill_dir, bundle_version=VERSION)
 
-    files = iter_skill_files(skill_dir)
-    if not files:
-        raise RuntimeError(f"{skill_name} 没有可打包的文件")
 
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    lines: List[str] = []
-    lines.append(BUNDLE_HEADER)
-    lines.append(f"name: {skill_name}")
-    lines.append(f"version: {VERSION}")
-    lines.append(f"built_at: {now}")
-    lines.append(f"files: {len(files)}")
-    lines.append("=" * len(BUNDLE_HEADER))
-    lines.append("")
-
-    for rel, path in files:
-        lines.append("")
-        lines.append(FILE_SEP_TPL.format(path=rel))
-        try:
-            content = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            # 二进制文件：跳过并记录
-            lines.append("<binary file skipped>")
-            continue
-        lines.append(content.rstrip("\n"))
-
-    lines.append("")
-    lines.append(BUNDLE_FOOTER)
-    return "\n".join(lines) + "\n"
+def precheck_skill(skill_name: str, repo_root: Path) -> Tuple[bool, List[str], List[str]]:
+    """Run governance audit before bundling a skill."""
+    skill_dir = repo_root / "underone" / "skills" / skill_name
+    result = audit_skill_dir(skill_dir)
+    messages: List[str] = []
+    messages.extend(f"error: {item}" for item in result.errors)
+    messages.extend(f"warn: {item}" for item in result.warnings)
+    return result.ok and not result.warnings, result.errors, result.warnings
 
 
 def main() -> int:
@@ -121,9 +82,14 @@ def main() -> int:
         default="../dist",
         help="输出目录（默认 ../dist/，相对于仓库根）",
     )
+    parser.add_argument(
+        "--skip-audit",
+        action="store_true",
+        help="跳过打包前skill审计（不推荐）",
+    )
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent.parent
+    repo_root = REPO_ROOT
     # out_dir 相对解析：绝对路径直接用；相对路径解析为 repo_root 下
     p = Path(args.out_dir)
     if p.is_absolute():
@@ -144,6 +110,15 @@ def main() -> int:
     ok = 0
     for name in targets:
         try:
+            if not args.skip_audit:
+                audit_ok, errors, warnings = precheck_skill(name, repo_root)
+                if not audit_ok:
+                    print(f"✗ {name}: 审计未通过，已阻止打包", file=sys.stderr)
+                    for item in errors:
+                        print(f"  error: {item}", file=sys.stderr)
+                    for item in warnings:
+                        print(f"  warn: {item}", file=sys.stderr)
+                    continue
             bundle = build_bundle(name, repo_root)
         except Exception as e:
             print(f"✗ {name}: {e}", file=sys.stderr)
