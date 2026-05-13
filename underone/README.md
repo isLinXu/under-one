@@ -63,6 +63,7 @@ python skills/check_versions.py
 python scripts/install_host_skills.py --host codex
 python scripts/install_host_skills.py --host workbuddy
 python scripts/install_host_skills.py --host qclaw
+python scripts/install_host_skills.py --host custom --dest /path/to/product/skills
 
 # 4. 运行一个 skill（源码侧）
 python skills/fenghou-qimen/scripts/priority_engine.py skills/fenghou-qimen/scripts/test_tasks.json
@@ -155,7 +156,7 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ## 当前稳定特性
 
 - **10 个独立 skill 源目录**，可以分别安装、分别测试、分别验证。
-- **同一套源码支持多宿主包装层**：`codex`、`workbuddy`、`qclaw`。
+- **同一套源码支持多宿主包装层**：`codex`、`workbuddy`、`qclaw/openclaw`、`custom`。
 - **源码、安装包、宿主副本三层都可单独验证**，适合逐 skill 调优。
 - **默认保留插图导航层**，方便人读，也方便 agent 在长文档中快速定位能力边界。
 
@@ -244,6 +245,7 @@ python scripts/build_skill_bundles.py my-skill
 | [仓库英文入口](../README.md) | 面向外部用户的总览、安装和多宿主说明 |
 | [仓库中文入口](../README.zh-CN.md) | 中文主文档，适合直接照着执行 |
 | [文档索引](../docs/README.md) | 当前可用深度文档入口 |
+| [宿主适配说明](../docs/HOST_ADAPTERS.md) | 内置宿主、OpenClaw 别名、custom 第三方产品 |
 | [Skill 优化手册](../docs/SKILL_OPTIMIZATION_PLAYBOOK.md) | 单 skill 优化顺序、验证命令、宿主安装方式 |
 | [CHANGELOG.md](./CHANGELOG.md) | 版本演进记录 |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | 贡献规范 |

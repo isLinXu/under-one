@@ -13,7 +13,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
   <img src="https://img.shields.io/badge/skills-10-brightgreen" alt="10 skills">
   <img src="https://img.shields.io/badge/quality-pytest%20%2B%20standalone-success" alt="quality">
-  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw-blue" alt="hosts">
+  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw%20%7C%20custom-blue" alt="hosts">
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
   <img src="https://img.shields.io/badge/status-production--ready-success" alt="status">
 </p>
@@ -158,9 +158,13 @@ Use the same source skills and choose a target runtime:
 python underone/scripts/install_host_skills.py --host codex
 python underone/scripts/install_host_skills.py --host workbuddy
 python underone/scripts/install_host_skills.py --host qclaw
+python underone/scripts/install_host_skills.py --host openclaw --dest /path/to/openclaw/skills
+python underone/scripts/install_host_skills.py --host custom --dest /path/to/product/skills
 ```
 
-Use `--dest /tmp/underone-host-test` when you want an isolated dry run instead of touching your real host directory.
+Use `--dest /tmp/underone-host-test` when you want an isolated dry run instead of touching your real host directory. Use `custom` for third-party products that can read native `SKILL.md` layout.
+
+For host profile details, see [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md).
 
 ### Minimal run without package install
 

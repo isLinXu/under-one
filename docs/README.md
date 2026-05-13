@@ -29,6 +29,7 @@
 | [README_Full.md](./README_Full.md) | 早期完整中英双语项目介绍（原 `README_Final.md`，保留作归档） |
 | [README_Github.md](./README_Github.md) | GitHub Release 专用说明 |
 | [README_Hachigiki.md](./README_Hachigiki.md) | 八奇技世界观到工程的完整映射说明 |
+| [HOST_ADAPTERS.md](./HOST_ADAPTERS.md) | 宿主适配说明：Codex、WorkBuddy、QClaw/OpenClaw、custom 第三方产品 |
 | [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) | 单 skill 优化手册：稳定 ID、安装路径、验证命令、推荐顺序 |
 | [PROJECT_NAMING.md](./PROJECT_NAMING.md) | 项目命名设计与候选方案 |
 | [GITHUB_RELEASE_CHECKLIST.md](./GITHUB_RELEASE_CHECKLIST.md) | 发布前检查清单 |
@@ -74,7 +75,8 @@ make evaluate-skills
 
 - `Codex`：frontmatter wrapper + `agents/openai.yaml`
 - `WorkBuddy`：frontmatter wrapper
-- `QClaw`：保留原生 source layout
+- `QClaw` / `OpenClaw`：保留原生 source layout
+- `Custom`：第三方产品通用入口，必须显式传 `--dest`
 
 统一安装入口：
 
@@ -82,6 +84,13 @@ make evaluate-skills
 cd underone
 python scripts/install_host_skills.py --host workbuddy
 python -m under_one.cli hosts
+```
+
+第三方产品示例：
+
+```bash
+cd ..
+python underone/scripts/install_host_skills.py --host custom --dest /path/to/product/skills fenghou-qimen
 ```
 
 ## 技术文档（位于 `underone/`）

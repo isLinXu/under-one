@@ -44,6 +44,7 @@ HOST_PROFILES: Dict[str, HostProfile] = {
     "codex": HostProfile("codex", "Codex", "frontmatter", lambda: _home_root(".codex", "skills"), True),
     "workbuddy": HostProfile("workbuddy", "WorkBuddy", "frontmatter", lambda: _home_root(".workbuddy", "skills")),
     "qclaw": HostProfile("qclaw", "QClaw", "passthrough", lambda: _home_root(".qclaw", "skills")),
+    "custom": HostProfile("custom", "Custom", "passthrough", None),
     "native": HostProfile("native", "Native", "passthrough", None),
 }
 
@@ -52,12 +53,27 @@ HOST_ALIASES = {
     "claw": "qclaw",
     "work-buddy": "workbuddy",
     "wb": "workbuddy",
+    "third-party": "custom",
+    "thirdparty": "custom",
     "source": "native",
 }
 
 
 def available_hosts() -> List[str]:
     return [name for name in HOST_PROFILES if name != "native"]
+
+
+def accepted_host_names() -> List[str]:
+    names = available_hosts()
+    for alias, target in HOST_ALIASES.items():
+        if target in names and alias not in names:
+            names.append(alias)
+    return names
+
+
+def host_aliases_for(host: str) -> List[str]:
+    canonical = resolve_host_name(host)
+    return [alias for alias, target in HOST_ALIASES.items() if target == canonical]
 
 
 def resolve_host_name(host: str) -> str:
@@ -77,6 +93,15 @@ def default_host_skills_root(host: str) -> Path:
     if profile.default_root_factory is None:
         raise ValueError(f"host runtime has no default root: {host}")
     return profile.default_root_factory()
+
+
+def resolve_host_target_root(host: str, target_root: Path | str | None = None) -> Path:
+    if target_root is not None:
+        return Path(target_root).expanduser().resolve()
+    profile = get_host_profile(host)
+    if profile.default_root_factory is None:
+        raise ValueError(f"host runtime '{profile.name}' requires --dest /path/to/skills")
+    return profile.default_root_factory().expanduser().resolve()
 
 
 def _load_skillhub_meta(skill_dir: Path) -> Dict[str, Any]:
@@ -298,11 +323,7 @@ def install_host_skill(
 ) -> Dict[str, Any]:
     source_skill_dir = Path(source_skill_dir).resolve()
     profile = get_host_profile(host)
-    if target_root is None:
-        if profile.default_root_factory is None:
-            raise ValueError(f"host runtime has no default root: {host}")
-        target_root = profile.default_root_factory()
-    target_root = Path(target_root).expanduser().resolve()
+    target_root = resolve_host_target_root(profile.name, target_root)
 
     with tempfile.TemporaryDirectory(prefix=f"{source_skill_dir.name}-{profile.name}-install-") as tmp:
         bundle_path = Path(tmp) / f"{source_skill_dir.name}.skill"

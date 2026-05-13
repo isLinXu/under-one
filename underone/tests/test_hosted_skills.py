@@ -8,10 +8,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from under_one.hosted_skills import (
+    accepted_host_names,
     available_hosts,
     build_host_skill_markdown,
     default_host_skills_root,
+    get_host_profile,
     install_host_skill,
+    resolve_host_name,
 )
 
 
@@ -61,10 +64,15 @@ def _make_demo_skill(tmp_path: Path) -> Path:
 
 
 def test_available_hosts_cover_target_products():
-    assert available_hosts() == ["codex", "workbuddy", "qclaw"]
+    assert available_hosts() == ["codex", "workbuddy", "qclaw", "custom"]
+    assert "openclaw" in accepted_host_names()
+    assert "third-party" in accepted_host_names()
     assert str(default_host_skills_root("codex")).endswith("/.codex/skills")
     assert str(default_host_skills_root("workbuddy")).endswith("/.workbuddy/skills")
     assert str(default_host_skills_root("qclaw")).endswith("/.qclaw/skills")
+    assert resolve_host_name("openclaw") == "qclaw"
+    assert resolve_host_name("third-party") == "custom"
+    assert get_host_profile("custom").layout == "passthrough"
 
 
 def test_workbuddy_markdown_uses_frontmatter_wrapper(tmp_path):
@@ -104,5 +112,27 @@ def test_install_host_skill_for_qclaw_keeps_native_layout(tmp_path):
     assert not (installed_dir / "agents" / "openai.yaml").exists()
     manifest = json.loads((installed_dir / "install-manifest.json").read_text(encoding="utf-8"))
     assert manifest["host_runtime"]["host"] == "qclaw"
+    assert result["host_validation"]["passed"] is True
+    assert result["installed_lifecycle"]["passed"] is True
+
+
+def test_install_host_skill_for_custom_requires_explicit_destination(tmp_path):
+    skill_dir = _make_demo_skill(tmp_path)
+    try:
+        install_host_skill(skill_dir, "custom", force=True)
+    except ValueError as exc:
+        assert "requires --dest" in str(exc)
+    else:
+        raise AssertionError("custom host should require an explicit destination")
+
+
+def test_install_host_skill_for_custom_keeps_native_layout(tmp_path):
+    skill_dir = _make_demo_skill(tmp_path)
+    result = install_host_skill(skill_dir, "custom", tmp_path / "third-party-skills", force=True)
+    installed_dir = Path(result["installed_dir"])
+    assert installed_dir.exists()
+    assert (installed_dir / "SKILL.md").read_text(encoding="utf-8").startswith("---\nmetadata:\n  name: \"demo-skill\"")
+    manifest = json.loads((installed_dir / "install-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["host_runtime"]["host"] == "custom"
     assert result["host_validation"]["passed"] is True
     assert result["installed_lifecycle"]["passed"] is True

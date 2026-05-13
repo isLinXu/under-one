@@ -11,7 +11,8 @@ Usage:
     under-one evolve [skill]                   # 启动修身炉进化
     under-one bundles [--check] [skill]        # 构建 .skill 单文件分发包
     under-one install-host --host qclaw        # 安装到指定宿主
-    under-one hosts                            # 列出支持的宿主
+    under-one install-host --host custom --dest /tmp/custom-skills   # 第三方产品
+    under-one hosts                            # 列出支持的宿主及别名
     under-one providers                        # 列出可用 LLM 适配器
 """
 
@@ -24,11 +25,14 @@ from .skill_bundle import install_bundle, verify_installed_skill
 from .skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
 from .hosted_skills import (
     DEFAULT_SKILLS,
+    accepted_host_names,
     available_hosts,
     default_host_skills_root,
     get_host_profile,
+    host_aliases_for,
     install_and_validate_host_skill,
     iter_source_skill_dirs,
+    resolve_host_target_root,
 )
 from .skill_lifecycle import SKILL_TEST_TARGETS, validate_skill
 
@@ -235,11 +239,17 @@ def cmd_hosts(args):
     print("-" * 50)
     for host in available_hosts():
         profile = get_host_profile(host)
-        root = default_host_skills_root(host)
+        try:
+            root = str(default_host_skills_root(host))
+        except ValueError:
+            root = "<requires --dest>"
         mode = "frontmatter-wrapper" if profile.layout == "frontmatter" else "native-source"
         extras = "agents/openai.yaml" if profile.uses_agents_yaml else "-"
         print(f"  {profile.name:<10} {profile.label:<12} layout={mode:<20} root={root}")
         print(f"             extra_files={extras}")
+        aliases = host_aliases_for(host)
+        if aliases:
+            print(f"             aliases={', '.join(aliases)}")
 
 
 def cmd_install_host(args):
@@ -251,7 +261,11 @@ def cmd_install_host(args):
         sys.exit(2)
 
     profile = get_host_profile(args.host)
-    dest = Path(args.dest).expanduser().resolve() if args.dest else default_host_skills_root(args.host).resolve()
+    try:
+        dest = resolve_host_target_root(args.host, args.dest)
+    except ValueError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(2)
     source_root = find_skill_dir()
 
     results = []
@@ -445,6 +459,7 @@ def main():
   under-one install-bundle foo.skill       # 安装单个 skill bundle
   under-one hosts                          # 列出支持的宿主
   under-one install-host --host workbuddy  # 安装到 WorkBuddy
+  under-one install-host --host custom --dest /tmp/custom-skills fenghou-qimen
   under-one test-skill priority-engine       # 单 skill 测试
   under-one test-skill --path ~/.under-one/skills/fenghou-qimen
   under-one validate-skill priority-engine   # 单 skill 验证
@@ -500,9 +515,9 @@ def main():
     p_hosts.set_defaults(func=cmd_hosts)
 
     # install-host
-    p_install_host = subparsers.add_parser("install-host", help="安装 skills 到指定宿主")
+    p_install_host = subparsers.add_parser("install-host", help="安装 skills 到指定宿主（含 custom 第三方产品）")
     p_install_host.add_argument("skills", nargs="*", help="skill names to install; defaults to all")
-    p_install_host.add_argument("--host", choices=available_hosts(), default="codex", help="目标宿主 Runtime")
+    p_install_host.add_argument("--host", choices=accepted_host_names(), default="codex", help="目标宿主 Runtime")
     p_install_host.add_argument("--dest", help="覆盖默认宿主技能目录")
     p_install_host.add_argument("--force", action="store_true", help="覆盖已存在的同名 skill")
     p_install_host.add_argument("--skip-source-validation", action="store_true", help="跳过源码侧验证")

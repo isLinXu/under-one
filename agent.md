@@ -17,6 +17,7 @@ version: v0.1.0
 - 每个 skill 必须保持独立、解耦、可单独安装、可单独测试、可单独验证。
 - 一次只优化一个 skill；不要把全套技能一起改。
 - `bagua-zhen` 的真实路径是 `underone/skills/bagua-zhen`。
+- 内置宿主是 `codex`、`workbuddy`、`qclaw`；OpenClaw 类产品可用 `openclaw`/`claw` 别名；第三方产品用 `custom --dest`。
 - 不要把生成报告、运行产物、`runtime_data/`、`underone/reports/` 当成源码。
 
 ## 先看这些文档
@@ -25,6 +26,7 @@ version: v0.1.0
 2. [README.zh-CN.md](./README.zh-CN.md) - 中文总览
 3. [docs/README.md](./docs/README.md) - 深度文档索引
 4. [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md) - 单 skill 优化手册
+5. [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md) - 宿主适配策略
 
 ## 标准动作
 
@@ -55,6 +57,7 @@ python underone/skills/check_versions.py
 python underone/scripts/install_host_skills.py --host codex
 python underone/scripts/install_host_skills.py --host workbuddy
 python underone/scripts/install_host_skills.py --host qclaw
+python underone/scripts/install_host_skills.py --host custom --dest /path/to/product/skills
 ```
 
 隔离测试时，加 `--dest /tmp/underone-host-test`。

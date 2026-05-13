@@ -67,6 +67,7 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 python underone/scripts/install_host_skills.py --host codex
 python underone/scripts/install_host_skills.py --host workbuddy
 python underone/scripts/install_host_skills.py --host qclaw
+python underone/scripts/install_host_skills.py --host custom --dest /tmp/underone-custom
 ```
 
 如果只想试一个 skill，就加上 skill 名：
@@ -75,3 +76,10 @@ python underone/scripts/install_host_skills.py --host qclaw
 python underone/scripts/install_host_skills.py --host codex fenghou-qimen
 ```
 
+第三方类 OpenClaw 产品优先使用原生布局：
+
+```bash
+python underone/scripts/install_host_skills.py --host openclaw --dest /path/to/openclaw/skills fenghou-qimen
+python underone/scripts/install_host_skills.py --host custom --dest /path/to/product/skills fenghou-qimen
+python /path/to/product/skills/fenghou-qimen/skillctl.py self-test
+```

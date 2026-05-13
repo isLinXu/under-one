@@ -13,11 +13,11 @@ sys.path.insert(0, str(REPO_ROOT / "underone"))
 
 from under_one.hosted_skills import (
     DEFAULT_SKILLS,
-    available_hosts,
-    default_host_skills_root,
+    accepted_host_names,
     get_host_profile,
     install_and_validate_host_skill,
     iter_source_skill_dirs,
+    resolve_host_target_root,
 )
 
 
@@ -48,9 +48,9 @@ def _print_text_report(results, dest: Path, host: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Install under-one skills into a supported host runtime.")
+    parser = argparse.ArgumentParser(description="Install under-one skills into a supported host runtime, including custom third-party targets.")
     parser.add_argument("skills", nargs="*", help="skill names to install; defaults to all")
-    parser.add_argument("--host", choices=available_hosts(), default="codex", help="target host runtime")
+    parser.add_argument("--host", choices=accepted_host_names(), default="codex", help="target host runtime")
     parser.add_argument("--dest", help="host skills root (defaults to the host's standard directory)")
     parser.add_argument("--json", action="store_true", help="print machine-readable JSON report")
     parser.add_argument("--no-force", action="store_true", help="do not overwrite existing installed skills")
@@ -67,7 +67,11 @@ def main() -> int:
         print(f"ERROR: 未知 skill: {unknown}", file=sys.stderr)
         return 2
 
-    dest = Path(args.dest).expanduser().resolve() if args.dest else default_host_skills_root(args.host).resolve()
+    try:
+        dest = resolve_host_target_root(args.host, args.dest)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     source_root = REPO_ROOT / "underone" / "skills"
 
     results = []

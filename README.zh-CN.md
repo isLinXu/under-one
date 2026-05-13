@@ -13,7 +13,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
   <img src="https://img.shields.io/badge/skills-10-brightgreen" alt="10 skills">
   <img src="https://img.shields.io/badge/quality-pytest%20%2B%20standalone-success" alt="quality">
-  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw-blue" alt="hosts">
+  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw%20%7C%20custom-blue" alt="hosts">
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
   <img src="https://img.shields.io/badge/status-production--ready-success" alt="status">
 </p>
@@ -156,9 +156,13 @@ cd ..
 python underone/scripts/install_host_skills.py --host codex
 python underone/scripts/install_host_skills.py --host workbuddy
 python underone/scripts/install_host_skills.py --host qclaw
+python underone/scripts/install_host_skills.py --host openclaw --dest /path/to/openclaw/skills
+python underone/scripts/install_host_skills.py --host custom --dest /path/to/product/skills
 ```
 
-如需隔离验证，请加上 `--dest /tmp/underone-host-test`。
+如需隔离验证，请加上 `--dest /tmp/underone-host-test`。第三方产品优先走 `custom`，并显式传入目标 skills 目录。
+
+宿主适配细节见 [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md)。
 
 **不装包直接跑：**
 
