@@ -59,7 +59,7 @@ cd under-one/underone
 python -m pytest -q
 python skills/check_versions.py
 
-# 3. 安装到当前宿主
+# 3. 安装到目标宿主
 python scripts/install_host_skills.py --host codex
 python scripts/install_host_skills.py --host workbuddy
 python scripts/install_host_skills.py --host qclaw
@@ -83,7 +83,7 @@ python -m under_one.cli validate-skill priority-engine --json
 # 安装到隔离宿主目录
 python scripts/install_host_skills.py --host qclaw --dest /tmp/underone-qclaw --skip-source-validation fenghou-qimen
 
-# 验证安装后的副本
+# 验证同一个目标目录里的安装副本
 python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ```
 
@@ -162,6 +162,8 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ---
 
 ## 直接运行脚本
+
+以下命令默认在 `underone/` 目录执行。
 
 ### 运行单个 Skill
 

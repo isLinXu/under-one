@@ -141,7 +141,7 @@ python -m under_one.cli hosts
 python -m under_one.cli list
 cd ..
 
-# Install all skills into one host runtime
+# Install all skills into a chosen host runtime
 python underone/scripts/install_host_skills.py --host codex
 
 # Validate one skill from source
@@ -186,7 +186,7 @@ python -m under_one.cli validate-skill priority-engine --json
 cd ..
 python underone/scripts/install_host_skills.py --host qclaw --dest /tmp/underone-qclaw --skip-source-validation fenghou-qimen
 
-# 4. Validate the installed copy
+# 4. Validate the installed copy created in the same target directory
 python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ```
 
@@ -273,6 +273,7 @@ python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 ```
 under-one/
 ├── README.md · README.zh-CN.md   # bilingual entry docs
+├── agent.md                      # agent-facing kernel entry
 ├── FAQ.md · IMPROVEMENTS.md
 ├── LICENSE · Makefile
 ├── dist/                         # build artifacts (.skill bundles, untracked)

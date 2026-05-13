@@ -182,7 +182,7 @@ python -m under_one.cli validate-skill priority-engine --json
 cd ..
 python underone/scripts/install_host_skills.py --host qclaw --dest /tmp/underone-qclaw --skip-source-validation fenghou-qimen
 
-# 4. 验证安装后的副本
+# 4. 验证同一个目标目录里的安装副本
 python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ```
 
@@ -269,6 +269,7 @@ python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 ```
 under-one/
 ├── README.md · README.zh-CN.md  # 双语入口文档
+├── agent.md                     # 面向 agent 的元婴入口
 ├── FAQ.md · IMPROVEMENTS.md
 ├── LICENSE · Makefile
 ├── dist/                        # 构建产物（.skill 分发包，不跟踪）
@@ -276,15 +277,20 @@ under-one/
 │   ├── README.md                # 文档索引
 │   ├── README_Full.md · README_Hachigiki.md
 │   └── history/                 # V6-V9 过程性报告
-└── underone/            # 工程目录
-    ├── {skill}/                 # 10 技能 · SKILL.md + scripts/ + scene_*.json
+└── underone/                    # 工程目录
+    ├── skills/                  # 10 技能 · SKILL.md + scripts/ + scene_*.json
+    │   ├── bagua-zhen/
+    │   ├── qiti-yuanliu/
+    │   ├── fenghou-qimen/
+    │   └── ...                  # 其余 7 个 skill
     ├── under_one/               # Python SDK + CLI
     │   └── adapters/            # base / mock / openai / anthropic / registry
-    ├── under-one.yaml           # 全局阈值配置
+    ├── tests/                   # pytest 套件
     ├── examples/                # demo · efficiency_benchmark · real_llm_benchmark
     ├── artifacts/               # 示例 JSON 报告
-    ├── scripts/build_skill_bundles.py
-    └── tests/                   # pytest 套件（14 测试 · 覆盖率 37%）
+    ├── scripts/                 # build_skill_bundles.py · tooling
+    ├── under-one.yaml           # 全局阈值配置
+    └── setup.py                 # pip installable
 ```
 
 ## 12. Make 命令表

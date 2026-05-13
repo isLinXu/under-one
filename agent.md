@@ -62,6 +62,7 @@ python underone/scripts/install_host_skills.py --host qclaw
 ### 4) 再复验安装副本
 
 ```bash
+# 例：前一步安装到了 /tmp/underone-qclaw
 python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 ```
 

@@ -8,6 +8,8 @@
 
 ## 运行示例
 
+以下命令默认在 `underone/` 目录执行。
+
 ```bash
 # 端到端演示
 python examples/demo.py
