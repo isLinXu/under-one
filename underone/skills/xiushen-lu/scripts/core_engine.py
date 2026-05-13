@@ -22,12 +22,55 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 
+# 运行时指标收集
+SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SKILLS_ROOT))
+try:
+    from metrics_collector import record_metrics
+except ImportError:
+    def record_metrics(*args, **kwargs):
+        def decorator(f): return f
+        return decorator
+
+try:
+    from _skill_config import get_skill_config
+except ImportError:
+    def get_skill_config(_section, _key=None, default=None):
+        return default
+
 # V7: 导入跨技能知识共享库
 try:
     from shared_knowledge import get_hub
     KnowledgeHub = get_hub()
 except ImportError:
     KnowledgeHub = None
+
+
+VERSION = "v0.1.0"
+_cfg_persist_on_apply_only = get_skill_config("xiushenlu", "persist_adaptive_thresholds_on_apply_only", True)
+_cfg_adaptive_bounds = get_skill_config("xiushenlu", "adaptive_threshold_bounds", {})
+
+
+def _evolution_quality(report: dict) -> float:
+    """Derive a quality score from the evolution cycle summary."""
+    if not isinstance(report, dict):
+        return 85.0
+    summary = report.get("summary", {})
+    if not isinstance(summary, dict):
+        return 85.0
+    total = max(int(summary.get("total", 0) or 0), 1)
+    completed = int(summary.get("evolved", 0) or 0) + int(summary.get("planned", 0) or 0) + int(summary.get("no_action", 0) or 0)
+    failure_penalty = int(summary.get("failed_rolled_back", 0) or 0) * 6
+    error_penalty = sum(1 for item in report.get("results", []) if item.get("status") == "error") * 8
+    completion_bonus = min(8.0, (completed / total) * 6.0)
+    stability_bonus = 5.0 if failure_penalty == 0 and error_penalty == 0 else 0.0
+    completeness = float(report.get("output_completeness", 100.0) or 0.0)
+    consistency = float(report.get("consistency_score", 85.0) or 0.0)
+    human_intervention = float(report.get("human_intervention", 0.0) or 0.0)
+    signal_adjustment = ((completeness - 85.0) * 0.08) + ((consistency - 85.0) * 0.06) - (human_intervention * 6.0)
+    base = 82.0
+    score = base + completion_bonus + stability_bonus + signal_adjustment - failure_penalty - error_penalty
+    return round(min(100.0, max(60.0, score)), 1)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -63,8 +106,17 @@ class QiSourceV7:
         if not file_path.exists():
             return []
         with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        records = [json.loads(line.strip()) for line in lines if line.strip()]
+            records = []
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(record, dict):
+                    records.append(record)
         return records[-n:]
 
 
@@ -74,25 +126,54 @@ class QiSourceV7:
 class RefinerV7:
     """V7炼化器: 自适应阈值引擎 + 深度瓶颈分析"""
 
-    def __init__(self):
+    def __init__(self, persist_adaptive: Optional[bool] = None, adaptive_bounds: Optional[Dict[str, Tuple[float, float]]] = None):
         # 基础阈值
         self.base_thresholds = {
             "success_rate_warning": 0.80,
             "success_rate_critical": 0.65,
             "human_intervention_warning": 0.10,
             "human_intervention_critical": 0.25,
+            "output_completeness_warning": 85.0,
+            "output_completeness_critical": 70.0,
+            "consistency_score_warning": 82.0,
+            "consistency_score_critical": 68.0,
             "degradation_consecutive": 4,
             "sla_threshold": 1.15,
             "quality_drop_threshold": 5.0,
         }
         # V7: 自适应阈值存储
         self.adaptive_file = Path("adaptive_thresholds.json")
+        self.persist_adaptive = (not _cfg_persist_on_apply_only) if persist_adaptive is None else persist_adaptive
+        self.adaptive_bounds = self._resolve_bounds(adaptive_bounds or _cfg_adaptive_bounds)
         self.adaptive = self._load_adaptive()
+
+    def _resolve_bounds(self, raw_bounds: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:
+        bounds: Dict[str, Tuple[float, float]] = {}
+        for key, value in (raw_bounds or {}).items():
+            if not isinstance(value, (list, tuple)) or len(value) != 2:
+                continue
+            low, high = value
+            try:
+                bounds[key] = (float(low), float(high))
+            except (TypeError, ValueError):
+                continue
+        return bounds
+
+    def _clamp_threshold(self, key: str, value: float) -> float:
+        bounds = self.adaptive_bounds.get(key)
+        if not bounds:
+            return value
+        low, high = bounds
+        return min(max(value, low), high)
 
     def _load_adaptive(self) -> Dict:
         if self.adaptive_file.exists():
-            with open(self.adaptive_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+            try:
+                with open(self.adaptive_file, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                return loaded if isinstance(loaded, dict) else {}
+            except Exception:
+                return {}
         return {}
 
     def _save_adaptive(self) -> None:
@@ -125,14 +206,39 @@ class RefinerV7:
 
     def update_adaptive(self, skill_name: str, key: str, value: float, reason: str) -> None:
         """V7: 更新自适应阈值并记录原因"""
+        bounded_value = self._clamp_threshold(key, value)
         if skill_name not in self.adaptive:
             self.adaptive[skill_name] = {}
         self.adaptive[skill_name][key] = {
-            "value": value,
+            "value": bounded_value,
             "updated_at": datetime.now().isoformat(),
             "reason": reason,
         }
-        self._save_adaptive()
+        if self.persist_adaptive:
+            self._save_adaptive()
+
+    @staticmethod
+    def _average_signal(records: List[Dict], key: str, fallback_key: Optional[str] = None, default: float = 0.0) -> float:
+        values: List[float] = []
+        for record in records:
+            raw = record.get(key)
+            if raw is None and fallback_key is not None:
+                raw = record.get(fallback_key)
+            try:
+                values.append(float(raw if raw is not None else default))
+            except (TypeError, ValueError):
+                values.append(float(default))
+        return sum(values) / len(values) if values else default
+
+    @staticmethod
+    def _promote_priority(current: str, candidate: str) -> str:
+        order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+        return candidate if order.get(candidate, 0) > order.get(current, 0) else current
+
+    @staticmethod
+    def _promote_evolution(current: str, candidate: str) -> str:
+        order = {"none": 0, "tuning": 1, "extension": 2, "refactor": 3}
+        return candidate if order.get(candidate, 0) > order.get(current, 0) else current
 
     def analyze(self, skill_name: str, records: List[Dict]) -> Dict:
         if not records:
@@ -143,22 +249,26 @@ class RefinerV7:
         total_errors = sum(r.get("error_count", 0) for r in records)
         total_human = sum(r.get("human_intervention", 0) for r in records)
         qualities = [r.get("quality_score", 100) for r in records]
+        completenesses = [self._average_signal([r], "output_completeness", fallback_key="quality_score", default=100.0) for r in records]
+        consistencies = [self._average_signal([r], "consistency_score", fallback_key="quality_score", default=100.0) for r in records]
         avg_duration = sum(r.get("duration_ms", 0) for r in records) / n
 
         success_rate = successes / n
         avg_errors = total_errors / n
         avg_human = total_human / n
         avg_quality = sum(qualities) / n
+        avg_completeness = sum(completenesses) / n
+        avg_consistency = sum(consistencies) / n
         std_quality = statistics.stdev(qualities) if len(qualities) > 1 else 0
 
         # V7: 自适应阈值调整逻辑
         # 如果skill长期稳定（成功率>95%且质量方差<5），则放宽阈值以减少不必要的进化
         # 如果skill波动大（方差>15），则收紧阈值以更早发现问题
         quality_variance = std_quality
-        if success_rate > 0.95 and quality_variance < 5:
+        if success_rate > 0.95 and quality_variance < 5 and avg_completeness > 92 and avg_consistency > 90:
             self.update_adaptive(skill_name, "success_rate_warning", 0.75,
                                  f"Skill高度稳定(成功率{success_rate*100:.0f}%, 方差{quality_variance:.1f})，放宽阈值")
-        elif quality_variance > 15:
+        elif quality_variance > 15 or avg_consistency < 75:
             self.update_adaptive(skill_name, "success_rate_warning", 0.85,
                                  f"Skill波动大(方差{quality_variance:.1f})，收紧阈值")
 
@@ -169,6 +279,11 @@ class RefinerV7:
         sr_warn = self.get_threshold(skill_name, "success_rate_warning")
         sr_crit = self.get_threshold(skill_name, "success_rate_critical")
         hi_warn = self.get_threshold(skill_name, "human_intervention_warning")
+        hi_crit = self.get_threshold(skill_name, "human_intervention_critical")
+        oc_warn = self.get_threshold(skill_name, "output_completeness_warning")
+        oc_crit = self.get_threshold(skill_name, "output_completeness_critical")
+        cs_warn = self.get_threshold(skill_name, "consistency_score_warning")
+        cs_crit = self.get_threshold(skill_name, "consistency_score_critical")
         deg_thresh = self.get_threshold(skill_name, "degradation_consecutive")
 
         recommendations = []
@@ -184,17 +299,51 @@ class RefinerV7:
             evolution_type = "extension"
             priority = "high"
 
+        if avg_completeness < oc_crit:
+            recommendations.append(f"输出完整度严重不足 ({avg_completeness:.1f}) < 临界值 {oc_crit}")
+            evolution_type = self._promote_evolution(
+                evolution_type,
+                "extension" if success_rate >= sr_warn else "refactor",
+            )
+            priority = self._promote_priority(priority, "critical")
+        elif avg_completeness < oc_warn:
+            recommendations.append(f"输出完整度偏低 ({avg_completeness:.1f}) < 警告值 {oc_warn}")
+            evolution_type = self._promote_evolution(evolution_type, "extension")
+            priority = self._promote_priority(priority, "high")
+
+        if avg_consistency < cs_crit:
+            recommendations.append(f"一致性严重不足 ({avg_consistency:.1f}) < 临界值 {cs_crit}")
+            evolution_type = self._promote_evolution(evolution_type, "refactor")
+            priority = self._promote_priority(priority, "critical")
+        elif avg_consistency < cs_warn:
+            recommendations.append(f"一致性偏低 ({avg_consistency:.1f}) < 警告值 {cs_warn}")
+            evolution_type = self._promote_evolution(evolution_type, "tuning")
+            priority = self._promote_priority(priority, "high")
+
         if consecutive_degradation >= deg_thresh:
             recommendations.append(f"连续{consecutive_degradation}次性能下降 >= 阈值{deg_thresh}")
-            evolution_type = evolution_type if evolution_type != "none" else "tuning"
-            priority = max(priority, "high", key=lambda x: {"low": 0, "medium": 1, "high": 2, "critical": 3}[x])
+            evolution_type = self._promote_evolution(evolution_type, "tuning")
+            priority = self._promote_priority(priority, "high")
 
         if avg_human > hi_warn:
             recommendations.append(f"人工干预率过高 ({avg_human:.2f}/task) > 阈值 {hi_warn}")
-            evolution_type = evolution_type if evolution_type != "none" else "extension"
+            evolution_type = self._promote_evolution(evolution_type, "extension")
+            priority = self._promote_priority(priority, "high" if avg_human > hi_crit else "medium")
 
         # V7: 新增瓶颈类型识别
-        bottleneck_type = self._identify_bottleneck(records, avg_errors, avg_human, quality_variance)
+        bottleneck_type = self._identify_bottleneck(
+            success_rate=success_rate,
+            avg_errors=avg_errors,
+            avg_human=avg_human,
+            variance=quality_variance,
+            avg_quality=avg_quality,
+            avg_completeness=avg_completeness,
+            avg_consistency=avg_consistency,
+            sr_warn=sr_warn,
+            hi_warn=hi_warn,
+            oc_warn=oc_warn,
+            cs_warn=cs_warn,
+        )
 
         return {
             "status": "analyzed",
@@ -204,19 +353,40 @@ class RefinerV7:
             "avg_human_intervention": round(avg_human, 2),
             "avg_duration_ms": round(avg_duration, 1),
             "avg_quality": round(avg_quality, 1),
+            "avg_output_completeness": round(avg_completeness, 1),
+            "avg_consistency_score": round(avg_consistency, 1),
             "quality_variance": round(quality_variance, 2),
             "consecutive_degradation": consecutive_degradation,
             "evolution_type": evolution_type,
             "priority": priority,
             "bottleneck_type": bottleneck_type,
             "recommendations": recommendations,
+            "signal_summary": {
+                "quality_minus_completeness": round(avg_quality - avg_completeness, 1),
+                "quality_minus_consistency": round(avg_quality - avg_consistency, 1),
+                "high_quality_low_completeness": avg_quality >= 85 and avg_completeness < oc_warn,
+                "manual_intervention_pressure": avg_human > hi_warn,
+                "consistency_drift": avg_consistency < cs_warn,
+            },
             "adaptive_thresholds_used": {
                 "success_rate_warning": sr_warn,
                 "success_rate_critical": sr_crit,
                 "human_intervention_warning": hi_warn,
+                "human_intervention_critical": hi_crit,
+                "output_completeness_warning": oc_warn,
+                "output_completeness_critical": oc_crit,
+                "consistency_score_warning": cs_warn,
+                "consistency_score_critical": cs_crit,
                 "degradation_consecutive": deg_thresh,
             },
-            "health_score": self._calc_health_score(success_rate, avg_errors, avg_human, avg_quality),
+            "health_score": self._calc_health_score(
+                success_rate,
+                avg_errors,
+                avg_human,
+                avg_quality,
+                avg_completeness,
+                avg_consistency,
+            ),
         }
 
     def _detect_degradation(self, records: List[Dict]) -> int:
@@ -233,20 +403,61 @@ class RefinerV7:
             prev_quality = q
         return max_streak
 
-    def _identify_bottleneck(self, records: List[Dict], avg_errors: float, avg_human: float, variance: float) -> str:
+    def _identify_bottleneck(
+        self,
+        success_rate: float,
+        avg_errors: float,
+        avg_human: float,
+        variance: float,
+        avg_quality: float,
+        avg_completeness: float,
+        avg_consistency: float,
+        sr_warn: float,
+        hi_warn: float,
+        oc_warn: float,
+        cs_warn: float,
+    ) -> str:
         """V7: 识别瓶颈类型"""
-        if avg_errors > 0.5:
-            return "error_prone"
-        if avg_human > 0.2:
-            return "low_autonomy"
-        if variance > 20:
-            return "unstable"
-        if avg_errors > 0.1 and avg_human > 0.05:
+        error_issue = avg_errors > 0.5 or success_rate < sr_warn
+        autonomy_issue = avg_human > hi_warn
+        completeness_issue = avg_completeness < oc_warn
+        consistency_issue = avg_consistency < cs_warn
+        stability_issue = variance > 20
+        issue_count = sum([error_issue, autonomy_issue, completeness_issue, consistency_issue, stability_issue])
+
+        if issue_count >= 2 and (error_issue or completeness_issue or consistency_issue):
             return "comprehensive"
+        if error_issue:
+            return "error_prone"
+        if completeness_issue:
+            return "incomplete_output" if avg_quality >= avg_completeness else "incomplete_delivery"
+        if consistency_issue:
+            return "inconsistent_output"
+        if autonomy_issue:
+            return "low_autonomy"
+        if stability_issue:
+            return "unstable"
         return "stable"
 
-    def _calc_health_score(self, sr: float, err: float, human: float, quality: float) -> float:
-        score = sr * 30 + max(0, 1 - err) * 25 + max(0, 1 - human) * 20 + (quality / 100) * 25
+    def _calc_health_score(
+        self,
+        sr: float,
+        err: float,
+        human: float,
+        quality: float,
+        completeness: float,
+        consistency: float,
+    ) -> float:
+        error_factor = max(0.0, 1 - min(err, 1.0))
+        autonomy_factor = max(0.0, 1 - min(human, 1.0))
+        score = (
+            sr * 24
+            + error_factor * 16
+            + autonomy_factor * 14
+            + (quality / 100) * 18
+            + (completeness / 100) * 14
+            + (consistency / 100) * 14
+        )
         return round(score, 1)
 
 
@@ -485,7 +696,7 @@ def _smooth(value):
             old_version = f"v{version_match.group(1)}.{version_match.group(2)}.{version_match.group(3)}"
             content = content.replace(old_version, new_version)
         else:
-            new_version = "v7.0.0"
+            new_version = "v7.1.0"
             if "metadata:" in content:
                 content = content.replace("metadata:", f"metadata:\n  version: {new_version}", 1)
             else:
@@ -543,78 +754,159 @@ class RollbackV7:
 class XiuShenLuCoreV7:
     """V7修身炉核心: 自适应阈值 + 深度进化 + 跨skill学习"""
 
-    def __init__(self, skills_dir: str, data_dir: str = "runtime_data"):
+    def __init__(
+        self,
+        skills_dir: str,
+        data_dir: str = "runtime_data",
+        apply_changes: bool = False,
+        persist_adaptive: Optional[bool] = None,
+    ):
         self.qi = QiSourceV7(data_dir)
-        self.refiner = RefinerV7()
+        if persist_adaptive is None:
+            persist_adaptive = apply_changes
+        self.refiner = RefinerV7(persist_adaptive=persist_adaptive)
         self.transformer = TransformerV7(skills_dir)
         self.rollback = RollbackV7(skills_dir)
         self.skills_dir = Path(skills_dir)
+        self.apply_changes = apply_changes
 
+    @record_metrics("xiushen-lu", quality_fn=_evolution_quality)
     def run_evolution_cycle(self, skill_name: Optional[str] = None) -> Dict:
         results = []
         targets = [skill_name] if skill_name else self._discover_skills()
+        eligible_targets = [target for target in targets if target != "xiushen-lu"]
 
         for target in targets:
-            if target == "xiushen-lu":
-                continue  # 不修炉自身
+            try:
+                if target == "xiushen-lu":
+                    continue  # 不修炉自身
 
-            print(f"\n🔥 V7 [{target}] 进化周期启动...")
+                print(f"\n🔥 V7 [{target}] 进化周期启动...")
 
-            records = self.qi.load_history(target, n=100)
-            print(f"  1️⃣ COLLECT: {len(records)} 条历史记录")
+                records = self.qi.load_history(target, n=100)
+                print(f"  1️⃣ COLLECT: {len(records)} 条历史记录")
 
-            if len(records) < 10:
-                print(f"  ⚠️ 数据不足，跳过")
-                results.append({"skill": target, "status": "skipped"})
-                continue
+                if len(records) < 10:
+                    print(f"  ⚠️ 数据不足，进入冷启动基线分析")
+                    bootstrap_analysis = self._build_bootstrap_analysis(target, records)
+                    results.append({
+                        "skill": target,
+                        "status": "planned",
+                        "planned_evolution_type": "bootstrap",
+                        "analysis": bootstrap_analysis,
+                    })
+                    continue
 
-            analysis = self.refiner.analyze(target, records)
-            print(f"  2️⃣ ANALYZE: 健康分={analysis.get('health_score')} 类型={analysis.get('evolution_type')} "
-                  f"瓶颈={analysis.get('bottleneck_type')}")
+                analysis = self.refiner.analyze(target, records)
+                print(
+                    f"  2️⃣ ANALYZE: 健康分={analysis.get('health_score')} 类型={analysis.get('evolution_type')} "
+                    f"瓶颈={analysis.get('bottleneck_type')} 完整度={analysis.get('avg_output_completeness')} "
+                    f"一致性={analysis.get('avg_consistency_score')} 人工={analysis.get('avg_human_intervention')}"
+                )
 
-            evo_type = analysis.get("evolution_type", "none")
-            if evo_type == "none":
-                print(f"  3️⃣ DECIDE: 无需进化")
-                results.append({"skill": target, "status": "no_action", "health": analysis.get("health_score")})
-                continue
+                evo_type = analysis.get("evolution_type", "none")
+                if evo_type == "none":
+                    print(f"  3️⃣ DECIDE: 无需进化")
+                    results.append({
+                        "skill": target,
+                        "status": "no_action",
+                        "health": analysis.get("health_score"),
+                        "analysis": analysis,
+                    })
+                    continue
 
-            print(f"  3️⃣ DECIDE: 触发{evo_type}深度进化")
+                print(f"  3️⃣ DECIDE: 触发{evo_type}深度进化")
 
-            evolution_result = self.transformer.evolve(target, evo_type, analysis)
-            print(f"  4️⃣ EVOLVE: {evolution_result.get('status')} 版本→{evolution_result.get('version')} "
-                  f"深度={evolution_result.get('deep_evolution')}")
-            for change in evolution_result.get("changes", []):
-                print(f"     ✓ {change}")
+                if not self.apply_changes:
+                    print(f"  4️⃣ PLAN: 分析模式，仅生成进化计划（未改写文件）")
+                    results.append({
+                        "skill": target,
+                        "status": "planned",
+                        "planned_evolution_type": evo_type,
+                        "analysis": analysis,
+                    })
+                    continue
 
-            validation = self._validate(target)
-            print(f"  5️⃣ VALIDATE: {'通过' if validation['passed'] else '失败'}")
+                evolution_result = self.transformer.evolve(target, evo_type, analysis)
+                print(f"  4️⃣ EVOLVE: {evolution_result.get('status')} 版本→{evolution_result.get('version')} "
+                      f"深度={evolution_result.get('deep_evolution')}")
+                for change in evolution_result.get("changes", []):
+                    print(f"     ✓ {change}")
 
-            if not validation["passed"]:
-                rb = self.rollback.rollback(target)
-                print(f"  🔄 已回滚到 {rb.get('version')}")
-                results.append({"skill": target, "status": "failed_rolled_back", "evolution": evolution_result})
-                continue
+                validation = self._validate(target)
+                print(f"  5️⃣ VALIDATE: {'通过' if validation['passed'] else '失败'}")
 
-            print(f"  6️⃣ DEPLOY: ✅ V7深度进化成功")
-            results.append({
-                "skill": target,
-                "status": "evolved",
-                "evolution": evolution_result,
-                "analysis": analysis,
-            })
+                if not validation["passed"]:
+                    rb = self.rollback.rollback(target)
+                    print(f"  🔄 已回滚到 {rb.get('version')}")
+                    results.append({"skill": target, "status": "failed_rolled_back", "evolution": evolution_result})
+                    continue
 
-        return {
-            "engine": "xiushen-lu",
-            "version": "7.0",
-            "timestamp": datetime.now().isoformat(),
-            "results": results,
-            "summary": {
-                "total": len(targets),
-                "evolved": sum(1 for r in results if r["status"] == "evolved"),
-                "failed_rolled_back": sum(1 for r in results if r["status"] == "failed_rolled_back"),
-                "no_action": sum(1 for r in results if r["status"] in ["no_action", "skipped"]),
-            }
+                print(f"  6️⃣ DEPLOY: ✅ V7深度进化成功")
+                results.append({
+                    "skill": target,
+                    "status": "evolved",
+                    "evolution": evolution_result,
+                    "analysis": analysis,
+                })
+            except Exception as exc:
+                print(f"  ❌ ERROR: {exc}")
+                results.append({"skill": target, "status": "error", "error": str(exc)})
+
+        analyzed_results = [item for item in results if isinstance(item.get("analysis"), dict)]
+        actionable_results = [item for item in results if item.get("status") in {"planned", "evolved", "failed_rolled_back"}]
+        avg_target_completeness = (
+            round(sum(item["analysis"].get("avg_output_completeness", 0.0) for item in analyzed_results) / len(analyzed_results), 1)
+            if analyzed_results else 0.0
+        )
+        avg_target_consistency = (
+            round(sum(item["analysis"].get("avg_consistency_score", 0.0) for item in analyzed_results) / len(analyzed_results), 1)
+            if analyzed_results else 0.0
+        )
+        avg_target_human = (
+            round(sum(item["analysis"].get("avg_human_intervention", 0.0) for item in analyzed_results) / len(analyzed_results), 2)
+            if analyzed_results else 0.0
+        )
+        decision_coverage = (
+            round(len(analyzed_results) / len(eligible_targets) * 100, 1)
+            if eligible_targets else 0.0
+        )
+        manual_gate_ratio = (
+            round(sum(1 for item in actionable_results if item.get("status") == "planned") / len(actionable_results), 2)
+            if actionable_results else 0.0
+        )
+        summary = {
+            "total": len(eligible_targets),
+            "evolved": sum(1 for r in results if r["status"] == "evolved"),
+            "failed_rolled_back": sum(1 for r in results if r["status"] == "failed_rolled_back"),
+            "planned": sum(1 for r in results if r["status"] == "planned"),
+            "no_action": sum(1 for r in results if r["status"] in ["no_action", "skipped"]),
         }
+        report = {
+            "engine": "xiushen-lu",
+            "version": VERSION,
+            "timestamp": datetime.now().isoformat(),
+            "overall_quality": _evolution_quality({
+                "results": results,
+                "summary": summary,
+                "output_completeness": decision_coverage,
+                "consistency_score": avg_target_consistency,
+                "human_intervention": manual_gate_ratio,
+            }),
+            "output_completeness": decision_coverage,
+            "consistency_score": avg_target_consistency,
+            "human_intervention": manual_gate_ratio,
+            "aggregated_runtime_signals": {
+                "avg_target_output_completeness": avg_target_completeness,
+                "avg_target_consistency_score": avg_target_consistency,
+                "avg_target_human_intervention": avg_target_human,
+                "analyzed_targets": len(analyzed_results),
+                "eligible_targets": len(eligible_targets),
+            },
+            "results": results,
+            "summary": summary,
+        }
+        return report
 
     def _discover_skills(self) -> List[str]:
         skills = []
@@ -622,6 +914,81 @@ class XiuShenLuCoreV7:
             if item.is_dir() and (item / "SKILL.md").exists():
                 skills.append(item.name)
         return sorted(skills)
+
+    def _build_bootstrap_analysis(self, skill_name: str, records: List[Dict]) -> Dict:
+        """为冷启动 skill 生成基线分析与采样建议。"""
+        skill_path = self.skills_dir / skill_name
+        script_dir = skill_path / "scripts"
+        script_files = list(script_dir.glob("*.py")) if script_dir.exists() else []
+        test_files = [p for p in script_files if p.name.startswith("test_")]
+        has_skill_md = (skill_path / "SKILL.md").exists()
+        has_meta = (skill_path / "_skillhub_meta.json").exists()
+
+        script_count = len(script_files)
+        sample_size = len(records)
+        actual_quality = self._safe_mean([r.get("quality_score", 0) for r in records])
+        actual_completeness = self._safe_mean([r.get("output_completeness", r.get("quality_score", 0)) for r in records])
+        actual_consistency = self._safe_mean([r.get("consistency_score", r.get("quality_score", 0)) for r in records])
+        actual_human = self._safe_mean([r.get("human_intervention", 0) for r in records])
+
+        structure_bonus = (8 if has_skill_md else 0) + (6 if has_meta else 0) + min(8, script_count * 2) + min(6, len(test_files) * 2)
+        runtime_confidence = "low" if sample_size < 5 else "medium"
+        baseline_quality = min(75.0, 45.0 + structure_bonus + sample_size * 1.5)
+        baseline_completeness = min(85.0, 35.0 + structure_bonus + sample_size * 2.0)
+        baseline_consistency = min(90.0, 50.0 + structure_bonus + sample_size * 1.2)
+        if sample_size:
+            baseline_quality = max(baseline_quality, actual_quality)
+            baseline_completeness = max(baseline_completeness, actual_completeness)
+            baseline_consistency = max(baseline_consistency, actual_consistency)
+
+        recommendations = [
+            "先补齐足量 runtime 轨迹，再决定是否进入正式进化。",
+            "建议至少补 10 条真实执行记录，覆盖成功、失败和边界样例。",
+        ]
+        if script_count == 0:
+            recommendations.append("该 skill 暂无脚本入口，优先补齐可执行主流程。")
+        if not has_meta:
+            recommendations.append("补充 _skillhub_meta.json 以便后续独立安装与生命周期验证。")
+        if not test_files:
+            recommendations.append("补充独立测试文件，避免冷启动阶段只能看文档不能验收。")
+
+        priority = "high" if sample_size == 0 else "medium"
+        return {
+            "status": "analyzed",
+            "bootstrap_mode": True,
+            "sample_size": sample_size,
+            "health_score": round(min(80.0, baseline_quality * 0.75 + baseline_consistency * 0.15 + baseline_completeness * 0.10), 1),
+            "evolution_type": "bootstrap",
+            "priority": priority,
+            "bottleneck_type": "cold_start",
+            "avg_quality": round(actual_quality if sample_size else baseline_quality, 1),
+            "avg_output_completeness": round(actual_completeness if sample_size else baseline_completeness, 1),
+            "avg_consistency_score": round(actual_consistency if sample_size else baseline_consistency, 1),
+            "avg_human_intervention": round(actual_human, 2),
+            "quality_variance": 0.0,
+            "consecutive_degradation": 0,
+            "recommendations": recommendations,
+            "signal_summary": {
+                "has_skill_md": has_skill_md,
+                "has_meta": has_meta,
+                "script_count": script_count,
+                "test_count": len(test_files),
+                "runtime_confidence": runtime_confidence,
+            },
+            "bootstrap_signals": {
+                "record_count": sample_size,
+                "script_count": script_count,
+                "test_count": len(test_files),
+                "has_skill_md": has_skill_md,
+                "has_meta": has_meta,
+                "runtime_confidence": runtime_confidence,
+            },
+        }
+
+    @staticmethod
+    def _safe_mean(values: List[Any]) -> float:
+        cleaned = [float(v) for v in values if isinstance(v, (int, float))]
+        return sum(cleaned) / len(cleaned) if cleaned else 0.0
 
     def _validate(self, skill_name: str) -> Dict:
         skill_path = self.skills_dir / skill_name
@@ -643,13 +1010,27 @@ class XiuShenLuCoreV7:
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python core_engine.py <skills_dir> [skill_name]")
+        print("用法: python core_engine.py <skills_dir> [skill_name] [--apply]")
         sys.exit(1)
 
     skills_dir = sys.argv[1]
-    skill_name = sys.argv[2] if len(sys.argv) > 2 else None
+    apply_changes = "--apply" in sys.argv[2:]
+    positional = [arg for arg in sys.argv[2:] if arg != "--apply"]
+    skill_name = positional[0] if positional else None
 
-    core = XiuShenLuCoreV7(skills_dir)
+    # 输入验证
+    sd = Path(skills_dir)
+    if not sd.exists():
+        print(f"错误: 技能目录不存在: {skills_dir}")
+        sys.exit(2)
+    if not sd.is_dir():
+        print(f"错误: 路径不是目录: {skills_dir}")
+        sys.exit(2)
+    if not any((sd / d / "SKILL.md").exists() for d in sd.iterdir() if d.is_dir()):
+        print(f"错误: 目录中未找到有效的技能: {skills_dir}")
+        sys.exit(2)
+
+    core = XiuShenLuCoreV7(skills_dir, apply_changes=apply_changes, persist_adaptive=apply_changes)
     result = core.run_evolution_cycle(skill_name)
 
     print("\n" + "=" * 60)
@@ -659,6 +1040,7 @@ def main():
     print(f"  总技能数: {summary['total']}")
     print(f"  成功进化: {summary['evolved']}")
     print(f"  失败回滚: {summary['failed_rolled_back']}")
+    print(f"  已规划待应用: {summary.get('planned', 0)}")
     print(f"  无需进化: {summary['no_action']}")
     print("=" * 60)
 

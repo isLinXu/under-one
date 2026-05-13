@@ -18,6 +18,16 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from collections import defaultdict, deque
 
+# 运行时指标收集
+SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SKILLS_ROOT))
+try:
+    from metrics_collector import record_metrics
+except ImportError:
+    def record_metrics(*args, **kwargs):
+        def decorator(f): return f
+        return decorator
+
 
 # ═══════════════════════════════════════════════════════════
 # V8.1 预测性维护引擎 (Predictive Maintenance)
@@ -485,6 +495,7 @@ class HachigikiV8Engine:
         self.federation = FederalEvolution()
         self.data_dir = Path(data_dir)
 
+    @record_metrics("xiushen-lu")
     def run_v8_cycle(self, skill_name: Optional[str] = None) -> Dict:
         """运行完整的V8智能周期"""
         targets = [skill_name] if skill_name else self._discover_skills()

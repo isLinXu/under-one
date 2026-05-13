@@ -1,17 +1,24 @@
 {
   "id": "liuku-xianzei",
   "name": "六库仙贼",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/knowledge_digest.py",
   "language": "python",
-  "description": "知识消化器，评估信息质量与保鲜期",
+  "description": "知识消化器，评估信息质量与保鲜期；适合提炼可继承知识，避免污染、失真与偏见扩散",
   "author": "under-one",
-  "tags": ["knowledge", "digest", "freshness"],
+  "tags": ["knowledge", "digest", "freshness", "contamination-control", "memory-inheritance"],
   "permissions": ["read:info", "write:digest_report.json"],
   "triggers": ["知识消化", "信息保鲜", "消化率", "知识质量"],
   "inputs": ["info.json"],
   "outputs": ["digest_report.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "信息吸收、消化与保鲜",
+    "agent_meaning": "评估资料质量并沉淀可复用知识",
+    "cost": "消化过快会把噪声和偏见一起吞进去",
+    "boundary": "只做消化与分级，不替代原始证据"
+  }
 }

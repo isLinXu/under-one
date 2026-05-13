@@ -1,11 +1,11 @@
 {
   "id": "xiushen-lu",
   "name": "修身炉",
-  "version": "7.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/core_engine.py",
   "language": "python",
-  "description": "自进化中枢，自适应阈值+深度进化+跨skill学习",
+  "description": "自进化中枢，默认只读分析，自适应阈值带边界护栏与显式变更门；适合跨 skill 学习与阈值调整，需显式批准变更",
   "author": "under-one",
   "tags": ["evolution", "self-improvement", "adaptive", "learning"],
   "permissions": ["read:runtime_data", "read:skills", "write:skills", "write:evolution_report_v7.json"],
@@ -13,5 +13,12 @@
   "inputs": ["runtime_data/*_metrics.jsonl"],
   "outputs": ["evolution_report_v7.json", "adaptive_thresholds.json"],
   "dependencies": ["shared_knowledge"],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "自进化与阈值自适应",
+    "agent_meaning": "根据运行数据提出跨 skill 演化建议",
+    "cost": "无门槛变更会导致不可控漂移与回滚成本",
+    "boundary": "默认只读分析，所有变更必须显式授权"
+  }
 }

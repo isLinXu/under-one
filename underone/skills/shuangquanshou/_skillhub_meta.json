@@ -1,17 +1,24 @@
 {
   "id": "shuangquanshou",
   "name": "双全手",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/dna_validator.py",
   "language": "python",
-  "description": "DNA校验器，人格守护与风格漂移检测",
+  "description": "记忆与人格手术台，生成改写方案并控制污染风险；适合上下文/风格修复，避免身份污染与事实失真",
   "author": "under-one",
-  "tags": ["persona", "dna", "validation", "guard"],
+  "tags": ["persona", "memory", "rewrite", "dna", "emotion", "perception"],
   "permissions": ["read:profile", "write:dna_report.json"],
-  "triggers": ["DNA校验", "人格守护", "风格漂移", "人设检查"],
+  "triggers": ["DNA校验", "人格守护", "记忆改写", "情绪调谐", "感知重塑"],
   "inputs": ["profile.json"],
   "outputs": ["dna_report.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "记忆与人格的安全改写",
+    "agent_meaning": "为上下文、风格与感知生成手术方案",
+    "cost": "污染控制失败会造成身份混乱与事实失真",
+    "boundary": "只建议可逆修复，不替代真实事实"
+  }
 }

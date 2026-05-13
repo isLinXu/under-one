@@ -1,17 +1,24 @@
 {
   "id": "dalu-dongguan",
   "name": "大罗洞观",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/link_detector.py",
   "language": "python",
-  "description": "关联检测器，从文本中提取实体和关联关系",
+  "description": "关联检测器，从文本中提取实体和关联关系；适合洞察隐含关系，需防止过度解释与虚假归因",
   "author": "under-one",
-  "tags": ["link-detection", "knowledge-graph", "entity"],
+  "tags": ["link-detection", "knowledge-graph", "entity", "anomaly-detection", "hallucination-risk"],
   "permissions": ["read:text", "write:link_report.json"],
   "triggers": ["检测关联", "知识图谱", "实体提取", "关联分析"],
   "inputs": ["segments.json"],
   "outputs": ["link_report.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "隐含关系识别与知识图谱构建",
+    "agent_meaning": "从文本中提取实体、链接与因果线索",
+    "cost": "规则化抽取容易产生误连和过度解释",
+    "boundary": "只输出证据化关联，不替代事实核验"
+  }
 }

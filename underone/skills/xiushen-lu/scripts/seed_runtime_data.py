@@ -2,19 +2,21 @@
 """
 器名: 数据播种器
 用途: 将36场景测试结果注入为修身炉的运行时数据
+输出格式: 与 metrics_collector.py 保持一致（9个标准字段）
 """
 import json, random
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # 自动定位 skills 目录（脚本位于 underone/skills/xiushen-lu/scripts/）
 SKILL_DIR = str(Path(__file__).resolve().parent.parent.parent)  # → underone/skills
 OUTPUT_DIR = Path("runtime_data")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# 基于36场景测试结果模拟100条运行时记录 per skill
+# 基于36场景测试结果模拟120条运行时记录 per skill
 skill_configs = {
     "qiti-yuanliu": {
-        "success_rate": 0.99, "avg_duration": 600, "avg_errors": 0.02, 
+        "success_rate": 0.99, "avg_duration": 600, "avg_errors": 0.02,
         "avg_human": 0.01, "avg_quality": 94, "complexity": "medium"
     },
     "tongtian-lu": {
@@ -49,10 +51,15 @@ skill_configs = {
         "success_rate": 0.99, "avg_duration": 400, "avg_errors": 0.01,
         "avg_human": 0.00, "avg_quality": 97, "complexity": "medium"
     },
+    "xiushen-lu": {
+        "success_rate": 0.97, "avg_duration": 800, "avg_errors": 0.03,
+        "avg_human": 0.01, "avg_quality": 92, "complexity": "medium"
+    },
 }
 
 def generate_records(skill_name, config, n=120):
     records = []
+    base_time = datetime(2026, 5, 6, 8, 0, 0)
     for i in range(n):
         # 加入一些退化趋势（最后20条记录质量略降，触发进化）
         if i > n - 20:
@@ -66,17 +73,17 @@ def generate_records(skill_name, config, n=120):
             human = max(0, config["avg_human"] + random.uniform(-0.01, 0.02))
             success = random.random() < config["success_rate"]
 
+        # 格式与 metrics_collector.record_metrics 输出一致
         records.append({
             "skill_name": skill_name,
-            "run_id": i,
-            "duration_ms": max(100, int(config["avg_duration"] + random.randint(-100, 200))),
+            "timestamp": (base_time + timedelta(minutes=i * 30)).isoformat(),
+            "duration_ms": max(100, round(config["avg_duration"] + random.randint(-100, 200), 2)),
             "success": success,
-            "quality_score": max(0, min(100, quality)),
+            "quality_score": round(max(0, min(100, quality)), 1),
             "error_count": max(0, round(errors, 2)),
             "human_intervention": 1 if human > 0.5 else (0 if human < 0.1 else round(human, 2)),
-            "input_complexity": config["complexity"],
-            "output_completeness": max(60, min(100, 95 + random.randint(-10, 5))),
-            "consistency_score": max(50, min(100, quality + random.randint(-5, 5))),
+            "output_completeness": round(max(60, min(100, 95 + random.randint(-10, 5))), 1),
+            "consistency_score": round(max(50, min(100, quality + random.randint(-5, 5))), 1),
         })
     return records
 

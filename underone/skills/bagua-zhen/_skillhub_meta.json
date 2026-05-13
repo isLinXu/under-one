@@ -1,11 +1,11 @@
 {
   "id": "bagua-zhen",
   "name": "八卦阵",
-  "version": "10.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/coordinator.py",
   "language": "python",
-  "description": "生态协调中枢，十技全景监控与互斥仲裁",
+  "description": "生态协调中枢，支持动态关系覆写、控制层降噪与十技全景监控；适合评估技能生态、互斥与协同，避免中央控制失控",
   "author": "under-one",
   "tags": ["ecosystem", "coordinator", "dashboard", "monitoring"],
   "permissions": ["read:runtime_data", "write:ecosystem_report_v10.json", "write:*.html"],
@@ -13,5 +13,12 @@
   "inputs": ["runtime_data/*_metrics.jsonl"],
   "outputs": ["ecosystem_report_v10.json", "hachigiki_v7_dashboard.html"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "生态协调与全景监控",
+    "agent_meaning": "聚合多 skill 状态，识别互斥与协同关系",
+    "cost": "过度中央化会掩盖局部信号并制造误判",
+    "boundary": "只做协调与报告，不替代各 skill 的内部决策"
+  }
 }

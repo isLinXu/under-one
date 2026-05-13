@@ -28,6 +28,16 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from collections import defaultdict
 
+# 运行时指标收集
+SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SKILLS_ROOT))
+try:
+    from metrics_collector import record_metrics
+except ImportError:
+    def record_metrics(*args, **kwargs):
+        def decorator(f): return f
+        return decorator
+
 
 # ═══════════════════════════════════════════════════════════
 # 通用Metrics接口 (任何skill/agent只需实现此接口即可被进化)
@@ -584,6 +594,7 @@ class UniversalXiuShenLu:
         self.backup_dir = Path(backup_dir)
         self.backup_dir.mkdir(exist_ok=True)
 
+    @record_metrics("xiushen-lu")
     def evolve(self, target_path: str, name: Optional[str] = None) -> Dict:
         """
         通用进化入口

@@ -8,8 +8,20 @@
 import json
 import re
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from datetime import datetime
+
+# 运行时指标收集
+SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SKILLS_ROOT))
+try:
+    from metrics_collector import record_metrics
+except ImportError:
+    def record_metrics(*args, **kwargs):
+        def decorator(f): return f
+        return decorator
 
 
 def load_metrics(skill_name: str) -> list:
@@ -62,6 +74,7 @@ def analyze_bottleneck(records: list) -> dict:
     }
 
 
+@record_metrics("xiushen-lu")
 def evolve_skill(skill_name: str, skills_dir: str, analysis: dict) -> dict:
     """执行真实进化 - 修改脚本源代码"""
     skill_path = Path(skills_dir) / skill_name
@@ -174,6 +187,16 @@ def validate_evolved_skill(skill_name: str, skills_dir: str) -> dict:
     }
 
 
+def run_evolved_skill(script_path: Path):
+    return subprocess.run(
+        [sys.executable, str(script_path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=str(script_path.parent),
+    )
+
+
 def main():
     from pathlib import Path as _P
 
@@ -231,8 +254,7 @@ def main():
     if metrics_file.exists():
         metrics_file.unlink()
     
-    r = subprocess.run(["python", str(script_path)], capture_output=True, text=True, timeout=30,
-                      cwd=str(script_path.parent))
+    r = run_evolved_skill(script_path)
     print(r.stdout)
     if r.stderr:
         print(f"    stderr: {r.stderr[:200]}")

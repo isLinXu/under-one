@@ -83,7 +83,7 @@ class LinkageProtocol:
 
         try:
             result = subprocess.run(
-                ["python", str(script), input_data],
+                [sys.executable, str(script), input_data],
                 capture_output=True,
                 text=True,
                 timeout=30,

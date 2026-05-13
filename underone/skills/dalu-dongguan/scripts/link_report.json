@@ -1,20 +1,87 @@
 {
   "detector": "dalu-dongguan",
-  "version": "5.0",
-  "segment_count": 5,
-  "entity_count": 1,
-  "link_count": 0,
-  "links": [],
-  "entity_map": {
-    "风险": [
-      "第20章-风险"
-    ]
-  },
+  "version": "5.1",
+  "segment_count": 3,
+  "entity_count": 0,
+  "link_count": 3,
+  "links": [
+    {
+      "source": "A",
+      "target": "B",
+      "type": "时序关联",
+      "strength": 0.8,
+      "confidence": "B"
+    },
+    {
+      "source": "B",
+      "target": "C",
+      "type": "时序关联",
+      "strength": 0.8,
+      "confidence": "B"
+    },
+    {
+      "source": "B",
+      "target": "C",
+      "type": "因果关系",
+      "strength": 0.47,
+      "confidence": "C"
+    }
+  ],
+  "entity_map": {},
+  "temporal_chain": [
+    {
+      "from": "A",
+      "to": "B",
+      "strength": 0.8
+    },
+    {
+      "from": "B",
+      "to": "C",
+      "strength": 0.8
+    }
+  ],
+  "causal_chain": [
+    {
+      "cause": "B",
+      "effect": "C",
+      "strength": 0.47
+    }
+  ],
   "knowledge_graph": {
     "nodes": [
-      "风险"
+      {
+        "id": "A",
+        "type": "segment"
+      },
+      {
+        "id": "B",
+        "type": "segment"
+      },
+      {
+        "id": "C",
+        "type": "segment"
+      }
     ],
-    "edges": []
+    "edges": [
+      {
+        "source": "A",
+        "target": "B",
+        "relation": "时序关联",
+        "weight": 0.8
+      },
+      {
+        "source": "B",
+        "target": "C",
+        "relation": "时序关联",
+        "weight": 0.8
+      },
+      {
+        "source": "B",
+        "target": "C",
+        "relation": "因果关系",
+        "weight": 0.47
+      }
+    ]
   },
-  "mermaid_code": "graph TD"
+  "mermaid_code": "graph TD\n    A[\"A\"]\n    B[\"B\"]\n    C[\"C\"]\n    A ==>|时序关联 0.8| B\n    B ==>|时序关联 0.8| C\n    B -->|因果关系 0.47| C\n    classDef segment fill:#e6f1fb,stroke:#378add\n    classDef entity fill:#fbeaf0,stroke:#d4537e\n    class A segment\n    class B segment\n    class C segment"
 }
