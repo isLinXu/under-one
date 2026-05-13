@@ -20,6 +20,7 @@
 
 <p align="center">
   <b>English</b> ·
+  <a href="./agent.md"><b>Agent.md</b></a> ·
   <a href="./README.zh-CN.md"><b>简体中文</b></a> ·
   <a href="./FAQ.md">FAQ</a> ·
   <a href="./IMPROVEMENTS.md">Roadmap</a> ·

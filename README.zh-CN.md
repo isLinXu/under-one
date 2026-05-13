@@ -20,6 +20,7 @@
 
 <p align="center">
   <a href="./README.md"><b>English</b></a> ·
+  <a href="./agent.md"><b>Agent.md</b></a> ·
   <b>简体中文</b> ·
   <a href="./FAQ.md">FAQ</a> ·
   <a href="./IMPROVEMENTS.md">路线图</a> ·

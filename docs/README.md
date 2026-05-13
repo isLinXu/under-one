@@ -6,17 +6,19 @@
   <img src="./skill-cards/00-overview-horizontal.png" width="880" alt="UnderOne docs overview">
 </p>
 
-根目录只保留两个门面入口：
+根目录现在保留三个入口：
 - [`README.md`](../README.md) — **English entry**
 - [`README.zh-CN.md`](../README.zh-CN.md) — **中文入口**
+- [`agent.md`](../agent.md) — **agent 元婴入口**
 
 ## 视觉入口
 
 如果你是第一次进入仓库，推荐先走这条路径：
 
 1. 看 [`../README.md`](../README.md) 或 [`../README.zh-CN.md`](../README.zh-CN.md) 的总览插图。
-2. 再到 [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) 按稳定 ID 逐个优化。
-3. 最后回到 `underone/skills/<skill>` 查看源码与脚本；`bagua-zhen` 也位于 `underone/skills/bagua-zhen`。
+2. 再看 [`../agent.md`](../agent.md) 的 agent 入口和标准动作。
+3. 然后到 [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) 按稳定 ID 逐个优化。
+4. 最后回到 `underone/skills/<skill>` 查看源码与脚本；`bagua-zhen` 也位于 `underone/skills/bagua-zhen`。
 
 `docs/skill-cards/` 是项目的插图资产目录，建议保留；这些技能卡既服务展示，也承担文档导航作用。
 

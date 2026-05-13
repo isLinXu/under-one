@@ -238,6 +238,7 @@ python scripts/build_skill_bundles.py my-skill
 
 | 文档 | 内容 |
 |------|------|
+| [agent.md](../agent.md) | agent 核心入口：元婴、标准动作、稳定 ID、禁止项 |
 | [仓库英文入口](../README.md) | 面向外部用户的总览、安装和多宿主说明 |
 | [仓库中文入口](../README.zh-CN.md) | 中文主文档，适合直接照着执行 |
 | [文档索引](../docs/README.md) | 当前可用深度文档入口 |
