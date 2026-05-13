@@ -233,13 +233,40 @@ __marimo__/
 *.swo
 
 # Skill 运行时产物
+runtime_data/
 underone/runtime_data/
 underone/**/runtime_data/
 **/runtime_data/logs/
 
+# 本地宿主/agent 状态
+.workbuddy/
+
 # 脚本生成的临时报告
 **/*.health_report.json
 **/*_report.json.tmp
+underone/reports/
+
+# 根目录中的一次性评估、排盘和工具锻造产物
+/*_report.json
+/*_report*.json
+/*_plan.json
+/adaptive_thresholds.json
+/DEEP_ANALYSIS_REPORT_*.md
+/skills_*_report*.md
+/skills_*_assessment.md
+/json_cleaner.py
+/json_cleaner.contract.md
+
+# 在 skills 根目录误落地的运行报告；稳定样例应放入 underone/artifacts/
+underone/skills/*_report.json
+underone/skills/*_report*.json
+underone/skills/*_plan.json
+underone/skills/evolution_report_v*.json
+underone/skills/fenghou-qimen/priority_plan.json
+underone/skills/juling-qianjiang/dispatch_report_v*.json
+
+# 工程目录根部误落地的报告
+underone/*_report*.json
 
 # 历史版本快照（已用 git history + CHANGELOG 取代，不应再出现）
 skill_backups/
