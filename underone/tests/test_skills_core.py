@@ -235,6 +235,11 @@ class TestContextGuard:
         assert plan["steps"][0]["id"] == "re-anchor-goal"
         assert escalation["severity"] in ["medium", "high"]
         assert "pre_resume" in [item["stage"] for item in checkpoints["checkpoints"]]
+        assert len(report["risk_hotspots"]) >= 2
+        assert report["priority_actions"][0]["id"] == "re-anchor-goal"
+        assert report["execution_contract"]["next_action_id"] == "re-anchor-goal"
+        assert report["execution_contract"]["manual_review_required"] is True
+        assert report["execution_contract"]["blocking_action_count"] >= 2
         assert report["quality_score"] <= report["metrics"]["health_score"]
         assert report["human_intervention"] == 1
 
@@ -251,6 +256,9 @@ class TestContextGuard:
         assert contract["operating_mode"] in ["guarded", "adaptive"]
         assert contract["freeze_self_evolution"] is False
         assert escalation["manual_review_required"] is False
+        assert report["execution_contract"]["resume_ready"] is True
+        assert report["execution_contract"]["next_owner"] == "qiti-yuanliu"
+        assert len(report["priority_actions"]) >= 3
         assert report["quality_score"] >= 75
         assert report["human_intervention"] == 0
 
@@ -266,6 +274,8 @@ class TestContextGuard:
         assert report["metrics"]["consistency"] >= 85
         assert report["metrics"]["entropy_components"]["clarification_events"] >= 1
         assert any("用户纠偏" in item["rule"] for item in report["self_evolution"]["rule_candidates"])
+        assert report["execution_contract"]["manual_review_required"] is False
+        assert not any(item["id"] == "repair-handoff" for item in report["risk_hotspots"])
         assert report["human_intervention"] == 0
 
     def test_config_can_override_clarification_and_hard_reset_markers(self, monkeypatch):
@@ -569,6 +579,31 @@ class TestKnowledgeDigest:
         assert len(result["quarantine_queue"]) >= 1
         assert any(unit["inheritance_ready"] is True for unit in result["knowledge_units"])
         assert any(unit["retention_action"] == "quarantine" for unit in result["knowledge_units"])
+        assert result["portfolio_diagnostics"]["inheritance_readiness"]["ready_rate"] > 0
+        assert len(result["refinement_queue"]) >= 1
+        assert result["priority_actions"][0]["id"] in ["review-quarantine", "run-refinement-queue"]
+
+    def test_portfolio_diagnostics_detect_source_concentration(self):
+        """知识组合诊断应识别单一来源过度集中的风险。"""
+        items = [
+            {
+                "source": "同一来源",
+                "content": "结论：缓存命中率提升到70%，建议继续扩展到更多查询链路。",
+                "credibility": "A",
+                "category": "技术方案",
+            },
+            {
+                "source": "同一来源",
+                "content": "观察：延迟下降20%，适合在生产流量继续验证。",
+                "credibility": "A",
+                "category": "技术方案",
+            },
+        ]
+        result = KnowledgeDigest(items).digest()
+        diversity = result["portfolio_diagnostics"]["source_diversity"]
+        assert diversity["dominant_source"] == "同一来源"
+        assert diversity["concentration_level"] == "high"
+        assert any(action["id"] == "diversify-sources" for action in result["priority_actions"])
 
 
 # ---------------------------------------------------------------------------
@@ -666,6 +701,10 @@ class TestPersonaGuard:
         assert result["surgery_plan"][0]["patch_preview"]["operations"][0]["op"] == "replace"
         assert result["rewrite_patch"]["apply_ready"] is True
         assert result["surgery_plan"][0]["rollback_token"]
+        assert result["safety_contract"]["mode"] == "edit"
+        assert result["approval_contract"]["safe_to_apply"] is True
+        assert result["operation_checklist"][0]["id"] == "lock-immutable-core"
+        assert result["priority_actions"][0]["owner"] == "shuangquanshou"
 
     def test_memory_fabrication_is_blocked(self):
         """触犯核心DNA的记忆伪造应被封禁。"""
@@ -682,6 +721,9 @@ class TestPersonaGuard:
         assert result["surgery_mode"] == "seal"
         assert result["surgery_plan"][0]["status"] == "blocked"
         assert result["contamination_index"] > 0
+        assert result["safety_contract"]["risk_level"] == "critical"
+        assert result["approval_contract"]["approval_status"] == "blocked"
+        assert result["priority_actions"][0]["blocking"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -1046,58 +1088,107 @@ class TestToolForge:
         result = factory.forge()
         assert result["artifact_type"] == "skill"
         assert any(name.endswith("/SKILL.md") for name in result["files"])
+        assert any(name.endswith("/README.md") for name in result["files"])
         assert any(name.endswith("/_skillhub_meta.json") for name in result["files"])
+        assert any(name.endswith("/assets/sample_input.json") for name in result["files"])
+        assert any(name.endswith("/assets/acceptance_checklist.json") for name in result["files"])
+        assert any(name.endswith("/assets/operational_playbook.md") for name in result["files"])
+        assert any(name.endswith("/assets/benchmark_cases.json") for name in result["files"])
         assert any(name.endswith("/tests/standalone_smoke.py") for name in result["files"])
+        assert any(name.endswith("/tests/failure_modes.py") for name in result["files"])
+        assert any(name.endswith("/tests/benchmark_runner.py") for name in result["files"])
         skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
+        readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
         assert '"standalone_validation"' in skill_meta
         assert "retrieval" in result["inferred_spec"]["sections"]["tool_contract"]["tags"]
         assert "总结" in result["inferred_spec"]["sections"]["tool_contract"]["triggers"]
+        assert "专精操作提示" in readme
+        assert "benchmark" in readme.lower()
 
     def test_natural_language_prompt_infers_analysis_skill_specialization(self):
         """分析类 skill 应识别为 analysis-skill，并补报告输出"""
         factory = ToolFactory("请生成一个用于分析销售数据并输出报告的 skill")
         result = factory.forge()
+        module_name = result["tool_name"].replace("-", "_").lower()
         assert result["artifact_type"] == "skill"
         assert result["specialization"] == "analysis-skill"
         assert "report.json" in result["inferred_spec"]["outputs"]
         assert "record_paths" in result["inferred_spec"]["inputs"]
         assert result["template_matched"] == "data_analyzer"
-        skill_script = next(content for name, content in result["files"].items() if name.endswith("/scripts/custom_skill.py") or name.endswith("/scripts/generated_tool.py") or name.endswith(".py"))
+        skill_script = result["files"][f"{module_name}/scripts/{module_name}.py"]
         assert "report_name" in skill_script
-        assert "metric_registry" in skill_script
-        assert "generate_insights" in skill_script
+        assert "from metrics import metric_registry" in skill_script
+        assert "from insights import generate_insights" in skill_script
+        assert any(name.endswith("/scripts/metrics.py") for name in result["files"])
+        assert any(name.endswith("/scripts/insights.py") for name in result["files"])
         assert any(name.endswith("/assets/report_schema.json") for name in result["files"])
+        assert any(name.endswith("/assets/module_contract.json") for name in result["files"])
+        assert any(name.endswith("/assets/failure_cases.json") for name in result["files"])
+        assert any(name.endswith("/assets/acceptance_checklist.json") for name in result["files"])
+        assert any(name.endswith("/assets/operational_playbook.md") for name in result["files"])
+        assert any(name.endswith("/assets/benchmark_cases.json") for name in result["files"])
         assert any(name.endswith("/scripts/source_adapter.py") for name in result["files"])
+        skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
+        readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
+        assert '"runtime_contract"' in skill_meta
+        assert '"required_output_keys"' in skill_meta
+        assert "非数值记录" in readme
 
     def test_natural_language_prompt_infers_browser_skill_specialization(self):
         """网页类 skill 应识别为 browser-skill，并补网页输入"""
         factory = ToolFactory("请生成一个用于抓取网页内容并整理链接的 skill")
         result = factory.forge()
+        module_name = result["tool_name"].replace("-", "_").lower()
         assert result["artifact_type"] == "skill"
         assert result["specialization"] == "browser-skill"
         assert "webpage_url" in result["inferred_spec"]["inputs"]
         assert result["template_matched"] == "text_extractor"
-        skill_script = next(content for name, content in result["files"].items() if name.endswith(".py"))
+        skill_script = result["files"][f"{module_name}/scripts/{module_name}.py"]
         assert "webpage_url" in skill_script
-        assert "fetch_page" in skill_script
-        assert "extract_links" in skill_script
+        assert "from runtime import fetch_page, summarize_page" in skill_script
+        assert "from extractors import extract_links" in skill_script
         assert '"links"' in skill_script or "links" in skill_script
+        assert any(name.endswith("/scripts/runtime.py") for name in result["files"])
+        assert any(name.endswith("/scripts/extractors.py") for name in result["files"])
+        assert any(name.endswith("/assets/module_contract.json") for name in result["files"])
+        assert any(name.endswith("/assets/failure_cases.json") for name in result["files"])
+        assert any(name.endswith("/assets/acceptance_checklist.json") for name in result["files"])
+        assert any(name.endswith("/assets/operational_playbook.md") for name in result["files"])
+        assert any(name.endswith("/assets/benchmark_cases.json") for name in result["files"])
         assert any(name.endswith("/assets/browser_targets.json") for name in result["files"])
         assert any(name.endswith("/scripts/source_adapter.py") for name in result["files"])
+        skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
+        readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
+        assert '"runtime_contract"' in skill_meta
+        assert '"required_files"' in skill_meta
+        assert "允许域名" in readme
 
     def test_natural_language_prompt_infers_workflow_skill_specialization(self):
         """工作流类 skill 应生成状态流转骨架"""
         factory = ToolFactory("请生成一个用于任务编排和自动化流转的 workflow skill")
         result = factory.forge()
+        module_name = result["tool_name"].replace("-", "_").lower()
         assert result["artifact_type"] == "skill"
         assert result["specialization"] == "workflow-skill"
         assert "workflow_state.json" in result["inferred_spec"]["outputs"]
-        skill_script = next(content for name, content in result["files"].items() if name.endswith(".py"))
+        skill_script = result["files"][f"{module_name}/scripts/{module_name}.py"]
         assert "execution_plan" in skill_script
         assert "workflow_state" in skill_script
-        assert "default_step_handlers" in skill_script
-        assert "run_step" in skill_script
+        assert "from handlers import default_step_handlers, run_step" in skill_script
+        assert "from state import normalize_workflow_state" in skill_script
+        assert any(name.endswith("/scripts/handlers.py") for name in result["files"])
+        assert any(name.endswith("/scripts/state.py") for name in result["files"])
+        assert any(name.endswith("/assets/module_contract.json") for name in result["files"])
+        assert any(name.endswith("/assets/failure_cases.json") for name in result["files"])
+        assert any(name.endswith("/assets/acceptance_checklist.json") for name in result["files"])
+        assert any(name.endswith("/assets/operational_playbook.md") for name in result["files"])
+        assert any(name.endswith("/assets/benchmark_cases.json") for name in result["files"])
         assert any(name.endswith("/assets/workflow_template.json") for name in result["files"])
+        skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
+        readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
+        assert '"runtime_contract"' in skill_meta
+        assert '"workflow_state"' in skill_meta
+        assert "未知步骤" in readme
 
     def test_natural_language_prompt_infers_retrieval_skill_specialization(self):
         """检索型 skill 应生成可执行的多源检索骨架，而不是纯占位脚手架。"""
@@ -1119,6 +1210,10 @@ class TestToolForge:
         assert "source_summary" in skill_script
         assert "summary" in skill_script
         assert any(name.endswith("/assets/retrieval_schema.json") for name in result["files"])
+        assert any(name.endswith("/assets/failure_cases.json") for name in result["files"])
+        assert any(name.endswith("/assets/acceptance_checklist.json") for name in result["files"])
+        assert any(name.endswith("/assets/operational_playbook.md") for name in result["files"])
+        assert any(name.endswith("/assets/benchmark_cases.json") for name in result["files"])
 
     def test_generated_retrieval_skill_executes_against_local_document_paths(self, tmp_path):
         """生成的 retrieval skill 应能读取本地文件和内联文本，而不只接受 documents 列表。"""
@@ -1304,8 +1399,21 @@ class TestToolForge:
         skill_root, script_path = _materialize_generated_skill(result, tmp_path)
 
         smoke_path = skill_root / "tests" / "standalone_smoke.py"
+        failure_path = skill_root / "tests" / "failure_modes.py"
+        benchmark_path = skill_root / "tests" / "benchmark_runner.py"
         assert smoke_path.exists()
-        assert '"standalone_validation"' in (skill_root / "_skillhub_meta.json").read_text(encoding="utf-8")
+        assert failure_path.exists()
+        assert benchmark_path.exists()
+        meta_text = (skill_root / "_skillhub_meta.json").read_text(encoding="utf-8")
+        assert '"standalone_validation"' in meta_text
+        assert '"runtime_contract"' in meta_text
+        assert (skill_root / "assets" / "module_contract.json").exists()
+        assert (skill_root / "assets" / "failure_cases.json").exists()
+        assert (skill_root / "assets" / "sample_input.json").exists()
+        assert (skill_root / "assets" / "acceptance_checklist.json").exists()
+        assert (skill_root / "assets" / "operational_playbook.md").exists()
+        assert (skill_root / "assets" / "benchmark_cases.json").exists()
+        assert (skill_root / "README.md").exists()
 
         spec = importlib.util.spec_from_file_location("generated_skill_smoke", smoke_path)
         smoke = importlib.util.module_from_spec(spec)
@@ -1324,6 +1432,52 @@ class TestToolForge:
 
         summary = smoke.run_smoke(skill_root, load_entry, load_meta)
         assert "status=ok" in summary
+        assert "specialization=analysis-skill" in summary
+
+    def test_generated_skill_failure_modes_executes(self, tmp_path):
+        """生成的 skill 应同时产出可独立执行的失败场景验证。"""
+        factory = ToolFactory("请生成一个用于分析销售数据并输出报告的 skill")
+        result = factory.forge()
+        skill_root, script_path = _materialize_generated_skill(result, tmp_path)
+
+        failure_path = skill_root / "tests" / "failure_modes.py"
+        spec = importlib.util.spec_from_file_location("generated_skill_failure_modes", failure_path)
+        failure_mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(failure_mod)
+
+        def load_entry():
+            entry_spec = importlib.util.spec_from_file_location("generated_skill_entry_for_failure", script_path)
+            entry = importlib.util.module_from_spec(entry_spec)
+            assert entry_spec.loader is not None
+            entry_spec.loader.exec_module(entry)
+            return entry
+
+        summary = failure_mod.run_failure_modes(skill_root, load_entry)
+        assert "missing_record_path" in summary
+        assert "non_numeric_records" in summary
+
+    def test_generated_skill_benchmark_runner_executes(self, tmp_path):
+        """生成的 skill 应同时产出可独立执行的 benchmark runner。"""
+        factory = ToolFactory("请生成一个用于分析销售数据并输出报告的 skill")
+        result = factory.forge()
+        skill_root, script_path = _materialize_generated_skill(result, tmp_path)
+
+        benchmark_path = skill_root / "tests" / "benchmark_runner.py"
+        spec = importlib.util.spec_from_file_location("generated_skill_benchmark_runner", benchmark_path)
+        benchmark_mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(benchmark_mod)
+
+        def load_entry():
+            entry_spec = importlib.util.spec_from_file_location("generated_skill_entry_for_benchmark", script_path)
+            entry = importlib.util.module_from_spec(entry_spec)
+            assert entry_spec.loader is not None
+            entry_spec.loader.exec_module(entry)
+            return entry
+
+        summary = benchmark_mod.run_benchmarks(skill_root, load_entry)
+        assert "sales_report_metrics" in summary
 
 
 # ---------------------------------------------------------------------------
@@ -1445,6 +1599,9 @@ class TestEcosystemHub:
             assert "ecosystem_level" in report
             assert "average_quality" in report
             assert "skill_states" in report
+            assert "weakest_skills" in report
+            assert "optimization_queue" in report
+            assert "governance_summary" in report
             assert report["coordinator"] == "bagua-zhen"
 
     def test_load_metrics_skips_invalid_json(self, tmp_path):
@@ -1505,6 +1662,57 @@ class TestEcosystemHub:
         assert tuple(sorted(("qiti-yuanliu", "fenghou-qimen"))) in {
             tuple(sorted(pair)) for pair in synergy_pairs
         }
+
+    def test_coordinate_builds_optimization_queue_for_weak_skills(self, tmp_path):
+        """生态报告应把最弱 skill 排到优化队列前列。"""
+        import os
+
+        fallback_cwd = Path(__file__).parent.parent
+        os.chdir(tmp_path)
+        try:
+            runtime_dir = tmp_path / "runtime_data"
+            runtime_dir.mkdir()
+            (runtime_dir / "liuku-xianzei_metrics.jsonl").write_text(
+                "\n".join(
+                    json.dumps(
+                        {
+                            "success": True,
+                            "quality_score": 68,
+                            "error_count": 1,
+                            "human_intervention": 0.5,
+                            "output_completeness": 72,
+                            "consistency_score": 70,
+                        }
+                    )
+                    for _ in range(12)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime_dir / "qiti-yuanliu_metrics.jsonl").write_text(
+                "\n".join(
+                    json.dumps(
+                        {
+                            "success": True,
+                            "quality_score": 92,
+                            "error_count": 0,
+                            "human_intervention": 0,
+                            "output_completeness": 96,
+                            "consistency_score": 94,
+                        }
+                    )
+                    for _ in range(12)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            report = coordinate(skills_dir="/dev/null")
+            assert report["weakest_skills"][0]["skill"] == "liuku-xianzei"
+            assert report["optimization_queue"][0]["skill"] == "liuku-xianzei"
+            assert report["governance_summary"]["queued_actions"] >= 1
+        finally:
+            os.chdir(fallback_cwd)
 
 
 # ---------------------------------------------------------------------------
@@ -1728,6 +1936,11 @@ class TestEvolutionEngine:
             assert result["consistency_score"] == 50.0
             assert result["output_completeness"] == 100.0
             assert result["human_intervention"] == 1.0
+            assert result["execution_policy"]["mode"] == "plan-only"
+            assert result["execution_policy"]["manual_gate_required"] is True
+            assert result["evolution_backlog"][0]["skill"] == "test-skill"
+            assert result["evolution_backlog"][0]["requires_approval"] is True
+            assert "test-skill" in result["pattern_summary"]["critical_skills"]
             assert script_path.read_text(encoding="utf-8") == original
             assert not (tmp_path / "adaptive_thresholds.json").exists()
         finally:
@@ -1756,6 +1969,10 @@ class TestEvolutionEngine:
         assert item["analysis"]["bootstrap_mode"] is True
         assert item["analysis"]["bottleneck_type"] == "cold_start"
         assert item["analysis"]["bootstrap_signals"]["record_count"] == 0
+        backlog_item = result["evolution_backlog"][0]
+        assert backlog_item["evolution_type"] == "bootstrap"
+        assert any("冷启动阶段" in blocker for blocker in backlog_item["blockers"])
+        assert result["execution_policy"]["next_targets"][0] == "cold-skill"
 
     def test_run_cycle_isolates_target_errors(self, tmp_path, monkeypatch):
         """单个skill分析失败不应拖垮整个进化周期"""

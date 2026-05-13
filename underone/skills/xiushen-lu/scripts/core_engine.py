@@ -882,6 +882,9 @@ class XiuShenLuCoreV7:
             "planned": sum(1 for r in results if r["status"] == "planned"),
             "no_action": sum(1 for r in results if r["status"] in ["no_action", "skipped"]),
         }
+        evolution_backlog = self._build_evolution_backlog(results)
+        pattern_summary = self._build_pattern_summary(analyzed_results, evolution_backlog)
+        execution_policy = self._build_execution_policy(summary, evolution_backlog, manual_gate_ratio)
         report = {
             "engine": "xiushen-lu",
             "version": VERSION,
@@ -905,6 +908,9 @@ class XiuShenLuCoreV7:
             },
             "results": results,
             "summary": summary,
+            "evolution_backlog": evolution_backlog,
+            "pattern_summary": pattern_summary,
+            "execution_policy": execution_policy,
         }
         return report
 
@@ -914,6 +920,104 @@ class XiuShenLuCoreV7:
             if item.is_dir() and (item / "SKILL.md").exists():
                 skills.append(item.name)
         return sorted(skills)
+
+    @staticmethod
+    def _priority_rank(level: str) -> int:
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(level, 4)
+
+    def _build_evolution_backlog(self, results: List[Dict]) -> List[Dict]:
+        backlog = []
+        for item in results:
+            analysis = item.get("analysis", {}) if isinstance(item.get("analysis"), dict) else {}
+            status = item.get("status", "unknown")
+            evolution_type = (
+                item.get("planned_evolution_type")
+                or item.get("evolution", {}).get("evolution_type")
+                or analysis.get("evolution_type")
+                or "none"
+            )
+            priority = analysis.get("priority", "high" if status in {"planned", "failed_rolled_back"} else "medium")
+            recommendation = ""
+            if analysis.get("recommendations"):
+                recommendation = analysis["recommendations"][0]
+            elif status == "error":
+                recommendation = item.get("error", "分析失败，需要人工排查。")
+            elif status == "no_action":
+                recommendation = "当前无需进化，继续观察运行信号。"
+            else:
+                recommendation = "等待下一轮验证后再决定是否落地。"
+
+            requires_approval = status in {"planned", "failed_rolled_back"} or not self.apply_changes
+            blockers = []
+            if status == "failed_rolled_back":
+                blockers.append("上一轮进化验证失败，已执行回滚。")
+            if status == "error":
+                blockers.append(item.get("error", "运行异常"))
+            if analysis.get("bootstrap_mode"):
+                blockers.append("处于冷启动阶段，优先补充真实运行样本。")
+            if not self.apply_changes and status in {"planned", "evolved"}:
+                blockers.append("当前处于 plan-only 模式，尚未应用文件变更。")
+
+            backlog.append(
+                {
+                    "skill": item.get("skill"),
+                    "status": status,
+                    "priority": priority,
+                    "evolution_type": evolution_type,
+                    "bottleneck_type": analysis.get("bottleneck_type", "unknown"),
+                    "recommended_action": recommendation,
+                    "requires_approval": requires_approval,
+                    "blockers": blockers,
+                }
+            )
+
+        backlog.sort(
+            key=lambda entry: (
+                self._priority_rank(entry.get("priority")),
+                0 if entry.get("status") in {"planned", "failed_rolled_back", "error"} else 1,
+                entry.get("skill", ""),
+            )
+        )
+        return backlog
+
+    def _build_pattern_summary(self, analyzed_results: List[Dict], evolution_backlog: List[Dict]) -> Dict:
+        bottlenecks: Dict[str, int] = {}
+        priorities: Dict[str, int] = {}
+        for item in analyzed_results:
+            analysis = item.get("analysis", {})
+            bottleneck = analysis.get("bottleneck_type")
+            priority = analysis.get("priority")
+            if bottleneck:
+                bottlenecks[bottleneck] = bottlenecks.get(bottleneck, 0) + 1
+            if priority:
+                priorities[priority] = priorities.get(priority, 0) + 1
+
+        shared_bottlenecks = sorted(bottlenecks.items(), key=lambda pair: (-pair[1], pair[0]))
+        critical_skills = [
+            entry["skill"] for entry in evolution_backlog if entry.get("priority") == "critical"
+        ]
+        return {
+            "shared_bottlenecks": [
+                {"type": name, "count": count} for name, count in shared_bottlenecks[:5]
+            ],
+            "priority_distribution": priorities,
+            "critical_skills": critical_skills,
+        }
+
+    def _build_execution_policy(self, summary: Dict, evolution_backlog: List[Dict], manual_gate_ratio: float) -> Dict:
+        top_targets = [entry["skill"] for entry in evolution_backlog[:3] if entry.get("skill")]
+        critical_count = sum(1 for entry in evolution_backlog if entry.get("priority") == "critical")
+        return {
+            "mode": "apply-changes" if self.apply_changes else "plan-only",
+            "manual_gate_required": (not self.apply_changes) or manual_gate_ratio > 0 or critical_count > 0,
+            "manual_gate_ratio": manual_gate_ratio,
+            "recommended_batch_size": 1 if critical_count else 2 if summary.get("planned", 0) > 2 else max(1, min(2, len(top_targets))),
+            "next_targets": top_targets,
+            "approval_scope": [
+                entry["skill"] for entry in evolution_backlog
+                if entry.get("requires_approval")
+            ][:5],
+        }
 
     def _build_bootstrap_analysis(self, skill_name: str, records: List[Dict]) -> Dict:
         """为冷启动 skill 生成基线分析与采样建议。"""

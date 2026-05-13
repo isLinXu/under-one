@@ -434,11 +434,143 @@ class DNAValidator:
             return "edit"
         return "observe"
 
+    @staticmethod
+    def _priority_rank(level):
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(level, 4)
+
+    def _build_operation_checklist(self):
+        mode = self._surgery_mode()
+        target_path = self.surgery_plan[0].get("target_path") if self.surgery_plan else None
+        return [
+            {
+                "id": "lock-immutable-core",
+                "stage": "preflight",
+                "required": True,
+                "owner": "shuangquanshou",
+                "action": "锁定 immutable_core，确认核心 DNA 不在本次改写作用域内。",
+            },
+            {
+                "id": "preview-patch-scope",
+                "stage": "preflight",
+                "required": bool(self.surgery_plan),
+                "owner": "shuangquanshou",
+                "action": f"检查 patch_preview 是否只覆盖 {target_path or '目标域'}。",
+            },
+            {
+                "id": "confirm-approval-gate",
+                "stage": "pre_apply",
+                "required": mode in {"review", "seal"},
+                "owner": "user" if mode in {"review", "seal"} else "shuangquanshou",
+                "action": "确认审批门是否通过；未通过则保持 seal/review 模式。",
+            },
+            {
+                "id": "apply-rewrite",
+                "stage": "apply",
+                "required": mode == "edit",
+                "owner": "shuangquanshou",
+                "action": "按 rewrite_patch 执行局部记忆/人格手术，不越过 editable_domains。",
+            },
+            {
+                "id": "verify-integrity",
+                "stage": "post_apply",
+                "required": True,
+                "owner": "shuangquanshou",
+                "action": "重新计算 contamination_index、identity_integrity，并验证回滚令牌可用。",
+            },
+        ]
+
+    def _build_safety_contract(self, contamination_index):
+        mode = self._surgery_mode()
+        blocked_reasons = [item.get("reason") for item in self.surgery_plan if item.get("status") == "blocked"]
+        review_reasons = [item.get("reason") for item in self.surgery_plan if item.get("status") == "review"]
+        risk_level = (
+            "critical" if mode == "seal"
+            else "high" if contamination_index >= 0.6 or mode == "review"
+            else "medium" if contamination_index >= 0.35
+            else "low"
+        )
+        return {
+            "mode": mode,
+            "risk_level": risk_level,
+            "immutable_core_locked": True,
+            "editable_domains": list(self.EDITABLE_DOMAINS),
+            "target_domains": sorted({item.get("domain") for item in self.surgery_plan if item.get("domain")}),
+            "rollback_ready": all(bool(item.get("rollback_token")) for item in self.surgery_plan if item.get("patch_preview")),
+            "requires_confirmation": any(item.get("requires_confirmation") for item in self.surgery_plan),
+            "blocked_reasons": blocked_reasons or review_reasons,
+            "allowed_operations": [item.get("operation") for item in self.surgery_plan if item.get("status") == "planned"],
+            "forbidden_operations": [item.get("operation") for item in self.surgery_plan if item.get("status") == "blocked"],
+        }
+
+    def _build_approval_contract(self, contamination_index, can_switch):
+        mode = self._surgery_mode()
+        rollback_tokens = [item.get("rollback_token") for item in self.surgery_plan if item.get("rollback_token")]
+        requires_user_confirmation = mode in {"review", "seal"}
+        safe_to_apply = mode == "edit" and can_switch and contamination_index < 0.75
+        approval_status = "blocked" if mode == "seal" else "pending" if requires_user_confirmation else "approved"
+        return {
+            "approval_status": approval_status,
+            "manual_review_required": requires_user_confirmation,
+            "requires_user_confirmation": requires_user_confirmation,
+            "safe_to_apply": safe_to_apply,
+            "blocking_violations": len(self.violations),
+            "rollback_tokens": rollback_tokens,
+            "reason": (
+                "存在核心 DNA 违背，禁止执行记忆/人格手术。"
+                if mode == "seal"
+                else "存在漂移或摇摆，需人工复核后执行。"
+                if requires_user_confirmation
+                else "手术范围受控，可按 patch_preview 执行。"
+            ),
+        }
+
+    def _build_priority_actions(self, safety_contract, approval_contract):
+        actions = []
+        for item in self.surgery_plan:
+            status = item.get("status")
+            priority = "critical" if status == "blocked" else "high" if status == "review" else "medium"
+            action = (
+                "停止执行并保持当前人格/记忆状态。"
+                if status == "blocked"
+                else "等待人工确认后再执行局部手术。"
+                if status == "review"
+                else f"将 patch_preview 应用到 {item.get('target_path')}。"
+            )
+            actions.append(
+                {
+                    "id": f"{item.get('domain', 'persona')}-{item.get('operation', 'operate')}",
+                    "priority": priority,
+                    "owner": "user" if status in {"blocked", "review"} else "shuangquanshou",
+                    "blocking": status in {"blocked", "review"},
+                    "action": action,
+                    "reason": item.get("reason"),
+                }
+            )
+
+        if approval_contract.get("safe_to_apply"):
+            actions.append(
+                {
+                    "id": "verify-post-op-integrity",
+                    "priority": "medium",
+                    "owner": "shuangquanshou",
+                    "blocking": False,
+                    "action": "执行后再次校验 identity_integrity 和 rollback_token。",
+                    "reason": "保证记忆/人格改写没有引入污染。",
+                }
+            )
+
+        actions.sort(key=lambda item: (self._priority_rank(item.get("priority")), item.get("id", "")))
+        return actions
+
     def _build_report(self):
         th = self.DRIFT_THRESHOLDS
         level = "green" if self.deviation < th["green"] else "yellow" if self.deviation < th["yellow"] else "red"
         contamination_index = self._contamination_index()
         can_switch = len(self.violations) == 0 and self.deviation < th["red"] and contamination_index < 0.75
+        safety_contract = self._build_safety_contract(contamination_index)
+        approval_contract = self._build_approval_contract(contamination_index, can_switch)
+        operation_checklist = self._build_operation_checklist()
+        priority_actions = self._build_priority_actions(safety_contract, approval_contract)
 
         return {
             "validator": "shuangquanshou",
@@ -453,6 +585,10 @@ class DNAValidator:
             "rewrite_patch": self._rewrite_patch_bundle(),
             "contamination_index": contamination_index,
             "identity_integrity": round(max(0.0, 1.0 - contamination_index), 3),
+            "safety_contract": safety_contract,
+            "approval_contract": approval_contract,
+            "operation_checklist": operation_checklist,
+            "priority_actions": priority_actions,
             "can_switch": can_switch,
             "can_operate": can_switch,
             "quality_score": round(

@@ -71,6 +71,10 @@ V6.5 重点增强：
 6. **兼容旧版**：原有 spec、模式和工具三件套仍然保留
 7. **检索专精增强**：retrieval-skill 默认支持 `documents / document_paths / source_text / source_urls / retriever_endpoint`
 8. **共享源适配层**：browser-skill 与 analysis-skill 也会附带 `scripts/source_adapter.py`，统一本地路径、URL 与外部检索入口的加载逻辑
+9. **运行时契约**：生成的 skill 会在 `_skillhub_meta.json` 中声明 `runtime_contract`，并在专精场景下附带 `assets/module_contract.json`
+10. **交付资产补全**：生成的 skill 会附带 `README.md`、`assets/sample_input.json`、`assets/failure_cases.json` 与 `tests/failure_modes.py`
+11. **专精交付指引**：生成的 skill 会附带 `assets/acceptance_checklist.json` 与 `assets/operational_playbook.md`
+12. **语义 benchmark**：生成的 skill 会附带 `assets/benchmark_cases.json` 与 `tests/benchmark_runner.py`
 
 ## 输入方式
 
@@ -194,7 +198,12 @@ print(result["files"].keys())
 - 自然语言生成 skill
 - analysis/browser/workflow 专精识别
 - 专精骨架字段生成
+- 多文件专精模块生成
 - 专精配套资产生成
+- standalone smoke + runtime contract 校验
+- README / sample input / failure modes 交付资产生成
+- acceptance checklist / operational playbook 专精交付资产生成
+- benchmark cases / benchmark runner 语义验收资产生成
 
 建议回归命令：
 
@@ -210,6 +219,32 @@ pytest underone/tests/test_skills_core.py underone/tests/test_under_one.py
 - 支持专精目录资产生成
 - 支持专精化 `SKILL.md` 说明
 - 支持 browser / analysis / workflow 半成品运行框架
+
+### V6.6
+
+- 支持 browser / analysis / workflow 多文件专精包
+- 支持 `runtime_contract` 运行时契约声明
+- 支持 `module_contract.json` 模块级结构资产
+- 支持 standalone smoke 校验必需文件、导出与关键输出字段
+
+### V6.7
+
+- 支持根目录 `README.md` 自动生成
+- 支持统一 `assets/sample_input.json`
+- 支持 `assets/failure_cases.json` 失败场景资产
+- 支持 `tests/failure_modes.py` 失败路径回归脚本
+
+### V6.8
+
+- 支持 `assets/acceptance_checklist.json` 验收清单
+- 支持 `assets/operational_playbook.md` 专精操作手册
+- 支持 README 内联专精操作提示与验收建议
+
+### V6.9
+
+- 支持 `assets/benchmark_cases.json` 语义 benchmark 样本
+- 支持 `tests/benchmark_runner.py` benchmark 执行器
+- 支持 README 内联 benchmark 使用方式
 
 ### V6.3
 

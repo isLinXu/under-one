@@ -132,6 +132,133 @@ def _ecosystem_quality(report: dict) -> float:
     return round(min(100.0, max(base, base + bonus - penalty)), 1)
 
 
+def _severity_rank(level: str) -> int:
+    return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(level, 4)
+
+
+def _build_weakest_skills(states: dict) -> list[dict]:
+    weakest = []
+    for skill_name, stats in states.items():
+        if stats.get("n", 0) <= 0:
+            continue
+        quality = stats.get("quality", 0)
+        completeness = stats.get("output_completeness", quality)
+        consistency = stats.get("consistency_score", quality)
+        human = stats.get("human_intervention", 0)
+        if consistency < 78:
+            concern = "consistency_drift"
+        elif completeness < 80:
+            concern = "incomplete_delivery"
+        elif human > 0.30:
+            concern = "manual_dependency"
+        else:
+            concern = "quality_floor"
+        weakest.append(
+            {
+                "skill": skill_name,
+                "quality": quality,
+                "output_completeness": completeness,
+                "consistency_score": consistency,
+                "human_intervention": human,
+                "primary_concern": concern,
+            }
+        )
+
+    weakest.sort(
+        key=lambda item: (
+            item.get("quality", 0),
+            item.get("consistency_score", 0),
+            item.get("output_completeness", 0),
+            -item.get("human_intervention", 0),
+        )
+    )
+    return weakest[:5]
+
+
+def _build_ecosystem_hotspots(states: dict, mutex_found: list[tuple], weakest_skills: list[dict]) -> list[dict]:
+    hotspots = []
+    for item in weakest_skills:
+        severity = (
+            "critical" if item["quality"] < 75 or item["consistency_score"] < 70
+            else "high" if item["quality"] < 82 or item["output_completeness"] < 80 or item["human_intervention"] > 0.35
+            else "medium"
+        )
+        hotspots.append(
+            {
+                "id": f"skill:{item['skill']}",
+                "severity": severity,
+                "owner": item["skill"],
+                "type": item["primary_concern"],
+                "signal": {
+                    "quality": item["quality"],
+                    "output_completeness": item["output_completeness"],
+                    "consistency_score": item["consistency_score"],
+                    "human_intervention": item["human_intervention"],
+                },
+                "action": "优先修复最弱信号，再考虑扩大 skill 作用域。",
+            }
+        )
+
+    for a, b, reason in mutex_found:
+        hotspots.append(
+            {
+                "id": f"mutex:{a}:{b}",
+                "severity": "high",
+                "owner": "bagua-zhen",
+                "type": "mutex_conflict",
+                "signal": {"pair": [a, b]},
+                "action": f"为 {a} 与 {b} 建立显式调度边界{reason or ''}。",
+            }
+        )
+
+    hotspots.sort(key=lambda item: (_severity_rank(item.get("severity")), item.get("id", "")))
+    return hotspots[:8]
+
+
+def _build_optimization_queue(weakest_skills: list[dict], hotspots: list[dict]) -> list[dict]:
+    queue = []
+    for item in weakest_skills[:3]:
+        if item["primary_concern"] == "consistency_drift":
+            focus = "收敛输出结构，减少互相冲突的分支。"
+        elif item["primary_concern"] == "incomplete_delivery":
+            focus = "补齐结果交付契约和缺失字段。"
+        elif item["primary_concern"] == "manual_dependency":
+            focus = "降低人工接管率，增强默认自治。"
+        else:
+            focus = "提升质量下限并增强异常场景表现。"
+
+        queue.append(
+            {
+                "skill": item["skill"],
+                "priority": (
+                    "critical"
+                    if item["quality"] < 75 or item["consistency_score"] < 70
+                    else "high"
+                    if item["quality"] < 82 or item["output_completeness"] < 80
+                    else "medium"
+                ),
+                "focus": item["primary_concern"],
+                "action": focus,
+            }
+        )
+
+    for hotspot in hotspots:
+        if hotspot.get("type") != "mutex_conflict":
+            continue
+        pair = hotspot.get("signal", {}).get("pair", [])
+        queue.append(
+            {
+                "skill": "bagua-zhen",
+                "priority": "high",
+                "focus": "mutex_conflict",
+                "action": f"协调 {' ↔ '.join(pair)} 的执行边界，避免重复激活。",
+            }
+        )
+
+    queue.sort(key=lambda item: (_severity_rank(item.get("priority")), item.get("skill", "")))
+    return queue
+
+
 def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
     """V10.2: 从runtime_data动态学习互斥/协同关系。
 
@@ -385,6 +512,9 @@ def coordinate(skills_dir: str = None):
         print(f"{sid:<20} {s['success_rate']:>5.0f}% {s['quality']:>5.1f} {s['errors']:>5.2f} {s['n']:>4d} {status:>6}")
 
     # 生成报告
+    weakest_skills = _build_weakest_skills(states)
+    ecosystem_hotspots = _build_ecosystem_hotspots(states, mutex_found, weakest_skills)
+    optimization_queue = _build_optimization_queue(weakest_skills, ecosystem_hotspots)
     report = {
         "coordinator": "bagua-zhen",
         "version": VERSION,
@@ -407,6 +537,15 @@ def coordinate(skills_dir: str = None):
         "relationship_policy": {
             "prefer_dynamic_overrides": _cfg_prefer_dynamic,
             "dynamic_ignore_pairs": sorted([list(pair) for pair in IGNORED_DYNAMIC_PAIRS]),
+        },
+        "weakest_skills": weakest_skills,
+        "ecosystem_hotspots": ecosystem_hotspots,
+        "optimization_queue": optimization_queue,
+        "governance_summary": {
+            "hotspot_count": len(ecosystem_hotspots),
+            "queued_actions": len(optimization_queue),
+            "active_mutex_pairs": len(mutex_found),
+            "active_synergy_pairs": len(synergy_found),
         },
         "skill_states": states,
         "timestamp": datetime.now().isoformat(),

@@ -534,19 +534,91 @@ SAMPLE_INPUT = __SAMPLE_INPUT__
 def run_smoke(root, load_entry, load_meta):
     mod = load_entry()
     meta = load_meta()
+    contract = meta.get("runtime_contract", {})
+    required_files = contract.get("required_files", [])
+    for rel_path in required_files:
+        assert (root / rel_path).exists(), f"missing required file: {rel_path}"
+    required_exports = contract.get("required_exports", ["transform"])
+    for export_name in required_exports:
+        assert hasattr(mod, export_name), f"missing export: {export_name}"
     result = mod.transform(SAMPLE_INPUT)
     assert isinstance(result, dict)
     assert result.get("status") == "ok"
-    contract = meta.get("standalone_validation", {})
-    assert contract.get("kind") == "python-script"
-    assert contract.get("path") == "tests/standalone_smoke.py"
+    required_output_keys = contract.get("required_output_keys", ["status"])
+    for key in required_output_keys:
+        assert key in result, f"missing output key: {key}"
+    smoke_contract = meta.get("standalone_validation", {})
+    assert smoke_contract.get("kind") == "python-script"
+    assert smoke_contract.get("path") == "tests/standalone_smoke.py"
     summary_keys = ("hit_count", "record_count", "step_count", "count", "document_count")
     summary_parts = [f"status={result.get('status')}"]
+    if contract.get("specialization"):
+        summary_parts.append(f"specialization={contract['specialization']}")
     for key in summary_keys:
         if key in result:
             summary_parts.append(f"{key}={result[key]}")
             break
     return " ".join(summary_parts)
+'''
+
+
+FAILURE_MODES_TEMPLATE = '''from __future__ import annotations
+
+import json
+
+
+def _resolve_path(payload, dotted_path):
+    current = payload
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def run_failure_modes(root, load_entry):
+    mod = load_entry()
+    cases = json.loads((root / "assets" / "failure_cases.json").read_text(encoding="utf-8"))
+    summaries = []
+    for case in cases:
+        result = mod.transform(case["input"])
+        assert isinstance(result, dict), f"failure case {case['id']} did not return dict"
+        assert result.get("status") == "ok", f"failure case {case['id']} returned non-ok status"
+        for dotted_path, expected_value in case.get("expect", {}).items():
+            assert _resolve_path(result, dotted_path) == expected_value, f"{case['id']} expected {dotted_path}={expected_value}"
+        summaries.append(case["id"])
+    return ",".join(summaries)
+'''
+
+
+BENCHMARK_RUNNER_TEMPLATE = '''from __future__ import annotations
+
+import json
+
+
+def _resolve_path(payload, dotted_path):
+    current = payload
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def run_benchmarks(root, load_entry):
+    mod = load_entry()
+    payload = json.loads((root / "assets" / "benchmark_cases.json").read_text(encoding="utf-8"))
+    summaries = []
+    for case in payload.get("cases", []):
+        result = mod.transform(case["input"])
+        assert isinstance(result, dict), f"benchmark case {case['id']} did not return dict"
+        assert result.get("status") == "ok", f"benchmark case {case['id']} returned non-ok status"
+        for dotted_path, expected_value in case.get("expect", {}).items():
+            assert _resolve_path(result, dotted_path) == expected_value, f"{case['id']} expected {dotted_path}={expected_value}"
+        for dotted_path in case.get("expect_contains", []):
+            assert _resolve_path(result, dotted_path) is not None, f"{case['id']} missing path {dotted_path}"
+        summaries.append(case["id"])
+    return ",".join(summaries)
 '''
 
 
@@ -747,8 +819,59 @@ SKILL_META_TEMPLATE = '''{{
   "outputs": {outputs_json},
   "dependencies": [],
   "standalone_validation": {{"kind": "python-script", "path": "tests/standalone_smoke.py"}},
+  "runtime_contract": {runtime_contract_json},
   "min_python": "3.8"
 }}
+'''
+
+
+README_TEMPLATE = '''# {display_name}
+
+由 `shenji-bailian` 自动锻造的 `{specialization}` skill 包。
+
+## 目录结构
+
+- `SKILL.md`: skill 说明
+- `_skillhub_meta.json`: 入口与运行时契约
+- `scripts/{module_name}.py`: 主入口脚本
+- `assets/sample_input.json`: 通用示例输入
+- `assets/failure_cases.json`: 失败/退化场景用例
+- `assets/acceptance_checklist.json`: 交付验收清单
+- `assets/operational_playbook.md`: 专精操作手册
+- `assets/benchmark_cases.json`: 贴近需求语义的 benchmark 样本
+- `tests/standalone_smoke.py`: 冒烟验证
+- `tests/failure_modes.py`: 失败路径验证
+- `tests/benchmark_runner.py`: benchmark 执行器
+
+## 快速开始
+
+```bash
+python scripts/{module_name}.py assets/sample_input.json -o output.json
+python scripts/test_{module_name}.py
+python tests/standalone_smoke.py
+python tests/benchmark_runner.py
+```
+
+## 运行时契约
+
+- specialization: `{specialization}`
+- required entry: `scripts/{module_name}.py`
+- required outputs: {required_output_keys}
+
+## 专精操作提示
+
+{specialization_guidance}
+
+## 验收建议
+
+{acceptance_guidance}
+
+## 建议扩展
+
+- 补充更真实的数据源或外部服务接入
+- 细化业务字段校验和错误分级
+- 把 `failure_cases.json` 扩展为团队自己的回归样本集
+- 把 `benchmark_cases.json` 扩展为团队自己的语义验收集
 '''
 
 
@@ -1112,6 +1235,8 @@ class ToolFactory:
         tool_contract = self.spec.get("sections", {}).get("tool_contract", {})
         tags = tool_contract.get("tags", ["generated-skill", "automation", "tooling"])
         triggers = tool_contract.get("triggers", [display_name, "自动化", "处理", "生成"])
+        specialization = tool_contract.get("specialization", "general-skill")
+        runtime_contract = self._build_runtime_contract(specialization, module_name)
         return SKILL_META_TEMPLATE.format(
             skill_name=display_name,
             display_name=display_name,
@@ -1121,7 +1246,85 @@ class ToolFactory:
             triggers_json=json.dumps(triggers, ensure_ascii=False),
             inputs_json=json.dumps(inputs, ensure_ascii=False),
             outputs_json=json.dumps(outputs, ensure_ascii=False),
+            runtime_contract_json=json.dumps(runtime_contract, ensure_ascii=False),
         )
+
+    def _render_skill_readme(self, skill_name, module_name):
+        display_name = skill_name.replace("_", "-")
+        specialization = self.spec.get("sections", {}).get("tool_contract", {}).get("specialization", "general-skill")
+        runtime_contract = self._build_runtime_contract(specialization, module_name)
+        output_keys = ", ".join(runtime_contract.get("required_output_keys", ["status"]))
+        specialization_guidance, acceptance_guidance = self._specialization_delivery_guidance(specialization)
+        return README_TEMPLATE.format(
+            display_name=display_name,
+            specialization=specialization,
+            module_name=module_name,
+            required_output_keys=output_keys,
+            specialization_guidance=specialization_guidance,
+            acceptance_guidance=acceptance_guidance,
+        )
+
+    def _specialization_delivery_guidance(self, specialization):
+        guidance = {
+            "browser-skill": (
+                "- 先确认允许抓取的域名范围，再逐步放开真实目标站点\n- 优先观察 `fetch_errors` 和 `links`，确认抓取与抽取是否同时稳定\n- 若页面结构复杂，先把 `extractors.py` 扩成更明确的字段抽取器",
+                "- 验证允许域名策略和 headers 配置\n- 验证空页面、超时页面、重定向页面三类退化路径\n- 验证 `summary` 与 `links` 是否都能稳定返回",
+            ),
+            "analysis-skill": (
+                "- 先确认记录来源是本地文件、远程 URL 还是内联 records\n- 优先检查 `metrics` 的定义是否贴近业务，再决定是否扩展 `insights.py`\n- 报告上线前至少补一组非数值字段样本，避免统计逻辑只在理想数据上成立",
+                "- 验证缺失文件、空记录、非数值记录三类输入\n- 验证 `metrics` 与 `insights` 是否与样本数据一致\n- 验证报告命名和输出字段能被下游消费",
+            ),
+            "workflow-skill": (
+                "- 先把业务步骤映射到 `handlers.py`，再补状态流转规则\n- 对未知步骤保持可观测，不要一开始就写死所有分支\n- 若要接真实自动化系统，优先在 `state.py` 里约束状态集合",
+                "- 验证默认步骤、未知步骤、空状态回退三类路径\n- 验证 `execution_plan` 顺序是否稳定\n- 验证非 pending 状态能否正确覆盖步骤结果",
+            ),
+            "retrieval-skill": (
+                "- 先明确本地文档、URL 和外部检索端点的优先级\n- 如果结果质量波动大，优先调 `score_document()` 而不是盲目扩数据源\n- 外部 retriever 上线前应固定返回 schema，减少归一化成本",
+                "- 验证本地路径、内联文本、外部检索三类来源\n- 验证无命中时 `summary` 是否仍然可读\n- 验证 `source_summary` 能否准确暴露错误数和来源分布",
+            ),
+        }
+        return guidance.get(
+            specialization,
+            (
+                "- 先用 sample input 跑通主路径，再补业务特化逻辑\n- 把失败样本持续沉淀到 `failure_cases.json`\n- 保持输出结构稳定，优先服务下游集成",
+                "- 验证 sample input、空输入、失败输入三类路径\n- 验证 README 与真实文件结构一致\n- 验证 smoke/failure 测试都能独立执行",
+            ),
+        )
+
+    def _build_runtime_contract(self, specialization, module_name):
+        required_files = [
+            f"scripts/{module_name}.py",
+            "tests/standalone_smoke.py",
+            "tests/failure_modes.py",
+            "tests/benchmark_runner.py",
+            "README.md",
+            "assets/failure_cases.json",
+            "assets/acceptance_checklist.json",
+            "assets/operational_playbook.md",
+            "assets/benchmark_cases.json",
+        ]
+        if specialization == "browser-skill":
+            required_files.extend(["scripts/runtime.py", "scripts/extractors.py", "scripts/source_adapter.py"])
+            required_output_keys = ["status", "webpage_url", "links", "summary"]
+        elif specialization == "analysis-skill":
+            required_files.extend(["scripts/metrics.py", "scripts/insights.py", "scripts/source_adapter.py"])
+            required_output_keys = ["status", "report_name", "record_count", "metrics", "insights"]
+        elif specialization == "workflow-skill":
+            required_files.extend(["scripts/handlers.py", "scripts/state.py"])
+            required_output_keys = ["status", "workflow_state", "step_count", "execution_plan"]
+        elif specialization == "retrieval-skill":
+            required_files.extend(["scripts/source_adapter.py"])
+            required_output_keys = ["status", "query", "document_count", "hit_count", "results", "summary"]
+        else:
+            required_output_keys = ["status"]
+        return {
+            "kind": "generated-skill-runtime",
+            "specialization": specialization or "general",
+            "entry": f"scripts/{module_name}.py",
+            "required_files": required_files,
+            "required_exports": ["transform", "process"],
+            "required_output_keys": required_output_keys,
+        }
 
     def _build_specialized_bundle(self, specialization, module_name):
         bundles = {
@@ -1475,41 +1678,12 @@ def test_transform():
             },
             "browser-skill": {
                 "transform_code": '''
-from source_adapter import fetch_text_from_url
-
-
-def fetch_page(payload):
-    """抓取入口：优先读取已给内容，否则尝试拉取网页正文"""
-    webpage_url = payload.get("webpage_url", "")
-    raw_content = payload.get("content", "")
-    title = payload.get("title", "")
-    errors = []
-    if not raw_content and webpage_url:
-        raw_content, error = fetch_text_from_url(
-            webpage_url,
-            timeout=int(payload.get("timeout", 5) or 5),
-            headers=payload.get("webpage_headers", {}),
-        )
-        if error:
-            errors.append(error)
-    return {"webpage_url": webpage_url, "content": raw_content or webpage_url, "title": title, "errors": errors}
-
-
-def extract_links(text):
-    """从文本中提取链接"""
-    links = re.findall(r"""https?://[^\\s'"<>]+""", text)
-    trailing_link_chars = re.compile(r"""[]'"<>.,;)}]+$""")
-    return [trailing_link_chars.sub("", link) for link in links]
-
-
-def summarize_page(page):
-    """页面摘要入口占位"""
-    text = page.get("content", "")
-    return text[:120] if isinstance(text, str) else ""
+from runtime import fetch_page, summarize_page
+from extractors import extract_links
 
 
 def transform(data):
-    """Browser skill 骨架 - 读取网页地址或网页内容并提取结构化结果"""
+    """Browser skill 运行入口 - 协调页面抓取、链接提取与摘要生成。"""
     payload = data if isinstance(data, dict) else {"webpage_url": data}
     page = fetch_page(payload)
     text = page.get("content", "")
@@ -1537,26 +1711,15 @@ def test_transform():
             },
             "workflow-skill": {
                 "transform_code": '''
-def default_step_handlers():
-    """默认步骤处理器映射"""
-    return {
-        "collect": lambda context: {"step": "collect", "state": "ready", "context": context},
-        "process": lambda context: {"step": "process", "state": "ready", "context": context},
-        "deliver": lambda context: {"step": "deliver", "state": "ready", "context": context},
-    }
-
-
-def run_step(step, context, handlers):
-    """执行单个步骤"""
-    handler = handlers.get(step, lambda ctx: {"step": step, "state": "custom", "context": ctx})
-    return handler(context)
+from handlers import default_step_handlers, run_step
+from state import normalize_workflow_state
 
 
 def transform(data):
-    """Workflow skill 骨架 - 编排步骤、状态和执行摘要"""
+    """Workflow skill 运行入口 - 编排步骤、状态和执行摘要。"""
     payload = data if isinstance(data, dict) else {"task": str(data)}
     steps = payload.get("steps") or ["collect", "process", "deliver"]
-    current_state = payload.get("state", "pending")
+    current_state = normalize_workflow_state(payload.get("state", "pending"))
     handlers = default_step_handlers()
     execution_plan = []
     for index, step in enumerate(steps, start=1):
@@ -1585,27 +1748,8 @@ def test_transform():
             "analysis-skill": {
                 "transform_code": '''
 from source_adapter import load_records_from_paths, load_records_from_urls
-
-
-def metric_registry():
-    """指标注册表，占位后可继续扩展更多统计项"""
-    return {
-        "count": lambda values: len(values),
-        "sum": lambda values: round(sum(values), 2),
-        "avg": lambda values: round(sum(values) / len(values), 2) if values else 0,
-        "max": lambda values: max(values) if values else 0,
-        "min": lambda values: min(values) if values else 0,
-    }
-
-
-def generate_insights(metrics):
-    """洞察生成入口占位"""
-    insights = []
-    if metrics.get("avg", 0) > 0:
-        insights.append(f"average={metrics.get('avg')}")
-    if metrics.get("max", 0) > metrics.get("avg", 0):
-        insights.append("max_above_average")
-    return insights
+from metrics import metric_registry
+from insights import generate_insights
 
 
 def normalize_records(payload):
@@ -1627,7 +1771,7 @@ def normalize_records(payload):
 
 
 def transform(data):
-    """Analysis skill 骨架 - 汇总指标并形成报告"""
+    """Analysis skill 运行入口 - 汇总指标并形成报告。"""
     payload = data if isinstance(data, dict) else {"records": data}
     records, source_summary = normalize_records(payload)
     metrics = {}
@@ -1763,9 +1907,102 @@ def test_transform():
                     ensure_ascii=False,
                     indent=2,
                 ),
+                "assets/failure_cases.json": json.dumps(
+                    [
+                        {
+                            "id": "missing_local_path",
+                            "input": {"query": "缓存", "document_paths": ["/nonexistent/retrieval-doc.json"]},
+                            "expect": {"source_summary.error_count": 1, "hit_count": 0},
+                        },
+                        {
+                            "id": "broken_retriever_endpoint",
+                            "input": {"query": "缓存", "retriever_endpoint": "http://127.0.0.1:1/search"},
+                            "expect": {"source_summary.external_retriever_count": 0},
+                        },
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/acceptance_checklist.json": json.dumps(
+                    {
+                        "specialization": "retrieval-skill",
+                        "checks": [
+                            "local documents can be loaded",
+                            "external retriever errors remain observable",
+                            "summary stays readable when no hit is found",
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/operational_playbook.md": """# Retrieval Skill Playbook
+
+- 优先验证 `document_paths` 与 `source_text` 的组合输入。
+- 外部检索端点接入前，先固定 `results` 字段结构。
+- 结果质量异常时，先检查 `source_summary.errors` 和 `score_document()`。
+""",
+                "assets/benchmark_cases.json": json.dumps(
+                    {
+                        "specialization": "retrieval-skill",
+                        "cases": [
+                            {
+                                "id": "inline_retrieval_summary",
+                                "input": {
+                                    "query": "缓存 延迟",
+                                    "documents": [{"title": "缓存优化", "content": "缓存命中率提升后接口延迟下降 35%"}],
+                                    "source_text": "结论：缓存命中率提升后，延迟进一步下降。",
+                                },
+                                "expect": {"hit_count": 2},
+                                "expect_contains": ["results", "summary"],
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
             },
             "browser-skill": {
                 "scripts/source_adapter.py": SOURCE_ADAPTER_TEMPLATE,
+                "scripts/runtime.py": '''#!/usr/bin/env python3
+"""Browser skill runtime helpers."""
+
+from source_adapter import fetch_text_from_url
+
+
+def fetch_page(payload):
+    """抓取入口：优先读取已给内容，否则尝试拉取网页正文。"""
+    webpage_url = payload.get("webpage_url", "")
+    raw_content = payload.get("content", "")
+    title = payload.get("title", "")
+    errors = []
+    if not raw_content and webpage_url:
+        raw_content, error = fetch_text_from_url(
+            webpage_url,
+            timeout=int(payload.get("timeout", 5) or 5),
+            headers=payload.get("webpage_headers", {}),
+        )
+        if error:
+            errors.append(error)
+    return {"webpage_url": webpage_url, "content": raw_content or webpage_url, "title": title, "errors": errors}
+
+
+def summarize_page(page):
+    """页面摘要入口占位。"""
+    text = page.get("content", "")
+    return text[:120] if isinstance(text, str) else ""
+''',
+                "scripts/extractors.py": '''#!/usr/bin/env python3
+"""Browser skill extractors."""
+
+import re
+
+
+def extract_links(text):
+    """从文本中提取链接。"""
+    links = re.findall(r"""https?://[^\\s'"<>]+""", text)
+    trailing_link_chars = re.compile(r"""[]'"<>.,;)}]+$""")
+    return [trailing_link_chars.sub("", link) for link in links]
+''',
                 "assets/sample_browser_input.json": json.dumps(
                     {"webpage_url": "https://example.com", "content": "Example content with https://example.com/docs"},
                     ensure_ascii=False,
@@ -1776,9 +2013,94 @@ def test_transform():
                     ensure_ascii=False,
                     indent=2,
                 ),
+                "assets/module_contract.json": json.dumps(
+                    {
+                        "specialization": "browser-skill",
+                        "modules": ["runtime.py", "extractors.py", "source_adapter.py"],
+                        "required_output_keys": ["status", "webpage_url", "links", "summary"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/failure_cases.json": json.dumps(
+                    [
+                        {
+                            "id": "unreachable_page",
+                            "input": {"webpage_url": "http://127.0.0.1:1/unreachable"},
+                            "expect": {"fetch_errors": [{"source": "http://127.0.0.1:1/unreachable", "reason": "fetch_failed:URLError"}]},
+                        },
+                        {
+                            "id": "empty_inline_content",
+                            "input": {"content": ""},
+                            "expect": {"links": []},
+                        },
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/acceptance_checklist.json": json.dumps(
+                    {
+                        "specialization": "browser-skill",
+                        "checks": [
+                            "allowed domain policy is explicit",
+                            "broken pages still return fetch_errors",
+                            "link extraction remains stable on inline content",
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/operational_playbook.md": """# Browser Skill Playbook
+
+- 先在 `browser_targets.json` 收紧允许域名，再逐步放开。
+- 观察 `fetch_errors` 与 `links` 是否一起可用。
+- 若页面字段抽取要变复杂，优先扩展 `extractors.py`。
+""",
+                "assets/benchmark_cases.json": json.dumps(
+                    {
+                        "specialization": "browser-skill",
+                        "cases": [
+                            {
+                                "id": "inline_link_extraction",
+                                "input": {"webpage_url": "https://example.com", "content": "See https://example.com/docs"},
+                                "expect": {"webpage_url": "https://example.com"},
+                                "expect_contains": ["links", "summary"],
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
             },
             "analysis-skill": {
                 "scripts/source_adapter.py": SOURCE_ADAPTER_TEMPLATE,
+                "scripts/metrics.py": '''#!/usr/bin/env python3
+"""Analysis skill metrics helpers."""
+
+
+def metric_registry():
+    """指标注册表，占位后可继续扩展更多统计项。"""
+    return {
+        "count": lambda values: len(values),
+        "sum": lambda values: round(sum(values), 2),
+        "avg": lambda values: round(sum(values) / len(values), 2) if values else 0,
+        "max": lambda values: max(values) if values else 0,
+        "min": lambda values: min(values) if values else 0,
+    }
+''',
+                "scripts/insights.py": '''#!/usr/bin/env python3
+"""Analysis skill insight helpers."""
+
+
+def generate_insights(metrics):
+    """洞察生成入口占位。"""
+    insights = []
+    if metrics.get("avg", 0) > 0:
+        insights.append(f"average={metrics.get('avg')}")
+    if metrics.get("max", 0) > metrics.get("avg", 0):
+        insights.append("max_above_average")
+    return insights
+''',
                 "assets/sample_analysis_input.json": json.dumps(
                     {
                         "records": [{"sales": 10}, {"sales": 20}],
@@ -1799,8 +2121,93 @@ def test_transform():
                     ensure_ascii=False,
                     indent=2,
                 ),
+                "assets/module_contract.json": json.dumps(
+                    {
+                        "specialization": "analysis-skill",
+                        "modules": ["metrics.py", "insights.py", "source_adapter.py"],
+                        "required_output_keys": ["status", "report_name", "record_count", "metrics", "insights"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/failure_cases.json": json.dumps(
+                    [
+                        {
+                            "id": "missing_record_path",
+                            "input": {"report_name": "sales_report", "record_paths": ["/nonexistent/sales.json"]},
+                            "expect": {"record_count": 0, "source_summary.error_count": 1},
+                        },
+                        {
+                            "id": "non_numeric_records",
+                            "input": {"records": [{"name": "north"}, {"team": "south"}], "report_name": "labels_only"},
+                            "expect": {"record_count": 2, "metrics": {}},
+                        },
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/acceptance_checklist.json": json.dumps(
+                    {
+                        "specialization": "analysis-skill",
+                        "checks": [
+                            "numeric metrics match sample data",
+                            "missing files remain observable in source_summary",
+                            "non-numeric records do not break transform output",
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/operational_playbook.md": """# Analysis Skill Playbook
+
+- 先确认数据源类型，再补指标定义。
+- 报告消费方如果依赖字段，优先冻结 `required_output_keys`。
+- 非数值数据应先进入 failure cases，再考虑扩展指标逻辑。
+""",
+                "assets/benchmark_cases.json": json.dumps(
+                    {
+                        "specialization": "analysis-skill",
+                        "cases": [
+                            {
+                                "id": "sales_report_metrics",
+                                "input": {"records": [{"sales": 10}, {"sales": 20}], "report_name": "sales_report"},
+                                "expect": {"record_count": 2, "metrics.avg": 15.0},
+                                "expect_contains": ["insights"],
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
             },
             "workflow-skill": {
+                "scripts/handlers.py": '''#!/usr/bin/env python3
+"""Workflow skill step handlers."""
+
+
+def default_step_handlers():
+    """默认步骤处理器映射。"""
+    return {
+        "collect": lambda context: {"step": "collect", "state": "ready", "context": context},
+        "process": lambda context: {"step": "process", "state": "ready", "context": context},
+        "deliver": lambda context: {"step": "deliver", "state": "ready", "context": context},
+    }
+
+
+def run_step(step, context, handlers):
+    """执行单个步骤。"""
+    handler = handlers.get(step, lambda ctx: {"step": step, "state": "custom", "context": ctx})
+    return handler(context)
+''',
+                "scripts/state.py": '''#!/usr/bin/env python3
+"""Workflow skill state helpers."""
+
+
+def normalize_workflow_state(raw_state):
+    """归一化工作流状态，避免空值直接透传。"""
+    state = str(raw_state or "pending").strip().lower()
+    return state or "pending"
+''',
                 "assets/sample_workflow_input.json": json.dumps(
                     {"steps": ["collect", "review", "publish"], "state": "pending"},
                     ensure_ascii=False,
@@ -1808,6 +2215,64 @@ def test_transform():
                 ),
                 "assets/workflow_template.json": json.dumps(
                     {"workflow_state": "pending", "execution_plan": [{"step": "collect", "order": 1}]},
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/module_contract.json": json.dumps(
+                    {
+                        "specialization": "workflow-skill",
+                        "modules": ["handlers.py", "state.py"],
+                        "required_output_keys": ["status", "workflow_state", "step_count", "execution_plan"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/failure_cases.json": json.dumps(
+                    [
+                        {
+                            "id": "blank_state_fallback",
+                            "input": {"steps": ["collect"], "state": ""},
+                            "expect": {"workflow_state": "pending", "step_count": 1},
+                        },
+                        {
+                            "id": "unknown_step_handler",
+                            "input": {"steps": ["review"], "state": "running"},
+                            "expect": {"workflow_state": "running", "step_count": 1},
+                        },
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/acceptance_checklist.json": json.dumps(
+                    {
+                        "specialization": "workflow-skill",
+                        "checks": [
+                            "unknown steps degrade gracefully",
+                            "blank state falls back to pending",
+                            "execution_plan order remains deterministic",
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "assets/operational_playbook.md": """# Workflow Skill Playbook
+
+- 先把业务步骤映射到 `handlers.py`，再扩状态集合。
+- 不确定的步骤先走 custom handler，保持可观测。
+- 对接外部系统前，先在 `state.py` 冻结状态名。
+""",
+                "assets/benchmark_cases.json": json.dumps(
+                    {
+                        "specialization": "workflow-skill",
+                        "cases": [
+                            {
+                                "id": "default_workflow_plan",
+                                "input": {"steps": ["collect", "review", "publish"], "state": "pending"},
+                                "expect": {"step_count": 3, "workflow_state": "pending"},
+                                "expect_contains": ["execution_plan"],
+                            }
+                        ],
+                    },
                     ensure_ascii=False,
                     indent=2,
                 ),
@@ -1870,15 +2335,20 @@ def test_transform():
         if artifact_type == "skill":
             skill_doc = self._render_skill_doc(name, desc, self.spec.get("inputs", []), self.spec.get("outputs", []), module_name)
             skill_meta = self._render_skill_meta(name, desc, self.spec.get("inputs", []), self.spec.get("outputs", []), module_name)
+            skill_readme = self._render_skill_readme(name, module_name)
             files[f"{module_name}/SKILL.md"] = skill_doc
+            files[f"{module_name}/README.md"] = skill_readme
             files[f"{module_name}/_skillhub_meta.json"] = skill_meta
             files[f"{module_name}/scripts/{module_name}.py"] = tool_code
+            files[f"{module_name}/assets/sample_input.json"] = sample_input
             for rel_path, content in self._build_support_files(specialization).items():
                 files[f"{module_name}/{rel_path}"] = content
             if test_code:
                 files[f"{module_name}/scripts/test_{module_name}.py"] = test_code
             if standalone_smoke:
                 files[f"{module_name}/tests/standalone_smoke.py"] = standalone_smoke
+                files[f"{module_name}/tests/failure_modes.py"] = FAILURE_MODES_TEMPLATE
+                files[f"{module_name}/tests/benchmark_runner.py"] = BENCHMARK_RUNNER_TEMPLATE
             if contract:
                 files[f"{module_name}/{module_name}.contract.md"] = contract
         else:

@@ -566,6 +566,26 @@ class QiTiScanner:
         stability_checkpoints = self._build_stability_checkpoints(
             repair_handoff, stability_contract, repair_plan, escalation_contract
         )
+        risk_hotspots = self._build_risk_hotspots(
+            repair_handoff, self_evolution, stability_contract, escalation_contract
+        )
+        priority_actions = self._build_priority_actions(
+            repair_handoff,
+            self_evolution,
+            stability_contract,
+            repair_plan,
+            escalation_contract,
+            risk_hotspots,
+        )
+        execution_contract = self._build_execution_contract(
+            repair_handoff,
+            self_evolution,
+            stability_contract,
+            repair_plan,
+            escalation_contract,
+            priority_actions,
+            risk_hotspots,
+        )
         return {
             "scanner": "qiti-yuanliu",
             "version": "v0.1.0",
@@ -582,6 +602,9 @@ class QiTiScanner:
             "repair_plan": repair_plan,
             "escalation_contract": escalation_contract,
             "stability_checkpoints": stability_checkpoints,
+            "risk_hotspots": risk_hotspots,
+            "priority_actions": priority_actions,
+            "execution_contract": execution_contract,
             "quality_score": self.metrics.get("health_score", 0),
             "human_intervention": 1 if escalation_contract.get("manual_review_required") else 0,
             "output_completeness": 100.0 if stability_checkpoints.get("checkpoint_count") else 0.0,
@@ -637,6 +660,312 @@ class QiTiScanner:
         if not recs:
             recs.append("上下文状态健康，继续正常运行")
         return recs
+
+    @staticmethod
+    def _severity_rank(level):
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(level, 4)
+
+    def _build_risk_hotspots(
+        self,
+        repair_handoff=None,
+        self_evolution=None,
+        stability_contract=None,
+        escalation_contract=None,
+    ):
+        self_evolution = self_evolution or self._build_self_evolution(repair_handoff)
+        stability_contract = stability_contract or self._build_stability_contract(repair_handoff, self_evolution)
+        escalation_contract = escalation_contract or self._build_escalation_contract(
+            repair_handoff,
+            self_evolution,
+            stability_contract,
+            self._build_repair_plan(repair_handoff, self_evolution, stability_contract),
+        )
+
+        hotspots = []
+        components = self.metrics.get("entropy_components", {})
+        entropy = self.metrics.get("entropy", 0)
+        consistency = self.metrics.get("consistency", 100)
+        alignment = self.metrics.get("alignment", 100)
+        info_gaps = self._count_info_gaps()
+
+        if repair_handoff:
+            hotspots.append(
+                {
+                    "id": "repair-handoff",
+                    "severity": "critical",
+                    "blocking": True,
+                    "owner": repair_handoff.get("target_skill", "dalu-dongguan"),
+                    "signal": f"{repair_handoff.get('observed_alerts', 0)}/{repair_handoff.get('alert_threshold', 0)} contradictions",
+                    "reason": repair_handoff.get("summary"),
+                    "action": repair_handoff.get("action"),
+                }
+            )
+
+        if entropy >= self.entropy_critical:
+            hotspots.append(
+                {
+                    "id": "entropy-red-zone",
+                    "severity": "critical",
+                    "blocking": True,
+                    "owner": "qiti-yuanliu",
+                    "signal": entropy,
+                    "reason": "上下文熵进入红区，继续扩写会放大漂移。",
+                    "action": "先压缩噪声并重建目标锚点。",
+                }
+            )
+        elif entropy >= self.entropy_warning:
+            hotspots.append(
+                {
+                    "id": "entropy-elevated",
+                    "severity": "high",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": entropy,
+                    "reason": "上下文熵升高，后续输出稳定性会下降。",
+                    "action": "执行轻量炁循环并限制新增规则数量。",
+                }
+            )
+
+        if alignment < 85:
+            hotspots.append(
+                {
+                    "id": "goal-anchor-drift",
+                    "severity": "critical",
+                    "blocking": True,
+                    "owner": "qiti-yuanliu",
+                    "signal": alignment,
+                    "reason": "目标锚点对齐度过低，自动改写风险不可接受。",
+                    "action": "回放用户原始目标并冻结自动目标重写。",
+                }
+            )
+        elif alignment < 95:
+            hotspots.append(
+                {
+                    "id": "alignment-soft-drift",
+                    "severity": "medium",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": alignment,
+                    "reason": "目标对齐开始松动。",
+                    "action": "在输出前追加一次目标回钩检查。",
+                }
+            )
+
+        if consistency < 85:
+            hotspots.append(
+                {
+                    "id": "consistency-break",
+                    "severity": "high",
+                    "blocking": True,
+                    "owner": "qiti-yuanliu",
+                    "signal": consistency,
+                    "reason": "当前认知链冲突较多，继续推进会扩大偏差。",
+                    "action": "先隔离冲突轮次，再恢复执行链。",
+                }
+            )
+        elif consistency < 90:
+            hotspots.append(
+                {
+                    "id": "consistency-watch",
+                    "severity": "medium",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": consistency,
+                    "reason": "一致性有轻微波动。",
+                    "action": "检查分支回答是否与用户纠偏一致。",
+                }
+            )
+
+        if components.get("topic_drift", 0) > 1:
+            hotspots.append(
+                {
+                    "id": "topic-drift",
+                    "severity": "high",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": components.get("topic_drift", 0),
+                    "reason": "主题漂移已超过单轮可容忍范围。",
+                    "action": "重新挂钩首轮目标并删去偏航上下文。",
+                }
+            )
+
+        if components.get("intent_shift", 0) > 1:
+            hotspots.append(
+                {
+                    "id": "intent-shift",
+                    "severity": "medium",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": components.get("intent_shift", 0),
+                    "reason": "用户意图出现转向迹象。",
+                    "action": "在重写计划前先确认最新需求。",
+                }
+            )
+
+        if info_gaps > 0:
+            hotspots.append(
+                {
+                    "id": "information-gap",
+                    "severity": "medium",
+                    "blocking": False,
+                    "owner": "qiti-yuanliu",
+                    "signal": info_gaps,
+                    "reason": "存在未闭合问题，会阻断稳定恢复。",
+                    "action": "将缺口转成显式待回答问题后再推进。",
+                }
+            )
+
+        if escalation_contract.get("manual_review_required"):
+            hotspots.append(
+                {
+                    "id": "manual-review-gate",
+                    "severity": "critical",
+                    "blocking": True,
+                    "owner": "user",
+                    "signal": escalation_contract.get("severity"),
+                    "reason": "当前修复链路需要人工确认才能继续。",
+                    "action": "等待人工确认后再恢复自演化。",
+                }
+            )
+
+        hotspots.sort(
+            key=lambda item: (
+                self._severity_rank(item.get("severity")),
+                0 if item.get("blocking") else 1,
+                item.get("id", ""),
+            )
+        )
+        return hotspots
+
+    def _build_priority_actions(
+        self,
+        repair_handoff=None,
+        self_evolution=None,
+        stability_contract=None,
+        repair_plan=None,
+        escalation_contract=None,
+        hotspots=None,
+    ):
+        self_evolution = self_evolution or self._build_self_evolution(repair_handoff)
+        stability_contract = stability_contract or self._build_stability_contract(repair_handoff, self_evolution)
+        repair_plan = repair_plan or self._build_repair_plan(repair_handoff, self_evolution, stability_contract)
+        escalation_contract = escalation_contract or self._build_escalation_contract(
+            repair_handoff, self_evolution, stability_contract, repair_plan
+        )
+        hotspots = hotspots or self._build_risk_hotspots(
+            repair_handoff, self_evolution, stability_contract, escalation_contract
+        )
+
+        hotspot_map = {item["owner"]: item for item in hotspots if item.get("blocking")}
+        actions = []
+        for step in repair_plan.get("steps", []):
+            blocking = bool(
+                step.get("status") == "required"
+                and step.get("id") in {"re-anchor-goal", "execute-handoff", "verify-resume"}
+            )
+            priority = "high" if step.get("status") == "required" else "medium"
+            if blocking and (
+                step.get("id") == "execute-handoff"
+                or self.metrics.get("alignment", 100) < 85
+                or self.metrics.get("entropy", 0) >= self.entropy_critical
+            ):
+                priority = "critical"
+            owner = step.get("owner", "qiti-yuanliu")
+            blocker_reason = hotspot_map.get(owner, {}).get("reason")
+            actions.append(
+                {
+                    "id": step.get("id"),
+                    "title": step.get("title"),
+                    "priority": priority,
+                    "blocking": blocking,
+                    "owner": owner,
+                    "action": step.get("action"),
+                    "success_signal": step.get("completion_signal"),
+                    "depends_on": [] if step.get("order", 0) <= 1 else [repair_plan["steps"][step["order"] - 2]["id"]],
+                    "reason": blocker_reason or step.get("title"),
+                }
+            )
+
+        if escalation_contract.get("manual_review_required"):
+            actions.append(
+                {
+                    "id": "manual-review",
+                    "title": "人工确认恢复门",
+                    "priority": "critical",
+                    "blocking": True,
+                    "owner": "user",
+                    "action": "确认当前修复结果是否允许恢复自演化。",
+                    "success_signal": "manual_review_required=False",
+                    "depends_on": ["verify-resume"],
+                    "reason": "修复链路已进入人工确认门。",
+                }
+            )
+
+        deduped = []
+        seen = set()
+        for item in sorted(
+            actions,
+            key=lambda entry: (
+                self._severity_rank(entry.get("priority")),
+                0 if entry.get("blocking") else 1,
+                entry.get("depends_on", []),
+            ),
+        ):
+            key = item.get("id")
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+        return deduped
+
+    def _build_execution_contract(
+        self,
+        repair_handoff=None,
+        self_evolution=None,
+        stability_contract=None,
+        repair_plan=None,
+        escalation_contract=None,
+        priority_actions=None,
+        hotspots=None,
+    ):
+        self_evolution = self_evolution or self._build_self_evolution(repair_handoff)
+        stability_contract = stability_contract or self._build_stability_contract(repair_handoff, self_evolution)
+        repair_plan = repair_plan or self._build_repair_plan(repair_handoff, self_evolution, stability_contract)
+        escalation_contract = escalation_contract or self._build_escalation_contract(
+            repair_handoff, self_evolution, stability_contract, repair_plan
+        )
+        priority_actions = priority_actions or self._build_priority_actions(
+            repair_handoff,
+            self_evolution,
+            stability_contract,
+            repair_plan,
+            escalation_contract,
+        )
+        hotspots = hotspots or self._build_risk_hotspots(
+            repair_handoff, self_evolution, stability_contract, escalation_contract
+        )
+
+        next_action = priority_actions[0] if priority_actions else None
+        blocking_actions = [item["id"] for item in priority_actions if item.get("blocking")]
+        return {
+            "operating_mode": stability_contract.get("operating_mode"),
+            "autonomy_budget": stability_contract.get("mutation_budget", {}).get("mode"),
+            "resume_ready": not stability_contract.get("freeze_self_evolution")
+            and not escalation_contract.get("manual_review_required")
+            and not repair_handoff,
+            "manual_review_required": escalation_contract.get("manual_review_required", False),
+            "queue_depth": len(priority_actions),
+            "blocking_actions": blocking_actions,
+            "blocking_action_count": len(blocking_actions),
+            "next_owner": next_action.get("owner") if next_action else "qiti-yuanliu",
+            "next_action_id": next_action.get("id") if next_action else None,
+            "next_action": next_action.get("action") if next_action else "继续当前炁循环",
+            "max_parallel_actions": 1 if repair_handoff or stability_contract.get("freeze_self_evolution") else 2,
+            "dispatch_hint": repair_handoff.get("target_skill") if repair_handoff else "qiti-yuanliu",
+            "hotspot_count": len(hotspots),
+            "halt_conditions": escalation_contract.get("escalation_triggers", []),
+            "resume_gate": stability_contract.get("resume_conditions", []),
+        }
 
     def _goal_anchor(self):
         for msg in self.context:

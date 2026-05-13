@@ -12,6 +12,7 @@ import sys
 import re
 from pathlib import Path
 from datetime import datetime, timedelta
+from collections import Counter
 
 # ── 路径设置 ───────────────────────────────────────────────
 SKILL_ROOT = Path(__file__).resolve().parent.parent  # liuku-xianzei/
@@ -394,6 +395,176 @@ class KnowledgeDigest:
             and unit["contamination_risk"] <= self.inheritance_rules["max_risk"]
         )
 
+    @staticmethod
+    def _priority_rank(level):
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(level, 4)
+
+    def _build_portfolio_diagnostics(self):
+        source_counts = Counter(unit["source"] for unit in self.units)
+        credibility_mix = Counter(unit["credibility"] for unit in self.units)
+        category_mix = Counter(unit["category"] for unit in self.units)
+        unique_sources = len(source_counts)
+        total_units = len(self.units) or 1
+        dominant_source, dominant_count = ("", 0)
+        if source_counts:
+            dominant_source, dominant_count = source_counts.most_common(1)[0]
+        dominant_ratio = round(dominant_count / total_units, 2) if dominant_count else 0.0
+        source_concentration = (
+            "high" if dominant_ratio >= 0.65 and unique_sources >= 1
+            else "medium" if dominant_ratio >= 0.45 and unique_sources >= 1
+            else "low"
+        )
+
+        evidence_ready = [
+            unit for unit in self.units
+            if unit.get("evidence_matches", 0) > 0 or unit.get("semantic_profile", {}).get("numeric_markers", 0) > 0
+        ]
+        application_ready = [unit for unit in self.units if unit.get("application_matches", 0) > 0]
+        thin_units = [
+            unit["concept"]
+            for unit in self.units
+            if unit.get("semantic_signal_count", 0) < 3 or unit.get("digestion_level") == "低"
+        ][:5]
+
+        avg_freshness = (
+            round(sum(unit.get("freshness_days", 0) for unit in self.units) / len(self.units), 1)
+            if self.units else 0.0
+        )
+        expiring_soon = sum(1 for unit in self.units if unit.get("freshness_days", 0) <= 14)
+        inheritance_ready_rate = round(len(self.inheritance_queue) / total_units * 100, 1)
+
+        return {
+            "source_diversity": {
+                "unique_sources": unique_sources,
+                "diversity_ratio": round(unique_sources / total_units, 2),
+                "dominant_source": dominant_source,
+                "dominant_ratio": dominant_ratio,
+                "concentration_level": source_concentration,
+            },
+            "credibility_mix": dict(credibility_mix),
+            "category_mix": dict(category_mix),
+            "evidence_coverage": {
+                "coverage_rate": round(len(evidence_ready) / total_units * 100, 1),
+                "application_coverage_rate": round(len(application_ready) / total_units * 100, 1),
+                "thin_units": thin_units,
+            },
+            "freshness_profile": {
+                "average_freshness_days": avg_freshness,
+                "expiring_soon_count": expiring_soon,
+            },
+            "inheritance_readiness": {
+                "ready_rate": inheritance_ready_rate,
+                "quarantine_rate": round(len(self.quarantine_queue) / total_units * 100, 1),
+            },
+        }
+
+    def _build_refinement_queue(self):
+        queue = []
+        for unit in self.units:
+            reason = []
+            next_step = "整理成结构化摘要并进入下轮复习。"
+            priority = "low"
+
+            if unit.get("contamination_level") == "high":
+                priority = "critical"
+                reason.append("污染风险高")
+                next_step = "先隔离来源并补做可信度复核，再决定是否继承。"
+            elif unit.get("digestion_level") == "低":
+                priority = "high"
+                reason.append("消化率低")
+                next_step = "补充核心论点、证据和应用场景后再二次炼化。"
+            elif unit.get("contamination_level") == "medium":
+                priority = "high"
+                reason.append("存在中等污染风险")
+                next_step = "补一层来源交叉验证，降低污染再继承。"
+
+            if unit.get("evidence_matches", 0) == 0 and unit.get("semantic_profile", {}).get("numeric_markers", 0) == 0:
+                reason.append("缺少证据支撑")
+                if priority == "low":
+                    priority = "medium"
+                if "补充核心论点、证据和应用场景后再二次炼化。" not in next_step:
+                    next_step = "补充数据、实验或案例证据，再重新评估消化率。"
+
+            if unit.get("application_matches", 0) == 0:
+                reason.append("缺少可执行场景")
+                if priority == "low":
+                    priority = "medium"
+
+            if unit.get("is_short_text"):
+                reason.append("短文本上下文不足")
+                if priority == "low":
+                    priority = "medium"
+
+            if priority == "low" and unit.get("inheritance_ready"):
+                continue
+
+            queue.append(
+                {
+                    "concept": unit["concept"],
+                    "source": unit["source"],
+                    "priority": priority,
+                    "retention_action": unit.get("retention_action"),
+                    "reason": " / ".join(reason) if reason else "建议做一次轻量复盘后再继承。",
+                    "next_step": next_step,
+                }
+            )
+
+        queue.sort(key=lambda item: (self._priority_rank(item.get("priority")), item.get("concept", "")))
+        return queue
+
+    def _build_priority_actions(self, portfolio_diagnostics, refinement_queue):
+        actions = []
+        if self.quarantine_queue:
+            top_risk = self.contamination_risk.get("drivers", [{}])[0]
+            actions.append(
+                {
+                    "id": "review-quarantine",
+                    "priority": "critical" if self.contamination_risk.get("level") == "high" else "high",
+                    "owner": "liuku-xianzei",
+                    "action": "优先复核隔离队列中的高风险知识单元。",
+                    "reason": f"最高风险单元来自 {top_risk.get('source', 'unknown')}。",
+                }
+            )
+
+        if refinement_queue:
+            actions.append(
+                {
+                    "id": "run-refinement-queue",
+                    "priority": refinement_queue[0].get("priority", "medium"),
+                    "owner": "liuku-xianzei",
+                    "action": "按 refinement_queue 顺序执行补证据、补场景和二次炼化。",
+                    "reason": f"当前共有 {len(refinement_queue)} 个单元需要继续炼化。",
+                }
+            )
+
+        if portfolio_diagnostics["source_diversity"]["concentration_level"] in {"high", "medium"}:
+            actions.append(
+                {
+                    "id": "diversify-sources",
+                    "priority": "medium",
+                    "owner": "liuku-xianzei",
+                    "action": "补充更多独立来源，降低单一来源主导风险。",
+                    "reason": (
+                        f"来源集中于 {portfolio_diagnostics['source_diversity']['dominant_source']} "
+                        f"({portfolio_diagnostics['source_diversity']['dominant_ratio']:.0%})."
+                    ),
+                }
+            )
+
+        if self.inheritance_queue:
+            actions.append(
+                {
+                    "id": "promote-inheritance",
+                    "priority": "medium" if self.contamination_risk.get("level") != "high" else "low",
+                    "owner": "liuku-xianzei",
+                    "action": "把继承队列中的高质量知识转写为长期记忆或可复用规则。",
+                    "reason": f"当前已有 {len(self.inheritance_queue)} 个单元满足继承门槛。",
+                }
+            )
+
+        actions.sort(key=lambda item: (self._priority_rank(item.get("priority")), item.get("id", "")))
+        return actions
+
     # ── 公共接口 ──────────────────────────────────────────────
 
     @record_metrics("liuku-xianzei")
@@ -534,6 +705,10 @@ class KnowledgeDigest:
         if self.contamination_risk["level"] != "low":
             quality_tags.append("需污染复核")
 
+        portfolio_diagnostics = self._build_portfolio_diagnostics()
+        refinement_queue = self._build_refinement_queue()
+        priority_actions = self._build_priority_actions(portfolio_diagnostics, refinement_queue)
+
         return {
             "digester": "liuku-xianzei",
             "version": "v0.1.0",
@@ -545,6 +720,9 @@ class KnowledgeDigest:
             "inheritance_queue": self.inheritance_queue,
             "quarantine_queue": self.quarantine_queue,
             "contamination_risk": self.contamination_risk,
+            "portfolio_diagnostics": portfolio_diagnostics,
+            "refinement_queue": refinement_queue,
+            "priority_actions": priority_actions,
             "recommendation": (
                 "优先净化高污染单元后再继承"
                 if self.contamination_risk["level"] == "high"
