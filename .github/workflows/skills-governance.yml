@@ -1,0 +1,62 @@
+name: Skills Governance
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ./underone
+
+      - name: Audit skills
+        run: make audit
+
+      - name: Generate audit report
+        run: make audit-report
+
+      - name: Run tests
+        run: make test
+
+      - name: Evaluate skills
+        run: make evaluate-skills
+
+      - name: Bundle precheck
+        run: cd underone && python scripts/build_skill_bundles.py --check
+
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-audit-py${{ matrix.python-version }}
+          path: |
+            underone/reports/skills-audit.json
+            underone/reports/skills-audit.stdout.json
+
+      - name: Upload evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-effectiveness-py${{ matrix.python-version }}
+          path: |
+            underone/reports/skill-effectiveness-report.json
+            underone/reports/skill-effectiveness-report.md

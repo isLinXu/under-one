@@ -8,6 +8,14 @@
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
+| **skills 治理门禁** | ✅ | 新增 `under_one.skill_audit`，统一检查 skill 结构、元数据、入口脚本与 `SKILL.md` 文档规范 |
+| **CLI 审计命令** | ✅ | `under-one audit [skill] [--json]` 支持全量 / 单 skill 治理检查 |
+| **打包前审计拦截** | ✅ | `scripts/build_skill_bundles.py` 默认先跑审计；发现 warning/error 阻止 `.skill` 构建，可显式 `--skip-audit` |
+| **默认质量门禁** | ✅ | `Makefile` 新增 `make audit` / `make check`，将审计、测试和 bundle precheck 串成日常入口 |
+| **GitHub Actions 治理工作流** | ✅ | 新增 `.github/workflows/skills-governance.yml`，在 `push` / `pull_request` 上执行 audit、tests、bundle precheck |
+| **机器可读审计报告** | ✅ | `make audit-report` 生成 `underone/reports/skills-audit.json`，CI 同步上传 audit artifact |
+| **输入输出一致性校验** | ✅ | 审计器新增 `SKILL.md` “输入输出”章节与 `_skillhub_meta.json` 的轻量一致性检查 |
+| **10 技统一效果评估** | ✅ | 新增 `underone/scripts/evaluate_skills.py` 和 `make evaluate-skills`，对每个 skill 跑代表性验证场景，并产出 JSON/Markdown 报告 |
 | 清理临时产物 | ✅ | `.DS_Store` · `__pycache__/` · `.pytest_cache/` · `*.egg-info/` · `*.health_report.json` · 根目录遗留的 `test_users*.json` 与 `test_json_cleaner.py` |
 | 归档散落示例 | ✅ | `underone/` 根下 13 个 demo/工具/报告文件 → `examples/forged_tools/` + `examples/demo.py` + `artifacts/` |
 | 完善 `.gitignore` | ✅ | 补充 macOS / IDE / `runtime_data/` / `*.health_report.json` / `htmlcov/` 等规则 |

@@ -16,6 +16,41 @@
 | [PROJECT_NAMING.md](./PROJECT_NAMING.md) | 项目命名设计与候选方案 |
 | [GITHUB_RELEASE_CHECKLIST.md](./GITHUB_RELEASE_CHECKLIST.md) | 发布前检查清单 |
 
+## 技能治理工作流
+
+仓库现在内置了面向 skills 的治理门禁，默认覆盖三层：
+
+- `make audit`：审计所有 skill 的目录结构、`_skillhub_meta.json`、`SKILL.md` 章节完整度、Mermaid 架构图、示例代码块和入口脚本埋点约定
+- `make audit-report`：生成机器可读的 JSON 审计报告，落到 `underone/reports/skills-audit.json`
+- `make evaluate-skills`：运行 10 个 skill 的代表性验证场景，并生成 `skill-effectiveness-report.{json,md}`
+- `make check`：执行默认质量门禁，顺序为 `audit` → `test` → `bundles --check`
+- `.github/workflows/skills-governance.yml`：在 `push` / `pull_request` 上运行同一套治理检查
+
+如果只是想本地快速确认某个 skill：
+
+```bash
+cd underone
+python -m under_one.cli audit fenghou-qimen --json
+```
+
+如果要验证所有分发包在当前状态下都可发布：
+
+```bash
+make check
+```
+
+如果要把审计结果喂给别的自动化流程：
+
+```bash
+make audit-report
+```
+
+如果要看每个 skill 当前的效果、运行指标和优化建议：
+
+```bash
+make evaluate-skills
+```
+
 ## 技术文档（位于 `underone/`）
 
 | 文档 | 内容 |
