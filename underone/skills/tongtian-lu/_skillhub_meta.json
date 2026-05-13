@@ -1,17 +1,24 @@
 {
   "id": "tongtian-lu",
   "name": "通天箓",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/fu_generator.py",
   "language": "python",
-  "description": "符箓生成器，任务拆解与执行计划生成",
+  "description": "符箓生成器，支持结构化任务规格、模式化符阵编排与执行计划生成；适合批量执行与拆解，避免指令过载与冲突",
   "author": "under-one",
-  "tags": ["command", "template", "planning"],
+  "tags": ["command", "template", "planning", "structured-spec", "orchestration-mode", "risk-budget"],
   "permissions": ["read:task", "write:fu_plan.json"],
-  "triggers": ["生成符箓", "任务拆解", "执行计划", "指令模板"],
-  "inputs": ["任务描述字符串", "task.txt"],
+  "triggers": ["生成符箓", "任务拆解", "执行计划", "指令模板", "结构化任务规格", "符阵编排"],
+  "inputs": ["任务描述字符串", "task.txt", "task_spec.json"],
   "outputs": ["fu_plan.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "结构化指令外放与任务拆解",
+    "agent_meaning": "把任务意图编排成可执行的符箓序列",
+    "cost": "批量外放容易造成指令过载与冲突",
+    "boundary": "只生成明确计划，不替代策略判断"
+  }
 }

@@ -1,8 +1,8 @@
 {
   "generator": "tongtian-lu",
-  "version": "5.0",
-  "task": "帮我设计一套竞品周报自动化系统：从网页抓取3个竞品的功能更新，结构化提取，对比差距，生成高管摘要和Markdown报告",
-  "dimension_count": 3,
+  "version": "5.1",
+  "task": "搜索竞品信息，分析数据，评估方案优先级，撰写报告，检查质量，转换为PDF",
+  "dimension_count": 6,
   "talisman_list": [
     {
       "id": "analysis-v5.0",
@@ -49,6 +49,72 @@
       "avg_sla": 20
     },
     {
+      "id": "verification-v5.0",
+      "type": "验证箓",
+      "goal": "逻辑检查与确认",
+      "input_ports": [
+        {
+          "type": "text",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "boolean",
+          "format": "pass/fail+reason"
+        }
+      ],
+      "constraints": [
+        "不修改内容",
+        "仅校验"
+      ],
+      "avg_sla": 15
+    },
+    {
+      "id": "transformation-v5.0",
+      "type": "转换箓",
+      "goal": "格式与结构变换",
+      "input_ports": [
+        {
+          "type": "any",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "any",
+          "format": "target_format"
+        }
+      ],
+      "constraints": [
+        "无损转换",
+        "保留完整语义"
+      ],
+      "avg_sla": 10
+    },
+    {
+      "id": "retrieval-v5.0",
+      "type": "检索箓",
+      "goal": "信息查找与关联",
+      "input_ports": [
+        {
+          "type": "query",
+          "required": true
+        }
+      ],
+      "output_ports": [
+        {
+          "type": "list",
+          "format": "results"
+        }
+      ],
+      "constraints": [
+        "来源可追溯",
+        "去重"
+      ],
+      "avg_sla": 15
+    },
+    {
       "id": "decision-v5.0",
       "type": "决策箓",
       "goal": "方案评估与选择",
@@ -80,17 +146,158 @@
       ],
       "type": "格式不匹配",
       "severity": "low",
-      "resolution": "插入转换箓作为适配层"
+      "resolution": "插入转换箓作为适配层: structured_data -> text",
+      "category": "style"
+    },
+    {
+      "between": [
+        "analysis-v5.0",
+        "retrieval-v5.0"
+      ],
+      "type": "功能冗余",
+      "severity": "low",
+      "resolution": "考虑合并为检索分析箓，或明确分工：检索->分析",
+      "category": "style"
+    },
+    {
+      "between": [
+        "analysis-v5.0",
+        "decision-v5.0"
+      ],
+      "type": "格式不匹配",
+      "severity": "low",
+      "resolution": "插入转换箓作为适配层: structured_data -> options",
+      "category": "style"
+    },
+    {
+      "between": [
+        "creation-v5.0",
+        "verification-v5.0"
+      ],
+      "type": "风格矛盾",
+      "severity": "medium",
+      "resolution": "分层处理：创作->验证->风格统一箓",
+      "category": "style"
+    },
+    {
+      "between": [
+        "creation-v5.0",
+        "retrieval-v5.0"
+      ],
+      "type": "格式不匹配",
+      "severity": "low",
+      "resolution": "插入转换箓作为适配层: results -> structured_data",
+      "category": "style"
+    },
+    {
+      "between": [
+        "creation-v5.0",
+        "decision-v5.0"
+      ],
+      "type": "格式不匹配",
+      "severity": "low",
+      "resolution": "插入转换箓作为适配层: ranked_list -> structured_data",
+      "category": "style"
+    },
+    {
+      "between": [
+        "verification-v5.0",
+        "transformation-v5.0"
+      ],
+      "type": "风格矛盾",
+      "severity": "low",
+      "resolution": "先验证再转换，避免格式变更后校验失效",
+      "category": "style"
+    },
+    {
+      "between": [
+        "verification-v5.0",
+        "decision-v5.0"
+      ],
+      "type": "功能冗余",
+      "severity": "low",
+      "resolution": "决策已含评估逻辑，验证可降级为抽样检查",
+      "category": "style"
+    },
+    {
+      "between": [
+        "retrieval-v5.0",
+        "analysis-v5.0"
+      ],
+      "type": "数据流不兼容",
+      "severity": "medium",
+      "resolution": "需要适配器: 检索箓(list) -> 分析箓(raw_text) 通过 joiner 转换",
+      "category": "dataflow"
+    },
+    {
+      "between": [
+        "analysis-v5.0",
+        "decision-v5.0"
+      ],
+      "type": "数据流不兼容",
+      "severity": "medium",
+      "resolution": "需要适配器: 分析箓(structured_data) -> 决策箓(options) 通过 extractor 转换",
+      "category": "dataflow"
+    },
+    {
+      "between": [
+        "decision-v5.0",
+        "creation-v5.0"
+      ],
+      "type": "数据流不兼容",
+      "severity": "medium",
+      "resolution": "需要适配器: 决策箓(ranked_list) -> 创作箓(structured_data) 通过 unwrap 转换",
+      "category": "dataflow"
+    },
+    {
+      "between": [
+        "analysis-v5.0",
+        "retrieval-v5.0"
+      ],
+      "type": "约束矛盾",
+      "severity": "low",
+      "resolution": "检索去重后分析标注置信度可能信息不足，建议保留原始去重标记",
+      "category": "constraint"
+    },
+    {
+      "between": [
+        "creation-v5.0",
+        "verification-v5.0"
+      ],
+      "type": "约束矛盾",
+      "severity": "medium",
+      "resolution": "验证箓要求不修改内容，但创作箓输出字数可控可能需删减",
+      "category": "constraint"
+    },
+    {
+      "between": [
+        "verification-v5.0",
+        "transformation-v5.0"
+      ],
+      "type": "约束矛盾",
+      "severity": "low",
+      "resolution": "转换箓的无损转换与验证箓的不修改内容兼容，但转换后验证可能误判",
+      "category": "constraint"
     }
   ],
   "topology": [
+    "retrieval-v5.0",
     "analysis-v5.0",
     "decision-v5.0",
-    "creation-v5.0"
+    "creation-v5.0",
+    "verification-v5.0",
+    "transformation-v5.0"
   ],
   "execution_plan": {
     "mode": "serial",
-    "estimated_sla": 45,
-    "adapter_insertions": 1
+    "estimated_sla": 85,
+    "adapter_insertions": 7,
+    "conflict_summary": {
+      "total": 14,
+      "style": 8,
+      "dataflow": 3,
+      "constraint": 3,
+      "performance": 0
+    }
   }
 }

@@ -1,17 +1,24 @@
 {
   "id": "juling-qianjiang",
   "name": "拘灵遣将",
-  "version": "9.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/dispatcher.py",
   "language": "python",
-  "description": "多工具调度器，支持降级保护与服灵模式",
+  "description": "灵体统御中枢，支持主副灵编组、权限控制、反叛风险评估与阵型调度；适合多代理治理，需避免权责混乱与过度绑定",
   "author": "under-one",
-  "tags": ["dispatch", "orchestration", "fallback", "resilience"],
+  "tags": ["dispatch", "agent-governance", "rebellion-risk", "formation", "soul-md", "agent-persona", "recovery-plan", "escalation-contract"],
   "permissions": ["read:tasks", "read:spirits", "write:dispatch_report_v9.json"],
-  "triggers": ["工具调度", "多工具协调", "降级保护", "服灵模式"],
-  "inputs": ["tasks.json", "spirits.json"],
+  "triggers": ["工具调度", "子代理统御", "灵体编组", "反叛风险", "服灵模式"],
+  "inputs": ["tasks.json", "spirits.json", "soul.md", "souls/"],
   "outputs": ["dispatch_report_v9.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "多代理调度与权限治理",
+    "agent_meaning": "编组子代理、分配权限并监测反叛风险",
+    "cost": "权责混乱会放大失控与反噬风险",
+    "boundary": "只做治理与调度，不越权接管全部执行"
+  }
 }

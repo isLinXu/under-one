@@ -1,11 +1,11 @@
 {
   "id": "fenghou-qimen",
   "name": "风后奇门",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/priority_engine.py",
   "language": "python",
-  "description": "优先级引擎，多维度任务评分与八门排盘",
+  "description": "优先级引擎，多维度任务评分与八门排盘；适合排序与排期，不替代最终策略判断",
   "author": "under-one",
   "tags": ["priority", "scheduling", "ranking"],
   "permissions": ["read:tasks", "write:priority_plan.json"],
@@ -13,5 +13,12 @@
   "inputs": ["tasks.json"],
   "outputs": ["priority_plan.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "多维任务评分与执行排序",
+    "agent_meaning": "把任务拆成可比较的优先级与排期",
+    "cost": "过度优化会造成僵化与局部最优",
+    "boundary": "只负责排序建议，不直接决定业务目标"
+  }
 }

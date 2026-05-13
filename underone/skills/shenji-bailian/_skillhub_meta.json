@@ -1,17 +1,24 @@
 {
   "id": "shenji-bailian",
   "name": "神机百炼",
-  "version": "5.0",
+  "version": "v0.1.0",
   "type": "script",
   "entry": "scripts/tool_factory.py",
   "language": "python",
-  "description": "工具工厂，根据需求生成Python脚本框架+测试+契约",
+  "description": "自然语言技能工坊，支持根据自然语言或结构化规格生成 skill、tool、专精骨架与配套资产；适合快速造物，要求产物可测且不过度膨胀",
   "author": "under-one",
-  "tags": ["code-generation", "scaffolding", "template"],
+  "tags": ["code-generation", "skill-generation", "tool-factory", "natural-language", "structured-spec", "forge-mode", "contract", "specialization", "skill-assets"],
   "permissions": ["read:spec", "write:*.py", "write:*.md"],
-  "triggers": ["生成工具", "代码脚手架", "工具模板", "锻造工具"],
-  "inputs": ["spec.json"],
-  "outputs": ["*.py", "*.md"],
+  "triggers": ["生成工具", "生成skill", "锻造skill", "代码脚手架", "工具模板", "自然语言生成工具", "生成CLI"],
+  "inputs": ["自然语言描述", "spec.json", "structured-spec.json", "prompt.txt"],
+  "outputs": ["*.py", "*.md", "*_skillhub_meta.json"],
   "dependencies": [],
-  "min_python": "3.8"
+  "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "min_python": "3.8",
+  "alignment": {
+    "core": "工具与技能造物",
+    "agent_meaning": "把自然语言规格锻造成可运行脚手架",
+    "cost": "造物过快会带来臃肿代码与脆弱测试",
+    "boundary": "生成物必须可测、可读、可维护"
+  }
 }
