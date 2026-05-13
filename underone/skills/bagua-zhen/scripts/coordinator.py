@@ -320,7 +320,7 @@ def coordinate(skills_dir: str = None):
     if skills_dir is None:
         skills_dir = _default_skills_dir()
     print(f"\n{'='*60}")
-    print(f"☯ under-one.skills V{VERSION} 八卦阵 · 十技生态全景")
+    print(f"☯ under-one.skills {VERSION} 八卦阵 · 十技生态全景")
     print(f"{'='*60}")
 
     # 收集所有skill状态

@@ -51,14 +51,11 @@ SKILLS = [
     "xiushen-lu",
 ]
 
-VERSION = "v10.0.0"
-
-
 def build_bundle(skill_name: str, repo_root: Path) -> str:
     skill_dir = repo_root / "underone" / "skills" / skill_name
     if not skill_dir.is_dir():
         raise FileNotFoundError(f"skill 目录不存在: {skill_dir}")
-    return build_bundle_text(skill_dir, bundle_version=VERSION)
+    return build_bundle_text(skill_dir)
 
 
 def precheck_skill(skill_name: str, repo_root: Path) -> Tuple[bool, List[str], List[str]]:

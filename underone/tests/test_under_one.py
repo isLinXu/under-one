@@ -23,7 +23,7 @@ from under_one import (
     CommandFactory, ContextGuard, EvolutionEngine, InsightRadar,
     EcosystemHub, KnowledgeDigest, PersonaGuard, PriorityEngine, ToolForge, ToolOrchestrator,
 )
-from under_one.skill_bundle import build_bundle_text, install_bundle, parse_bundle_text, verify_bundle_roundtrip
+from under_one.skill_bundle import build_bundle_text, install_bundle, parse_bundle_text, resolve_bundle_version, verify_bundle_roundtrip
 from under_one.skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
 from under_one.codex_skills import build_codex_skill_markdown, install_codex_skill
 from scripts.evaluate_skills import evaluate_all
@@ -683,6 +683,21 @@ class TestSkillBundleLifecycle:
         assert "__shared__/metrics_collector.py" in parsed.files
         assert "__shared__/_skill_config.py" in parsed.files
         assert "tests/standalone_smoke.py" in parsed.files
+        assert parsed.version == "v0.1.0"
+
+    def test_resolve_bundle_version_prefers_skill_metadata(self, tmp_path):
+        """bundle 默认版本应跟随 skill metadata，而不是硬编码框架版本。"""
+        skill_dir = tmp_path / "demo-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "_skillhub_meta.json").write_text(
+            json.dumps({"id": "demo-skill", "version": "v0.1.0"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            "---\nmetadata:\n  version: \"v9.9.9\"\n---\n",
+            encoding="utf-8",
+        )
+        assert resolve_bundle_version(skill_dir) == "v0.1.0"
 
     def test_verify_bundle_roundtrip_runs_behavioral_smoke(self):
         """真实 skill 的独立安装应通过行为级 smoke test。"""

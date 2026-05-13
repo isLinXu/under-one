@@ -98,7 +98,9 @@ def test_install_host_skill_for_workbuddy_creates_frontmatter_wrapper(tmp_path):
     assert (installed_dir / "SKILL.md").read_text(encoding="utf-8").startswith("---\nname: \"demo-skill\"")
     assert not (installed_dir / "agents" / "openai.yaml").exists()
     manifest = json.loads((installed_dir / "install-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == "v0.1.0"
     assert manifest["host_runtime"]["host"] == "workbuddy"
+    assert manifest["host_runtime"]["bundle_version"] == "v0.1.0"
     assert result["host_validation"]["passed"] is True
     assert result["installed_lifecycle"]["passed"] is True
 
@@ -111,8 +113,12 @@ def test_install_host_skill_for_qclaw_keeps_native_layout(tmp_path):
     assert (installed_dir / "SKILL.md").read_text(encoding="utf-8").startswith("---\nmetadata:\n  name: \"demo-skill\"")
     assert not (installed_dir / "agents" / "openai.yaml").exists()
     manifest = json.loads((installed_dir / "install-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == "v0.1.0"
     assert manifest["host_runtime"]["host"] == "qclaw"
+    assert manifest["host_runtime"]["bundle_version"] == "v0.1.0"
     assert result["host_validation"]["passed"] is True
+    assert result["host_validation"]["name"] == "demo-skill"
+    assert result["host_validation"]["description"] == "用于演示多宿主安装适配"
     assert result["installed_lifecycle"]["passed"] is True
 
 
@@ -133,6 +139,10 @@ def test_install_host_skill_for_custom_keeps_native_layout(tmp_path):
     assert installed_dir.exists()
     assert (installed_dir / "SKILL.md").read_text(encoding="utf-8").startswith("---\nmetadata:\n  name: \"demo-skill\"")
     manifest = json.loads((installed_dir / "install-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == "v0.1.0"
     assert manifest["host_runtime"]["host"] == "custom"
+    assert manifest["host_runtime"]["bundle_version"] == "v0.1.0"
     assert result["host_validation"]["passed"] is True
+    assert result["host_validation"]["name"] == "demo-skill"
+    assert result["host_validation"]["description"] == "用于演示多宿主安装适配"
     assert result["installed_lifecycle"]["passed"] is True

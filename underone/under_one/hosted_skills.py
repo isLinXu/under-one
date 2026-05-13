@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
-from .skill_bundle import build_bundle_text, install_bundle, verify_installed_skill
+from .skill_bundle import build_bundle_text, install_bundle, resolve_bundle_version, verify_installed_skill
 from .skill_lifecycle import validate_skill
 
 
@@ -239,6 +239,9 @@ def verify_host_skill_install(skill_dir: Path, host: str) -> Dict[str, Any]:
             meta_payload = json.loads(meta_json.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             errors.append(f"invalid _skillhub_meta.json: {exc}")
+        if profile.layout == "passthrough" and isinstance(meta_payload, dict):
+            parsed_name = str(meta_payload.get("id") or skill_dir.name)
+            parsed_description = str(meta_payload.get("description") or meta_payload.get("name") or "").strip() or None
 
     if profile.uses_agents_yaml:
         if not agents_yaml.exists():
@@ -319,15 +322,19 @@ def install_host_skill(
     target_root: Path | None = None,
     *,
     force: bool = False,
-    bundle_version: str = "v10.0.0",
+    bundle_version: str | None = None,
 ) -> Dict[str, Any]:
     source_skill_dir = Path(source_skill_dir).resolve()
     profile = get_host_profile(host)
     target_root = resolve_host_target_root(profile.name, target_root)
+    resolved_bundle_version = resolve_bundle_version(source_skill_dir, bundle_version)
 
     with tempfile.TemporaryDirectory(prefix=f"{source_skill_dir.name}-{profile.name}-install-") as tmp:
         bundle_path = Path(tmp) / f"{source_skill_dir.name}.skill"
-        bundle_path.write_text(build_bundle_text(source_skill_dir, bundle_version=bundle_version), encoding="utf-8")
+        bundle_path.write_text(
+            build_bundle_text(source_skill_dir, bundle_version=resolved_bundle_version),
+            encoding="utf-8",
+        )
         install_result = install_bundle(bundle_path, target_root, force=force)
 
     installed_dir = Path(str(install_result["target_dir"])).resolve()
@@ -344,7 +351,7 @@ def install_host_skill(
         installed_dir,
         host=profile.name,
         source_skill_dir=source_skill_dir,
-        bundle_version=bundle_version,
+        bundle_version=resolved_bundle_version,
         extra_files=extra_files,
     )
 
@@ -354,7 +361,7 @@ def install_host_skill(
         "host": profile.name,
         "installed_dir": str(installed_dir),
         "target_root": str(target_root),
-        "bundle_version": bundle_version,
+        "bundle_version": resolved_bundle_version,
         "install_result": install_result,
         "installed_lifecycle": verify_installed_skill(installed_dir),
         "host_validation": host_validation,
@@ -367,7 +374,7 @@ def install_and_validate_host_skill(
     target_root: Path | None = None,
     *,
     force: bool = False,
-    bundle_version: str = "v10.0.0",
+    bundle_version: str | None = None,
     include_source_validation: bool = True,
 ) -> Dict[str, Any]:
     source_skill_dir = Path(source_skill_dir).resolve()
@@ -424,7 +431,7 @@ def install_codex_skill(
     target_root: Path | None = None,
     *,
     force: bool = False,
-    bundle_version: str = "v10.0.0",
+    bundle_version: str | None = None,
 ) -> Dict[str, Any]:
     report = install_host_skill(
         source_skill_dir,
@@ -442,7 +449,7 @@ def install_and_validate_codex_skill(
     target_root: Path | None = None,
     *,
     force: bool = False,
-    bundle_version: str = "v10.0.0",
+    bundle_version: str | None = None,
     include_source_validation: bool = True,
 ) -> Dict[str, Any]:
     report = install_and_validate_host_skill(

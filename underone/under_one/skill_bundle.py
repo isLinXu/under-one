@@ -399,18 +399,45 @@ def _build_self_test_text(parsed: ParsedSkillBundle) -> str:
     return SELF_TEST_TEMPLATE
 
 
-def build_bundle_text(skill_dir: Path, bundle_version: str = "v10.0.0") -> str:
+def resolve_bundle_version(skill_dir: Path, bundle_version: str | None = None) -> str:
+    """Resolve the bundle version, defaulting to the skill's own declared version."""
+    if bundle_version:
+        return bundle_version
+
+    skill_dir = Path(skill_dir)
+    meta_path = skill_dir / "_skillhub_meta.json"
+    if meta_path.exists():
+        try:
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            version = str(payload.get("version") or "").strip()
+            if version:
+                return version
+
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.exists():
+        match = re.search(r'version:\s*"?([0-9A-Za-z_.-]+)"?', skill_md.read_text(encoding="utf-8"))
+        if match:
+            return match.group(1)
+
+    return "v0.0.0"
+
+
+def build_bundle_text(skill_dir: Path, bundle_version: str | None = None) -> str:
     """Build a .skill bundle string from a source skill directory."""
     skill_dir = Path(skill_dir)
     files = list(iter_skill_files(skill_dir))
     if not files:
         raise RuntimeError(f"{skill_dir.name} 没有可打包的文件")
 
+    resolved_bundle_version = resolve_bundle_version(skill_dir, bundle_version)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     lines = [
         BUNDLE_HEADER,
         f"name: {skill_dir.name}",
-        f"version: {bundle_version}",
+        f"version: {resolved_bundle_version}",
         f"built_at: {now}",
         f"files: {len(files)}",
         "=" * len(BUNDLE_HEADER),
@@ -597,7 +624,7 @@ def verify_installed_skill(skill_dir: Path) -> Dict[str, object]:
     }
 
 
-def verify_bundle_roundtrip(skill_dir: Path, bundle_version: str = "v10.0.0") -> Dict[str, object]:
+def verify_bundle_roundtrip(skill_dir: Path, bundle_version: str | None = None) -> Dict[str, object]:
     """Build a source skill into a bundle, install it into a temp dir, then validate/self-test it."""
     skill_dir = Path(skill_dir).resolve()
     with tempfile.TemporaryDirectory(prefix=f"{skill_dir.name}-bundle-") as tmp:
