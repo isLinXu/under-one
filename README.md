@@ -11,10 +11,9 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/version-V10-blue" alt="v10">
   <img src="https://img.shields.io/badge/skills-10-brightgreen" alt="10 skills">
-  <img src="https://img.shields.io/badge/tests-14%2F14-success" alt="tests">
-  <img src="https://img.shields.io/badge/coverage-37%25-yellow" alt="coverage">
+  <img src="https://img.shields.io/badge/quality-pytest%20%2B%20standalone-success" alt="quality">
+  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw-blue" alt="hosts">
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
   <img src="https://img.shields.io/badge/status-production--ready-success" alt="status">
 </p>
@@ -121,32 +120,80 @@ context-guard  ─→  command-factory  ─→  insight-radar  ─→  tool-forg
 
 **3 mutex pairs · 6 synergy links · 1 central arbiter.**
 
-## 7. Quickstart
+## 7. Reproducible quickstart
 
 ```bash
-# Clone and install
+# Clone
 git clone https://github.com/isLinXu/under-one.git
 cd under-one
+
+# Verify the repo state first
+python -m pytest -q
+python underone/skills/check_versions.py
+
+# Optional: install the Python package locally
 make install                         # pip install -e underone/
 
-under-one list                       # ten skills at a glance
-under-one scan priority-engine tasks.json
-under-one status                     # ecosystem snapshot
-under-one providers                  # LLM adapter availability
-make bundles                         # build dist/*.skill for distribution
+# Inspect host runtimes and available skills
+cd underone
+python -m under_one.cli hosts
+python -m under_one.cli list
+cd ..
+
+# Install all skills into one host runtime
+python underone/scripts/install_host_skills.py --host codex
+
+# Validate one skill from source
+cd underone
+python -m under_one.cli validate-skill priority-engine --json
+cd ..
 ```
 
-**Minimal run without install:**
+### Host install matrix
+
+Use the same source skills and choose a target runtime:
 
 ```bash
-python underone/fenghou-qimen/scripts/priority_engine.py tasks.json
-python underone/qiti-yuanliu/scripts/entropy_scanner.py context.json
-python underone/bagua-zhen/scripts/coordinator.py
+python underone/scripts/install_host_skills.py --host codex
+python underone/scripts/install_host_skills.py --host workbuddy
+python underone/scripts/install_host_skills.py --host qclaw
 ```
+
+Use `--dest /tmp/underone-host-test` when you want an isolated dry run instead of touching your real host directory.
+
+### Minimal run without package install
+
+```bash
+python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json
+python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/test_context.json
+python underone/skills/bagua-zhen/scripts/coordinator.py
+```
+
+### Optimize one skill at a time
+
+Use this loop when you want stable, reproducible iteration:
+
+```bash
+# 1. Audit structure and metadata
+cd underone
+python -m under_one.cli audit priority-engine --json
+
+# 2. Validate behavior from source
+python -m under_one.cli validate-skill priority-engine --json
+
+# 3. Install just one source directory into an isolated host target
+cd ..
+python underone/scripts/install_host_skills.py --host qclaw --dest /tmp/underone-qclaw --skip-source-validation fenghou-qimen
+
+# 4. Validate the installed copy
+python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
+```
+
+For the full per-skill optimization map, see [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md).
 
 ## 8. Deep example — priority-engine
 
-Input (`tasks.json`):
+Input (`underone/skills/fenghou-qimen/scripts/test_tasks.json`):
 
 ```json
 [
@@ -159,7 +206,7 @@ Input (`tasks.json`):
 Run:
 
 ```bash
-python underone/fenghou-qimen/scripts/priority_engine.py tasks.json
+python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json
 ```
 
 Output (`priority_plan.json`):
@@ -178,7 +225,7 @@ Output (`priority_plan.json`):
 
 See [`underone/examples/demo.py`](./underone/examples/demo.py) for end-to-end multi-skill demos.
 
-## 9. LLM adapter layer (v10)
+## 9. LLM adapter layer
 
 A unified `LLMClient` abstraction lets skills talk to any provider. **Defaults to a fully offline `mock` client, so nothing breaks without API keys.**
 
@@ -240,7 +287,7 @@ under-one/
     │   └── …                     #    (7 more)
     ├── under_one/                # ── Python SDK + CLI (importable package)
     │   └── adapters/             #    base / mock / openai / anthropic / registry
-    ├── tests/                    # ── pytest suite (14 tests · 37% coverage)
+    ├── tests/                    # ── pytest suite
     ├── examples/                 # ── demo · efficiency_benchmark · real_llm_benchmark
     ├── artifacts/                # ── sample JSON reports
     ├── scripts/                  # ── build_skill_bundles.py · tooling
@@ -265,12 +312,12 @@ under-one/
 
 ## 13. Roadmap
 
-| Stage | Deliverable | Status |
+| Track | Deliverable | Status |
 |---|---|---|
-| V10 | Production-ready · 10 skills · LLM adapters · CI · benchmark | ✅ Shipped |
-| V11 | PyPI release · FastAPI dashboard · MCP server mode | 🚧 In progress |
-| V12 | Real-LLM A/B validation report · LangChain adapter | 📋 Planned |
-| V13 | Community skill marketplace · federated evolution | 💭 Vision |
+| Current | Stable install flow · 10 skills · LLM adapters · CI · benchmark | ✅ Available |
+| Next | PyPI release · FastAPI dashboard · MCP server mode | 🚧 In progress |
+| Validation | Real-LLM A/B validation report · LangChain adapter | 📋 Planned |
+| Ecosystem | Community skill marketplace · federated evolution | 💭 Vision |
 
 ## 14. FAQ (highlights)
 
@@ -278,7 +325,7 @@ Full answers in [`FAQ.md`](./FAQ.md):
 
 - **Q1** Is the naming just a skin? → No. Each skill is independent; Chinese names are **cultural annotation, not functional dependency**. Rename them to `context-guard / priority-engine / …` and it works the same.
 - **Q2** vs LangChain? → Complementary, not competing. See §4 above.
-- **Q3** Production-ready? → V10 is used as the reference framework for the author's own agent fleets. External production usage: at your own risk.
+- **Q3** Production-ready? → The current line is used as a reference framework for the author's own agent fleets. External production usage: at your own risk.
 - **Q5** Is self-evolution a fake requirement? → No — `xiushen-lu` evolves thresholds (not logic) based on runtime metrics, with rollback safeguards.
 - **Q6** How to write a custom skill? → Create `my-skill/SKILL.md` + `my-skill/scripts/main.py`. ~30 lines of boilerplate, full example in docs.
 

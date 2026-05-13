@@ -2,9 +2,23 @@
 
 本目录收纳项目全部深度文档。
 
+<p align="center">
+  <img src="./skill-cards/00-overview-horizontal.png" width="880" alt="UnderOne docs overview">
+</p>
+
 根目录只保留两个门面入口：
 - [`README.md`](../README.md) — **English entry**
 - [`README.zh-CN.md`](../README.zh-CN.md) — **中文入口**
+
+## 视觉入口
+
+如果你是第一次进入仓库，推荐先走这条路径：
+
+1. 看 [`../README.md`](../README.md) 或 [`../README.zh-CN.md`](../README.zh-CN.md) 的总览插图。
+2. 再到 [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) 按稳定 ID 逐个优化。
+3. 最后回到 `underone/skills/<skill>` 查看源码与脚本；`bagua-zhen` 也位于 `underone/skills/bagua-zhen`。
+
+`docs/skill-cards/` 是项目的插图资产目录，建议保留；这些技能卡既服务展示，也承担文档导航作用。
 
 ## 核心文档
 
@@ -13,6 +27,7 @@
 | [README_Full.md](./README_Full.md) | 早期完整中英双语项目介绍（原 `README_Final.md`，保留作归档） |
 | [README_Github.md](./README_Github.md) | GitHub Release 专用说明 |
 | [README_Hachigiki.md](./README_Hachigiki.md) | 八奇技世界观到工程的完整映射说明 |
+| [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) | 单 skill 优化手册：稳定 ID、安装路径、验证命令、推荐顺序 |
 | [PROJECT_NAMING.md](./PROJECT_NAMING.md) | 项目命名设计与候选方案 |
 | [GITHUB_RELEASE_CHECKLIST.md](./GITHUB_RELEASE_CHECKLIST.md) | 发布前检查清单 |
 
@@ -87,8 +102,13 @@ python -m under_one.cli hosts
 
 ## 视觉资产
 
-`assets/` 下保存项目使用的 PNG 图片：
+- `skill-cards/` — 十大技能卡、总览栅格图、横幅图；这是当前 README 与安装导航使用的主视觉资产目录
+- `assets/` — 历史 PNG 图片与演示图表
 
+其中较常用的文件包括：
+
+- `skill-cards/00-overview-grid.png` — 十技总览栅格图
+- `skill-cards/00-overview-horizontal.png` — 横向总览图
 - `hachigiki_efficiency_comparison.png` — 效能对比图
 - `gdp_top10_2024.png` — 早期脚本产出的演示图表
 

@@ -11,10 +11,9 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/version-V10-blue" alt="v10">
   <img src="https://img.shields.io/badge/skills-10-brightgreen" alt="10 skills">
-  <img src="https://img.shields.io/badge/tests-14%2F14-success" alt="tests">
-  <img src="https://img.shields.io/badge/coverage-37%25-yellow" alt="coverage">
+  <img src="https://img.shields.io/badge/quality-pytest%20%2B%20standalone-success" alt="quality">
+  <img src="https://img.shields.io/badge/hosts-codex%20%7C%20workbuddy%20%7C%20qclaw-blue" alt="hosts">
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
   <img src="https://img.shields.io/badge/status-production--ready-success" alt="status">
 </p>
@@ -124,29 +123,73 @@
 ## 7. 快速开始
 
 ```bash
-# 克隆与安装
+# 克隆
 git clone https://github.com/isLinXu/under-one.git
 cd under-one
+
+# 先确认仓库状态可复现
+python -m pytest -q
+python underone/skills/check_versions.py
+
+# 可选：安装到本地 Python 环境
 make install                          # pip install -e underone/
 
-under-one list                        # 一览十技
-under-one scan priority-engine tasks.json
-under-one status                      # 生态快照
-under-one providers                   # LLM 适配情况
-make bundles                          # 构建 dist/*.skill 发布包
+# 查看宿主与可用 skills
+cd underone
+python -m under_one.cli hosts
+python -m under_one.cli list
+cd ..
+
+# 安装到指定宿主
+python underone/scripts/install_host_skills.py --host codex
+
+# 验证单个 skill
+cd underone
+python -m under_one.cli validate-skill priority-engine --json
+cd ..
 ```
+
+### 宿主安装矩阵
+
+```bash
+python underone/scripts/install_host_skills.py --host codex
+python underone/scripts/install_host_skills.py --host workbuddy
+python underone/scripts/install_host_skills.py --host qclaw
+```
+
+如需隔离验证，请加上 `--dest /tmp/underone-host-test`。
 
 **不装包直接跑：**
 
 ```bash
-python underone/fenghou-qimen/scripts/priority_engine.py tasks.json
-python underone/qiti-yuanliu/scripts/entropy_scanner.py context.json
-python underone/bagua-zhen/scripts/coordinator.py
+python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json
+python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/test_context.json
+python underone/skills/bagua-zhen/scripts/coordinator.py
 ```
+
+### 单 skill 优化流程
+
+```bash
+# 1. 审计结构与元数据
+cd underone
+python -m under_one.cli audit priority-engine --json
+
+# 2. 验证行为输出
+python -m under_one.cli validate-skill priority-engine --json
+
+# 3. 安装到隔离宿主目录
+cd ..
+python underone/scripts/install_host_skills.py --host qclaw --dest /tmp/underone-qclaw --skip-source-validation fenghou-qimen
+
+# 4. 验证安装后的副本
+python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
+```
+
+完整的“按 skill 逐个优化”清单见 [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md)。
 
 ## 8. 深度示例 — 风后奇门优先级
 
-输入（`tasks.json`）：
+输入（`underone/skills/fenghou-qimen/scripts/test_tasks.json`）：
 
 ```json
 [
@@ -159,7 +202,7 @@ python underone/bagua-zhen/scripts/coordinator.py
 执行：
 
 ```bash
-python underone/fenghou-qimen/scripts/priority_engine.py tasks.json
+python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json
 ```
 
 输出（`priority_plan.json`）：
@@ -178,7 +221,7 @@ python underone/fenghou-qimen/scripts/priority_engine.py tasks.json
 
 完整多 Skill 协同示例见 [`underone/examples/demo.py`](./underone/examples/demo.py)。
 
-## 9. LLM 适配层（V10 新增）
+## 9. LLM 适配层
 
 统一的 `LLMClient` 抽象让 Skill 对接任意 provider。**默认是完全离线的 `mock`，没有 API key 也能跑。**
 
@@ -258,12 +301,12 @@ under-one/
 
 ## 13. 路线图
 
-| 阶段 | 内容 | 状态 |
+| 方向 | 内容 | 状态 |
 |------|------|------|
-| V10 | 生产就绪 · 10 技能 · LLM 适配 · CI · benchmark | ✅ 已交付 |
-| V11 | PyPI 正式发布 · FastAPI 仪表盘 · MCP server 模式 | 🚧 进行中 |
-| V12 | 真实 LLM A/B 验证报告 · LangChain 适配 | 📋 规划中 |
-| V13 | 社区 Skill 市场 · 联邦进化 | 💭 愿景 |
+| 当前 | 稳定安装流程 · 10 技能 · LLM 适配 · CI · benchmark | ✅ 可用 |
+| 下一步 | PyPI 正式发布 · FastAPI 仪表盘 · MCP server 模式 | 🚧 进行中 |
+| 验证增强 | 真实 LLM A/B 验证报告 · LangChain 适配 | 📋 规划中 |
+| 生态扩展 | 社区 Skill 市场 · 联邦进化 | 💭 愿景 |
 
 ## 14. 高频问题（FAQ 精选）
 
@@ -271,7 +314,7 @@ under-one/
 
 - **Q1** 八奇技只是名字包装？→ 不是。每个 Skill 机制独立，中文名是**文化注释不是功能依赖**。把它们改成 `context-guard / priority-engine / …` 功能完全一样。
 - **Q2** 和 LangChain 什么关系？→ 互补而非竞争。详见第 4 节。
-- **Q3** 能用于生产吗？→ V10 是作者自己 Agent 集群的参考框架。外部生产使用请自担风险。
+- **Q3** 能用于生产吗？→ 当前代码线已被作者用作自有 Agent 集群的参考框架。外部生产使用请自担风险。
 - **Q5** 自进化是伪需求吗？→ 不是 —— `xiushen-lu` 基于运行时指标进化阈值（非逻辑），并带回滚保护。
 - **Q6** 怎么写自定义 Skill？→ 创建 `my-skill/SKILL.md` + `my-skill/scripts/main.py`。~30 行样板，文档有完整示例。
 
