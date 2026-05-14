@@ -267,6 +267,7 @@ underone/skills/juling-qianjiang/dispatch_report_v*.json
 
 # 工程目录根部误落地的报告
 underone/*_report*.json
+underone/artifacts/skill_showcase.json
 
 # 历史版本快照（已用 git history + CHANGELOG 取代，不应再出现）
 skill_backups/

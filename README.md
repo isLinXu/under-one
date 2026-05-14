@@ -198,15 +198,16 @@ For the full per-skill optimization map, see [docs/SKILL_OPTIMIZATION_PLAYBOOK.m
 
 ### Package-backed demo mode
 
-Use this path when you want the importable SDK and the bundled demos. `demo.py` also runs from a source checkout now, but `make install` is still the cleanest path for SDK usage:
+Use this path when you want the importable SDK and the bundled demos. `demo.py` and `skill_showcase.py` both run from a source checkout now, but `make install` is still the cleanest path for SDK usage:
 
 ```bash
 make install
 python underone/examples/demo.py
+python underone/examples/skill_showcase.py
 python underone/examples/efficiency_benchmark.py
 ```
 
-`underone/examples/demo.py` imports `under_one`, so it is intentionally listed after `make install`.
+`underone/examples/skill_showcase.py` writes a structured report to `underone/artifacts/skill_showcase.json` by default and is the fastest way to verify all 10 wrapper APIs in one pass.
 
 ## 8. Validation recipes
 
@@ -326,7 +327,7 @@ Output (`priority_plan.json`):
 }
 ```
 
-See [`underone/examples/demo.py`](./underone/examples/demo.py) for end-to-end multi-skill demos.
+See [`underone/examples/demo.py`](./underone/examples/demo.py) for the quick 5-skill smoke path, and [`underone/examples/skill_showcase.py`](./underone/examples/skill_showcase.py) for the full 10-skill showcase with JSON output.
 
 ## 11. LLM adapter layer
 

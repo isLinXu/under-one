@@ -75,6 +75,7 @@ make evaluate-skills
 
 ```bash
 python underone/examples/demo.py
+python underone/examples/skill_showcase.py
 ```
 
 ## 多宿主安装

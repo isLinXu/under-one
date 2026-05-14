@@ -194,15 +194,16 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 
 ### 安装后 Demo 模式
 
-如果你想直接使用可导入的 SDK 和内置 Demo，请走这条路径。`demo.py` 现在也支持源码 checkout 直跑，但如果你准备长期通过 SDK 调用，`make install` 仍然是最稳的入口：
+如果你想直接使用可导入的 SDK 和内置 Demo，请走这条路径。`demo.py` 和 `skill_showcase.py` 现在都支持源码 checkout 直跑，但如果你准备长期通过 SDK 调用，`make install` 仍然是最稳的入口：
 
 ```bash
 make install
 python underone/examples/demo.py
+python underone/examples/skill_showcase.py
 python underone/examples/efficiency_benchmark.py
 ```
 
-`underone/examples/demo.py` 会导入 `under_one`，所以它被有意放在 `make install` 之后。
+`underone/examples/skill_showcase.py` 默认会输出 `underone/artifacts/skill_showcase.json`，也是一次性验证 10 个包装层 API 是否都可运行的最快入口。
 
 ## 8. 验证配方
 
@@ -322,7 +323,7 @@ python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/
 }
 ```
 
-完整多 Skill 协同示例见 [`underone/examples/demo.py`](./underone/examples/demo.py)。
+快速 5-skill 烟雾演示见 [`underone/examples/demo.py`](./underone/examples/demo.py)，完整 10-skill showcase 见 [`underone/examples/skill_showcase.py`](./underone/examples/skill_showcase.py)。
 
 ## 11. LLM 适配层
 

@@ -68,6 +68,10 @@ python scripts/install_host_skills.py --host custom --dest /path/to/product/skil
 # 4. 运行一个 skill（源码侧）
 python skills/fenghou-qimen/scripts/priority_engine.py skills/fenghou-qimen/scripts/test_tasks.json
 # → 输出: JSON {ranked_tasks, eight_gates, monte_carlo}
+
+# 5. 跑全量包装层 showcase（仓库根目录执行）
+cd ..
+python underone/examples/skill_showcase.py --skills priority-engine persona-guard
 ```
 
 ## 按 skill 逐个优化
