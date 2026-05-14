@@ -32,7 +32,8 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        # 核心依赖（尽量保持轻量）
+        # 配置系统依赖完整 YAML 语义；缺失时会导致 CI 与宿主行为不一致。
+        "PyYAML>=6.0",
     ],
     extras_require={
         "dev": ["pytest>=7.0", "pytest-cov", "black", "flake8"],
