@@ -4,12 +4,20 @@ under-one.skills 5分钟Demo
 一行命令体验八奇技Agent运维框架
 
 Usage:
-    python demo.py
+    python underone/examples/demo.py
 
 效果：自动运行5个核心skill的示例任务，展示完整输出
 """
 
 import json
+import sys
+from pathlib import Path
+
+# 允许从仓库根目录直接运行，无需先安装 editable package。
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from under_one import (
     PriorityEngine, ContextGuard,
     ToolOrchestrator, CommandFactory,
@@ -37,7 +45,7 @@ def demo_priority():
     plan = result.get("execution_plan", [])
     for item in plan[:3]:
         gate = item.get("gate", "?")
-        name = item.get("name", "?")
+        name = item.get("task") or item.get("name", "?")
         score = item.get("score", 0)
         print(f"  [{gate}] {name} (score={score:.2f})")
 
@@ -63,7 +71,7 @@ def demo_context():
     if alerts:
         print(f"发现 {len(alerts)} 个上下文问题:")
         for a in alerts[:2]:
-            print(f"  [{a.get('level', '?')}] {a.get('msg', 'unknown')}")
+            print(f"  [{a.get('level', '?')}] {a.get('message', a.get('msg', 'unknown'))}")
     else:
         print("上下文状态良好，无漂移检测")
 
@@ -109,7 +117,7 @@ def demo_command():
     result = factory.run(task)
 
     print(f"任务: {task}")
-    print(f"维度数: {result.get('dimensions', 0)}")
+    print(f"维度数: {result.get('dimension_count', result.get('dimensions', 0))}")
     print(f"禁咒等级: {result.get('curse_level', 'low')}")
 
 
@@ -150,8 +158,8 @@ def main():
 
     except Exception as e:
         print(f"\n  Demo运行遇到错误: {e}")
-        print("  请确保: pip install -e . 已执行")
-        print("  并在正确的工作目录中运行 python demo.py\n")
+        print("  请确认当前在仓库根目录，或已正确安装 editable package。")
+        print("  推荐命令: python underone/examples/demo.py\n")
 
 
 if __name__ == "__main__":

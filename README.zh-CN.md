@@ -194,7 +194,7 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 
 ### 安装后 Demo 模式
 
-如果你想直接使用可导入的 SDK 和内置 Demo，请走这条路径：
+如果你想直接使用可导入的 SDK 和内置 Demo，请走这条路径。`demo.py` 现在也支持源码 checkout 直跑，但如果你准备长期通过 SDK 调用，`make install` 仍然是最稳的入口：
 
 ```bash
 make install

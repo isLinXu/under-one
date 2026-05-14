@@ -17,8 +17,9 @@
 
 1. 看 [`../README.md`](../README.md) 或 [`../README.zh-CN.md`](../README.zh-CN.md) 的总览插图。
 2. 再看 [`../agent.md`](../agent.md) 的 agent 入口和标准动作。
-3. 然后到 [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) 按稳定 ID 逐个优化。
-4. 最后回到 `underone/skills/<skill>` 查看源码与脚本；`bagua-zhen` 也位于 `underone/skills/bagua-zhen`。
+3. 然后先到 README / 中文 README 的第 8 节“验证配方”和第 9 节“Skill 使用样例库”，直接复制命令做最小复现。
+4. 再到 [SKILL_OPTIMIZATION_PLAYBOOK.md](./SKILL_OPTIMIZATION_PLAYBOOK.md) 按稳定 ID 逐个优化。
+5. 最后回到 `underone/skills/<skill>` 查看源码与脚本；`bagua-zhen` 也位于 `underone/skills/bagua-zhen`。
 
 `docs/skill-cards/` 是项目的插图资产目录，建议保留；这些技能卡既服务展示，也承担文档导航作用。
 
@@ -49,6 +50,7 @@
 ```bash
 cd underone
 python -m under_one.cli audit fenghou-qimen --json
+python -m under_one.cli validate-skill priority-engine --json
 ```
 
 如果要验证所有分发包在当前状态下都可发布：
@@ -67,6 +69,12 @@ make audit-report
 
 ```bash
 make evaluate-skills
+```
+
+如果要直接体验源码 checkout 的最小 demo：
+
+```bash
+python underone/examples/demo.py
 ```
 
 ## 多宿主安装

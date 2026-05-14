@@ -198,7 +198,7 @@ For the full per-skill optimization map, see [docs/SKILL_OPTIMIZATION_PLAYBOOK.m
 
 ### Package-backed demo mode
 
-Use this path when you want the importable SDK and the bundled demos:
+Use this path when you want the importable SDK and the bundled demos. `demo.py` also runs from a source checkout now, but `make install` is still the cleanest path for SDK usage:
 
 ```bash
 make install
