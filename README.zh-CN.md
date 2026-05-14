@@ -192,7 +192,105 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 
 完整的“按 skill 逐个优化”清单见 [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md)。
 
-## 8. 深度示例 — 风后奇门优先级
+### 安装后 Demo 模式
+
+如果你想直接使用可导入的 SDK 和内置 Demo，请走这条路径：
+
+```bash
+make install
+python underone/examples/demo.py
+python underone/examples/efficiency_benchmark.py
+```
+
+`underone/examples/demo.py` 会导入 `under_one`，所以它被有意放在 `make install` 之后。
+
+## 8. 验证配方
+
+### 仓库级信心检查
+
+```bash
+# 全量源码测试
+python -m pytest -q
+
+# 版本与元数据一致性
+python underone/skills/check_versions.py
+
+# 审计全部 skill，并校验可分发 bundle
+cd underone
+python -m under_one.cli audit
+python -m under_one.cli bundles --check
+python -m under_one.cli status
+cd ..
+```
+
+### 单 skill 信心检查
+
+```bash
+# 把 priority-engine 换成任意 public skill ID 即可
+cd underone
+python -m under_one.cli test-skill priority-engine
+python -m under_one.cli validate-skill priority-engine --json
+cd ..
+```
+
+### 单 skill 测试矩阵
+
+| Public ID | Stable ID | 精准 pytest 选择器 | 生命周期验证 |
+|---|---|---|---|
+| `context-guard` | `qiti-yuanliu` | `underone/tests/test_skills_core.py::TestContextGuard` | `cd underone && python -m under_one.cli validate-skill context-guard --json` |
+| `command-factory` | `tongtian-lu` | `underone/tests/test_skills_core.py::TestCommandFactory` | `cd underone && python -m under_one.cli validate-skill command-factory --json` |
+| `insight-radar` | `dalu-dongguan` | `underone/tests/test_skills_core.py::TestInsightRadar` | `cd underone && python -m under_one.cli validate-skill insight-radar --json` |
+| `tool-forge` | `shenji-bailian` | `underone/tests/test_skills_core.py::TestToolForge` | `cd underone && python -m under_one.cli validate-skill tool-forge --json` |
+| `priority-engine` | `fenghou-qimen` | `underone/tests/test_skills_core.py::TestPriorityEngine` | `cd underone && python -m under_one.cli validate-skill priority-engine --json` |
+| `knowledge-digest` | `liuku-xianzei` | `underone/tests/test_skills_core.py::TestKnowledgeDigest` | `cd underone && python -m under_one.cli validate-skill knowledge-digest --json` |
+| `persona-guard` | `shuangquanshou` | `underone/tests/test_skills_core.py::TestPersonaGuard` | `cd underone && python -m under_one.cli validate-skill persona-guard --json` |
+| `tool-orchestrator` | `juling-qianjiang` | `underone/tests/test_skills_core.py::TestToolOrchestrator` | `cd underone && python -m under_one.cli validate-skill tool-orchestrator --json` |
+| `ecosystem-hub` | `bagua-zhen` | `underone/tests/test_skills_core.py::TestEcosystemHub` | `cd underone && python -m under_one.cli validate-skill ecosystem-hub --json` |
+| `evolution-engine` | `xiushen-lu` | `underone/tests/test_skills_core.py::TestEvolutionEngine` | `cd underone && python -m under_one.cli validate-skill evolution-engine --json` |
+
+### 隔离宿主验证
+
+```bash
+# 安装一个 skill 到隔离的第三方宿主目录
+python underone/scripts/install_host_skills.py --host custom --dest /tmp/underone-custom fenghou-qimen
+
+# 不碰真实宿主目录，直接验证安装副本
+python /tmp/underone-custom/fenghou-qimen/skillctl.py self-test
+```
+
+## 9. Skill 使用样例库
+
+下面所有夹具文件都已经在 `underone/skills/<stable-id>/scripts/` 下，直接在仓库根目录复制命令即可运行。
+
+| Skill | 正常样例命令 | 建议重跑的边界夹具 | 重点观察字段 |
+|---|---|---|---|
+| `context-guard` | `python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/scene_q2.json` | `underone/skills/qiti-yuanliu/scripts/boundary_drift.json` | `scene_q2.health_report.json` → `risk_hotspots`、`priority_actions`、`execution_contract` |
+| `command-factory` | `python underone/skills/tongtian-lu/scripts/fu_generator.py underone/skills/tongtian-lu/scripts/scene_t2.txt` | `underone/skills/tongtian-lu/scripts/scene_t4.txt` | `fu_plan.json` → `talisman_list`、`conflicts`、`execution_plan` |
+| `insight-radar` | `python underone/skills/dalu-dongguan/scripts/link_detector.py underone/skills/dalu-dongguan/scripts/scene_d2.json` | `underone/skills/dalu-dongguan/scripts/boundary_c_level.json` | `link_report.json` → `links`、`anomaly_signals`、`hallucination_risk` |
+| `tool-forge` | `python underone/skills/shenji-bailian/scripts/tool_factory.py underone/skills/shenji-bailian/scripts/spec.json` | `python underone/skills/shenji-bailian/scripts/tool_factory.py "generate an analysis skill for messy sales data"` | 生成的 `README.md`、`_skillhub_meta.json`、`assets/benchmark_cases.json`、`tests/benchmark_runner.py` |
+| `priority-engine` | `python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json` | `underone/skills/fenghou-qimen/scripts/boundary_low.json` | `priority_plan.json` → `execution_plan`、`monte_carlo`、`buffer_recommendation` |
+| `knowledge-digest` | `python underone/skills/liuku-xianzei/scripts/knowledge_digest.py underone/skills/liuku-xianzei/scripts/scene_l2.json` | `underone/skills/liuku-xianzei/scripts/boundary_conflict.json` | `digest_report.json` → `portfolio_diagnostics`、`refinement_queue`、`contamination_risk` |
+| `persona-guard` | `python underone/skills/shuangquanshou/scripts/dna_validator.py underone/skills/shuangquanshou/scripts/profile.json` | `underone/skills/shuangquanshou/scripts/boundary_dna.json` | `dna_report.json` → `safety_contract`、`approval_contract`、`operation_checklist` |
+| `tool-orchestrator` | `python underone/skills/juling-qianjiang/scripts/dispatcher.py underone/skills/juling-qianjiang/scripts/scene_j1_tasks.json underone/skills/juling-qianjiang/scripts/scene_j1_spirits.json protect` | `underone/skills/juling-qianjiang/scripts/spirits_sick.json` + `underone/skills/juling-qianjiang/scripts/tasks_sick.json` | `dispatch_report_v9.json` → `command_plan`、`soul_bindings`、`governance_summary` |
+| `ecosystem-hub` | `python underone/skills/bagua-zhen/scripts/coordinator.py` | `underone/skills/bagua-zhen/scripts/boundary_broken.json` | `ecosystem_report_v10.json` → `weakest_skills`、`ecosystem_hotspots`、`optimization_queue` |
+| `evolution-engine` | `python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills fenghou-qimen` | `python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills shuangquanshou` | `evolution_report_v7.json` → `evolution_backlog`、`pattern_summary`、`execution_policy` |
+
+### 三条可直接复用的工作流
+
+```bash
+# 1. 漂移修复流
+python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/boundary_full.json
+
+# 2. 知识净化流
+python underone/skills/liuku-xianzei/scripts/knowledge_digest.py underone/skills/liuku-xianzei/scripts/scene_l4.json
+python underone/skills/dalu-dongguan/scripts/link_detector.py underone/skills/dalu-dongguan/scripts/segments.json
+
+# 3. 运行时治理流
+python underone/skills/bagua-zhen/scripts/coordinator.py
+python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills
+```
+
+## 10. 深度示例 — 风后奇门优先级
 
 输入（`underone/skills/fenghou-qimen/scripts/test_tasks.json`）：
 
@@ -226,7 +324,7 @@ python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/
 
 完整多 Skill 协同示例见 [`underone/examples/demo.py`](./underone/examples/demo.py)。
 
-## 9. LLM 适配层
+## 11. LLM 适配层
 
 统一的 `LLMClient` 抽象让 Skill 对接任意 provider。**默认是完全离线的 `mock`，没有 API key 也能跑。**
 
@@ -253,7 +351,7 @@ pip install under-one-skills[llm]         # 全装
 python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 ```
 
-## 10. 量化效能（内部基准）
+## 12. 量化效能（内部基准）
 
 | 工作负载 | Baseline | With UnderOne | 综合提升 |
 |---|---|---|---|
@@ -268,7 +366,7 @@ python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 
 > 数据来自内部 `efficiency_benchmark.py`（仿真 LLM）。**真实 LLM 验证**是下一个里程碑——端到端基准已在 `examples/real_llm_benchmark.py` 接好适配器，配好 API key 即可产出独立数据。
 
-## 11. 目录结构
+## 13. 目录结构
 
 ```
 under-one/
@@ -297,7 +395,7 @@ under-one/
     └── setup.py                 # pip installable
 ```
 
-## 12. Make 命令表
+## 14. Make 命令表
 
 | 命令 | 动作 |
 |------|------|
@@ -310,7 +408,7 @@ under-one/
 | `make status` | 十技生态状态 |
 | `make clean` | 清理临时产物 |
 
-## 13. 路线图
+## 15. 路线图
 
 | 方向 | 内容 | 状态 |
 |------|------|------|
@@ -319,7 +417,7 @@ under-one/
 | 验证增强 | 真实 LLM A/B 验证报告 · LangChain 适配 | 📋 规划中 |
 | 生态扩展 | 社区 Skill 市场 · 联邦进化 | 💭 愿景 |
 
-## 14. 高频问题（FAQ 精选）
+## 16. 高频问题（FAQ 精选）
 
 完整版见 [`FAQ.md`](./FAQ.md)：
 
@@ -329,15 +427,15 @@ under-one/
 - **Q5** 自进化是伪需求吗？→ 不是 —— `xiushen-lu` 基于运行时指标进化阈值（非逻辑），并带回滚保护。
 - **Q6** 怎么写自定义 Skill？→ 创建 `my-skill/SKILL.md` + `my-skill/scripts/main.py`。~30 行样板，文档有完整示例。
 
-## 15. 贡献
+## 17. 贡献
 
 见 [`CONTRIBUTING.md`](./underone/CONTRIBUTING.md)。欢迎 PR，尤其欢迎：新 LLM provider 适配器、真实 LLM 基准、社区 Skill、翻译改进。
 
-## 16. 开源协议
+## 18. 开源协议
 
 MIT License。自由使用、修改、分发，请保留原始作者声明。
 
-## 17. 致谢与声明
+## 19. 致谢与声明
 
 "八奇技"概念源自米二先生创作的漫画《一人之下》。本项目是对这一文化符号的**技术化演绎**，所有代码与文档均为原创实现。如有侵权或不适之处，请联系删除。
 

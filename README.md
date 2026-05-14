@@ -196,7 +196,105 @@ python /tmp/underone-qclaw/fenghou-qimen/skillctl.py self-test
 
 For the full per-skill optimization map, see [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md).
 
-## 8. Deep example — priority-engine
+### Package-backed demo mode
+
+Use this path when you want the importable SDK and the bundled demos:
+
+```bash
+make install
+python underone/examples/demo.py
+python underone/examples/efficiency_benchmark.py
+```
+
+`underone/examples/demo.py` imports `under_one`, so it is intentionally listed after `make install`.
+
+## 8. Validation recipes
+
+### Repo-level confidence pass
+
+```bash
+# Full source test suite
+python -m pytest -q
+
+# Version and metadata consistency
+python underone/skills/check_versions.py
+
+# Audit every skill, then verify distributable bundles
+cd underone
+python -m under_one.cli audit
+python -m under_one.cli bundles --check
+python -m under_one.cli status
+cd ..
+```
+
+### One-skill confidence pass
+
+```bash
+# Replace priority-engine with any public skill ID
+cd underone
+python -m under_one.cli test-skill priority-engine
+python -m under_one.cli validate-skill priority-engine --json
+cd ..
+```
+
+### Per-skill test matrix
+
+| Public ID | Stable ID | Focused pytest selector | Lifecycle validation |
+|---|---|---|---|
+| `context-guard` | `qiti-yuanliu` | `underone/tests/test_skills_core.py::TestContextGuard` | `cd underone && python -m under_one.cli validate-skill context-guard --json` |
+| `command-factory` | `tongtian-lu` | `underone/tests/test_skills_core.py::TestCommandFactory` | `cd underone && python -m under_one.cli validate-skill command-factory --json` |
+| `insight-radar` | `dalu-dongguan` | `underone/tests/test_skills_core.py::TestInsightRadar` | `cd underone && python -m under_one.cli validate-skill insight-radar --json` |
+| `tool-forge` | `shenji-bailian` | `underone/tests/test_skills_core.py::TestToolForge` | `cd underone && python -m under_one.cli validate-skill tool-forge --json` |
+| `priority-engine` | `fenghou-qimen` | `underone/tests/test_skills_core.py::TestPriorityEngine` | `cd underone && python -m under_one.cli validate-skill priority-engine --json` |
+| `knowledge-digest` | `liuku-xianzei` | `underone/tests/test_skills_core.py::TestKnowledgeDigest` | `cd underone && python -m under_one.cli validate-skill knowledge-digest --json` |
+| `persona-guard` | `shuangquanshou` | `underone/tests/test_skills_core.py::TestPersonaGuard` | `cd underone && python -m under_one.cli validate-skill persona-guard --json` |
+| `tool-orchestrator` | `juling-qianjiang` | `underone/tests/test_skills_core.py::TestToolOrchestrator` | `cd underone && python -m under_one.cli validate-skill tool-orchestrator --json` |
+| `ecosystem-hub` | `bagua-zhen` | `underone/tests/test_skills_core.py::TestEcosystemHub` | `cd underone && python -m under_one.cli validate-skill ecosystem-hub --json` |
+| `evolution-engine` | `xiushen-lu` | `underone/tests/test_skills_core.py::TestEvolutionEngine` | `cd underone && python -m under_one.cli validate-skill evolution-engine --json` |
+
+### Isolated host verification
+
+```bash
+# Install one skill into an isolated third-party runtime directory
+python underone/scripts/install_host_skills.py --host custom --dest /tmp/underone-custom fenghou-qimen
+
+# Validate the installed copy without touching your real host runtime
+python /tmp/underone-custom/fenghou-qimen/skillctl.py self-test
+```
+
+## 9. Skill example gallery
+
+All fixtures below already live in `underone/skills/<stable-id>/scripts/`, so the commands are copy-pasteable from the repo root.
+
+| Skill | Happy-path command | Boundary fixture to retry | What to inspect |
+|---|---|---|---|
+| `context-guard` | `python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/scene_q2.json` | `underone/skills/qiti-yuanliu/scripts/boundary_drift.json` | `scene_q2.health_report.json` → `risk_hotspots`, `priority_actions`, `execution_contract` |
+| `command-factory` | `python underone/skills/tongtian-lu/scripts/fu_generator.py underone/skills/tongtian-lu/scripts/scene_t2.txt` | `underone/skills/tongtian-lu/scripts/scene_t4.txt` | `fu_plan.json` → `talisman_list`, `conflicts`, `execution_plan` |
+| `insight-radar` | `python underone/skills/dalu-dongguan/scripts/link_detector.py underone/skills/dalu-dongguan/scripts/scene_d2.json` | `underone/skills/dalu-dongguan/scripts/boundary_c_level.json` | `link_report.json` → `links`, `anomaly_signals`, `hallucination_risk` |
+| `tool-forge` | `python underone/skills/shenji-bailian/scripts/tool_factory.py underone/skills/shenji-bailian/scripts/spec.json` | `python underone/skills/shenji-bailian/scripts/tool_factory.py \"generate an analysis skill for messy sales data\"` | Generated `README.md`, `_skillhub_meta.json`, `assets/benchmark_cases.json`, `tests/benchmark_runner.py` |
+| `priority-engine` | `python underone/skills/fenghou-qimen/scripts/priority_engine.py underone/skills/fenghou-qimen/scripts/test_tasks.json` | `underone/skills/fenghou-qimen/scripts/boundary_low.json` | `priority_plan.json` → `execution_plan`, `monte_carlo`, `buffer_recommendation` |
+| `knowledge-digest` | `python underone/skills/liuku-xianzei/scripts/knowledge_digest.py underone/skills/liuku-xianzei/scripts/scene_l2.json` | `underone/skills/liuku-xianzei/scripts/boundary_conflict.json` | `digest_report.json` → `portfolio_diagnostics`, `refinement_queue`, `contamination_risk` |
+| `persona-guard` | `python underone/skills/shuangquanshou/scripts/dna_validator.py underone/skills/shuangquanshou/scripts/profile.json` | `underone/skills/shuangquanshou/scripts/boundary_dna.json` | `dna_report.json` → `safety_contract`, `approval_contract`, `operation_checklist` |
+| `tool-orchestrator` | `python underone/skills/juling-qianjiang/scripts/dispatcher.py underone/skills/juling-qianjiang/scripts/scene_j1_tasks.json underone/skills/juling-qianjiang/scripts/scene_j1_spirits.json protect` | `underone/skills/juling-qianjiang/scripts/spirits_sick.json` + `underone/skills/juling-qianjiang/scripts/tasks_sick.json` | `dispatch_report_v9.json` → `command_plan`, `soul_bindings`, `governance_summary` |
+| `ecosystem-hub` | `python underone/skills/bagua-zhen/scripts/coordinator.py` | `underone/skills/bagua-zhen/scripts/boundary_broken.json` | `ecosystem_report_v10.json` → `weakest_skills`, `ecosystem_hotspots`, `optimization_queue` |
+| `evolution-engine` | `python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills fenghou-qimen` | `python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills shuangquanshou` | `evolution_report_v7.json` → `evolution_backlog`, `pattern_summary`, `execution_policy` |
+
+### Three practical copy-paste flows
+
+```bash
+# 1. Drift repair workflow
+python underone/skills/qiti-yuanliu/scripts/entropy_scanner.py underone/skills/qiti-yuanliu/scripts/boundary_full.json
+
+# 2. Knowledge hygiene workflow
+python underone/skills/liuku-xianzei/scripts/knowledge_digest.py underone/skills/liuku-xianzei/scripts/scene_l4.json
+python underone/skills/dalu-dongguan/scripts/link_detector.py underone/skills/dalu-dongguan/scripts/segments.json
+
+# 3. Runtime governance workflow
+python underone/skills/bagua-zhen/scripts/coordinator.py
+python underone/skills/xiushen-lu/scripts/core_engine.py underone/skills
+```
+
+## 10. Deep example — priority-engine
 
 Input (`underone/skills/fenghou-qimen/scripts/test_tasks.json`):
 
@@ -230,7 +328,7 @@ Output (`priority_plan.json`):
 
 See [`underone/examples/demo.py`](./underone/examples/demo.py) for end-to-end multi-skill demos.
 
-## 9. LLM adapter layer
+## 11. LLM adapter layer
 
 A unified `LLMClient` abstraction lets skills talk to any provider. **Defaults to a fully offline `mock` client, so nothing breaks without API keys.**
 
@@ -257,7 +355,7 @@ End-to-end A/B benchmark:
 python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 ```
 
-## 10. Quantified efficacy (internal benchmark)
+## 12. Quantified efficacy (internal benchmark)
 
 | Workload | Baseline | With UnderOne | Lift |
 |---|---|---|---|
@@ -272,7 +370,7 @@ python underone/examples/real_llm_benchmark.py --providers mock openai anthropic
 
 > Data comes from the internal `efficiency_benchmark.py` (simulated LLM). **Real-LLM validation** is the next milestone — an end-to-end adapter-based benchmark is already wired in `examples/real_llm_benchmark.py`; plug in an API key to produce independent numbers.
 
-## 11. Project layout
+## 13. Project layout
 
 ```
 under-one/
@@ -303,7 +401,7 @@ under-one/
 
 **Why grouped under `skills/`** — the 10 skill directories are now cleanly separated from SDK / tests / examples / scripts. Picking one skill to study or package no longer needs scrolling through infrastructure folders.
 
-## 12. Make targets
+## 14. Make targets
 
 | Command | Action |
 |---|---|
@@ -316,7 +414,7 @@ under-one/
 | `make status` | Ten-skill ecosystem status |
 | `make clean` | Remove temp files (`.DS_Store`, `__pycache__`, …) |
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Track | Deliverable | Status |
 |---|---|---|
@@ -325,7 +423,7 @@ under-one/
 | Validation | Real-LLM A/B validation report · LangChain adapter | 📋 Planned |
 | Ecosystem | Community skill marketplace · federated evolution | 💭 Vision |
 
-## 14. FAQ (highlights)
+## 16. FAQ (highlights)
 
 Full answers in [`FAQ.md`](./FAQ.md):
 
@@ -335,15 +433,15 @@ Full answers in [`FAQ.md`](./FAQ.md):
 - **Q5** Is self-evolution a fake requirement? → No — `xiushen-lu` evolves thresholds (not logic) based on runtime metrics, with rollback safeguards.
 - **Q6** How to write a custom skill? → Create `my-skill/SKILL.md` + `my-skill/scripts/main.py`. ~30 lines of boilerplate, full example in docs.
 
-## 15. Contributing
+## 17. Contributing
 
 See [`CONTRIBUTING.md`](./underone/CONTRIBUTING.md). Pull requests welcome — especially for new LLM provider adapters, real-LLM benchmarks, community skills, and translation improvements.
 
-## 16. License
+## 18. License
 
 MIT. Free to use, modify, distribute — please keep the original attribution.
 
-## 17. Acknowledgement
+## 19. Acknowledgement
 
 The Eight Heterodox Arts (八奇技) concept originates from the manga *Under One Person* (《一人之下》) by **Mi Er (米二)**. This project is a technical interpretation — all code and documentation are original implementations. For any copyright concerns, please contact us for removal.
 
