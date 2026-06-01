@@ -712,6 +712,76 @@ def _compute_fallback_quality(spirit: dict, task: dict, mode: str, cfg: dict) ->
     return round(min(0.95, max(0.0, blended)), 2)
 
 
+# ══════════════════════════════════════════════════════════════
+# V9.9 灵契：服灵永久强化 + 灵体弱点识别
+# ══════════════════════════════════════════════════════════════
+_SOUL_PACTS = {}            # {"spirit_id::task_type": success_count}
+_SOUL_PACT_STEP = 0.03      # 每次成功服灵的精度增益
+_SOUL_PACT_CAP = 0.15       # 灵契加成上限（永久强化但有顶）
+
+
+def _soul_pact_key(spirit_id, task_type):
+    return f"{spirit_id}::{task_type or 'general'}"
+
+
+def record_soul_pact(spirit_id, task_type, success=True):
+    """服灵：一次成功使用后积累灵契经验值，永久提升匹配精度。
+
+    呼应漫画"服灵=吃掉灵获得永久性强化"。仅记录成功（失败不削弱已有灵契）。
+    Returns: 当前累计成功次数。
+    """
+    key = _soul_pact_key(spirit_id, task_type)
+    if not success:
+        return _SOUL_PACTS.get(key, 0)
+    _SOUL_PACTS[key] = _SOUL_PACTS.get(key, 0) + 1
+    return _SOUL_PACTS[key]
+
+
+def soul_pact_bonus(spirit_id, task_type):
+    """根据累计灵契经验值返回匹配加成（0 ~ _SOUL_PACT_CAP）。"""
+    count = _SOUL_PACTS.get(_soul_pact_key(spirit_id, task_type), 0)
+    return round(min(_SOUL_PACT_CAP, count * _SOUL_PACT_STEP), 3)
+
+
+def reset_soul_pacts():
+    """清空内存灵契（测试/重置用）。"""
+    _SOUL_PACTS.clear()
+
+
+def identify_spirit_weakness(spirit, required_capabilities=None):
+    """灵体弱点识别（呼应"灵体本质上是不完整的"）。
+
+    从能力覆盖、可用性、历史质量三方面刻画灵体的不完整之处，便于扬长避短。
+    """
+    caps = set(spirit.get("capabilities", []) or [])
+    required = set(required_capabilities or [])
+    weaknesses = []
+
+    missing = sorted(required - caps)
+    if missing:
+        weaknesses.append({"type": "capability_gap", "detail": missing,
+                           "note": "缺失所需能力，需请其他灵补位"})
+    if not spirit.get("available", True):
+        weaknesses.append({"type": "unavailable", "detail": spirit.get("id", "unknown"),
+                           "note": "当前不可用，需降级或服灵替代"})
+    q = spirit.get("quality_score")
+    if isinstance(q, (int, float)) and not isinstance(q, bool) and q < 0.6:
+        weaknesses.append({"type": "low_quality", "detail": q,
+                           "note": "历史质量偏低，反叛/失控风险较高"})
+    if not caps:
+        weaknesses.append({"type": "no_capability", "detail": spirit.get("id", "unknown"),
+                           "note": "未声明任何能力，本质高度不完整"})
+
+    coverage = 1.0 if not required else round(len(required & caps) / len(required), 3)
+    return {
+        "spirit_id": spirit.get("id", "unknown"),
+        "completeness": coverage,
+        "weaknesses": weaknesses,
+        "is_complete": not weaknesses,
+        "lore": "灵体本质不完整，识别弱点方能扬长避短" if weaknesses else "暂未发现明显弱点",
+    }
+
+
 def rank_spirits(task: dict, spirits: list, cfg: dict = None) -> list:
     """返回按综合得分排序的 spirit 列表。"""
     if not spirits:
@@ -737,12 +807,13 @@ def rank_spirits(task: dict, spirits: list, cfg: dict = None) -> list:
         health_score = _score_health(s, health_critical, health_warning)
         load_score = _score_load_balance(spirit_id, lb_strategy)
         quality_score = _score_quality(s)
+        pact_bonus = soul_pact_bonus(spirit_id, task_type)
         total_score = (
             cap_score * weights.get("capability", 0.40) +
             health_score * weights.get("health", 0.25) +
             load_score * weights.get("load_balance", 0.20) +
             quality_score * weights.get("quality", 0.15)
-        )
+        ) + pact_bonus
         spirit_copy = dict(s)
         spirit_copy["_match_score"] = round(total_score, 3)
         spirit_copy["_match_detail"] = {
@@ -750,6 +821,7 @@ def rank_spirits(task: dict, spirits: list, cfg: dict = None) -> list:
             "health": health_score,
             "load_balance": load_score,
             "quality": quality_score,
+            "soul_pact": pact_bonus,
         }
         ranked.append(spirit_copy)
 
