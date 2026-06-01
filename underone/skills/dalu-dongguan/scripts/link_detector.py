@@ -111,6 +111,8 @@ class LinkDetector:
         self.anomaly_signals = []
         self.hidden_insights = []
         self.hallucination_risk = {}
+        self.temporal_evolution = []
+        self.fate_interventions = []
         self._entity_confidence = {}
         # V5.2: 从 under-one.yaml 加载配置
         self._load_config()
@@ -168,7 +170,75 @@ class LinkDetector:
         self.anomaly_signals = self._collect_anomaly_signals()
         self.hidden_insights = self._build_hidden_insights()
         self.hallucination_risk = self._build_hallucination_risk()
+        self.temporal_evolution = self._build_temporal_evolution()
+        self.fate_interventions = self._build_fate_interventions()
         return self._build_output()
+
+    # ═══════════════════════════════════════════════════════════
+    # V5.4: 超越时间的认知 + 命运干涉
+    # ═══════════════════════════════════════════════════════════
+    def _build_temporal_evolution(self):
+        """时间维度关联（呼应"超越时间的认知"）。
+
+        不同于 temporal_chain（仅相邻段的时序触发），本方法跨整个时间轴，
+        追踪同一实体在多个时间点的复现，揭示主题随时间的演变轨迹。
+        时间键优先级：timestamp > round > ts > time > 原始顺序。
+        """
+        def time_key(idx, seg):
+            for k in ("timestamp", "round", "ts", "time"):
+                v = seg.get(k)
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    return v
+            return idx
+
+        source_order = {}
+        for idx, seg in enumerate(self.segments):
+            src = seg.get("source", f"seg{idx}")
+            source_order[src] = time_key(idx, seg)
+
+        evolutions = []
+        for ent, sources in self.entities.items():
+            uniq = sorted(set(sources), key=lambda s: source_order.get(s, 0))
+            if len(uniq) >= 2:
+                evolutions.append({
+                    "entity": ent,
+                    "span": len(uniq),
+                    "trajectory": uniq,
+                    "trend": "persistent",
+                    "insight": f"实体「{ent}」跨 {len(uniq)} 个时间点持续演变，建议追踪其纵向变化",
+                })
+        evolutions.sort(key=lambda e: e["span"], reverse=True)
+        return evolutions
+
+    def _build_fate_interventions(self):
+        """命运干涉（呼应"踏在别人命运上"）。
+
+        对高置信度（A 级）关联，不止于报告，而是主动给出"干预策略"——
+        锁定命脉、改写下游结局。
+        """
+        interventions = []
+        for link in self.links:
+            if link.get("confidence") != "A":
+                continue
+            ltype = link.get("type", "关联")
+            if ltype == "因果关系":
+                action = (
+                    f"已锁定因果命脉 {link['source']}→{link['target']}："
+                    f"建议直接干预源头 {link['source']}，可改写下游结局"
+                )
+            else:
+                action = (
+                    f"{link['source']} 与 {link['target']} 命数高度纠缠（{ltype}）："
+                    f"建议合并处理或同步变更，避免顾此失彼"
+                )
+            interventions.append({
+                "source": link["source"],
+                "target": link["target"],
+                "type": ltype,
+                "strength": link.get("strength"),
+                "intervention": action,
+            })
+        return interventions
 
     # ═══════════════════════════════════════════════════════════
     # V5.1: 基于模式匹配的精准实体提取
@@ -798,11 +868,13 @@ class LinkDetector:
     def _build_output(self):
         mermaid = self._generate_mermaid()
         return {
-            "detector": "dalu-dongguan", "version": "v5.3",
+            "detector": "dalu-dongguan", "version": "v5.4",
             "segment_count": len(self.segments), "entity_count": len(self.entities),
             "link_count": len(self.links), "links": self.links,
             "entity_map": dict(self.entities),
             "temporal_chain": self.temporal_chain, "causal_chain": self.causal_chain,
+            "temporal_evolution": self.temporal_evolution,
+            "fate_interventions": self.fate_interventions,
             "anomaly_signals": self.anomaly_signals,
             "hidden_insights": self.hidden_insights,
             "hallucination_risk": self.hallucination_risk,
