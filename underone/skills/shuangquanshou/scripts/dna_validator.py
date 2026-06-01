@@ -39,6 +39,12 @@ except ImportError:
 
 
 class DNAValidator:
+    # 双全手两手分工（V5.3）：
+    #   性手·蓝手 → 精神层：读取/影响/改写记忆与认知
+    #   命手·红手 → 物理层：治疗/恢复/逆转损伤
+    XING_HAND_DOMAINS = ("memory", "persona", "emotion")
+    MING_HAND_DOMAINS = ("perception", "behavior", "action")
+
     def __init__(self, profile):
         self.profile = profile
         self.violations = []
@@ -46,6 +52,10 @@ class DNAValidator:
         self.surgery_plan = []
         # V5.2: 从 under-one.yaml 加载配置
         self._load_config()
+
+    def _hand_for_domain(self, domain):
+        """判定手术域归属性手（精神层）还是命手（物理层）。"""
+        return "命手" if domain in self.MING_HAND_DOMAINS else "性手"
 
     def _load_config(self):
         """V5.2: 从配置加载禁止词和否定前缀"""
@@ -410,6 +420,7 @@ class DNAValidator:
                 self.surgery_plan.append(
                     {
                         "domain": "persona",
+                        "hand": self._hand_for_domain("persona"),
                         "operation": "stabilize",
                         "status": "observe",
                         "before": self._summarize_state(self.profile.get("current_style", {})),
@@ -433,6 +444,7 @@ class DNAValidator:
         self.surgery_plan.append(
             {
                 "domain": domain,
+                "hand": self._hand_for_domain(domain),
                 "operation": self._operation_name(request, domain),
                 "status": status,
                 "before": self._summarize_state(self._domain_state(domain)),
@@ -445,6 +457,57 @@ class DNAValidator:
                 "requires_confirmation": status != "planned",
             }
         )
+
+    def _build_hand_division(self):
+        """性手/命手分区汇总（V5.3）。"""
+        xing, ming = [], []
+        for item in self.surgery_plan:
+            (ming if item.get("hand") == "命手" else xing).append(item.get("domain"))
+        return {
+            "性手": {
+                "layer": "精神层（记忆/人格/情绪）",
+                "role": "读取/影响/改写认知与记忆",
+                "domains": sorted({d for d in xing if d}),
+            },
+            "命手": {
+                "layer": "物理层（感知/行为修复）",
+                "role": "治疗/恢复/逆转损伤",
+                "domains": sorted({d for d in ming if d}),
+            },
+        }
+
+    def generate_repair_patch(self):
+        """命手积极修复（治疗/恢复，V5.3）。
+
+        命手是双全手的"红手"，核心在主动治疗——生成可应用的修复 patch，
+        将 current_style 朝 dna_expectation 复原，而非仅检测偏离。
+        触发核心 DNA 保护（封印）时返回不可应用，避免走火入魔。
+        """
+        mode = self._surgery_mode()
+        current = self.profile.get("current_style", {}) or {}
+        expectation = self.profile.get("dna_expectation", {}) or {}
+        ops = []
+        for key in self.STYLE_DIMENSIONS:
+            exp = expectation.get(key)
+            if exp is None:
+                continue
+            cur = current.get(key)
+            if cur is None or cur != exp:
+                ops.append({
+                    "field": f"style.{key}",
+                    "op": "restore",
+                    "from": cur,
+                    "to": exp,
+                })
+        applicable = mode != "seal" and bool(ops)
+        return {
+            "hand": "命手",
+            "intent": "治疗/恢复：将偏离的风格维度复原至灵魂烙印基线",
+            "applicable": applicable,
+            "blocked_reason": "触发核心DNA保护（走火入魔），禁止积极修复" if mode == "seal" else None,
+            "ops": ops if applicable else [],
+            "op_count": len(ops) if applicable else 0,
+        }
 
     def _contamination_index(self):
         weights = self.CONTAMINATION_WEIGHTS
@@ -643,7 +706,7 @@ class DNAValidator:
         drift_trend = getattr(self, "drift_trend", {"trend": "insufficient_data", "early_avg": 0.0, "recent_avg": 0.0, "delta": 0.0})
         return {
             "validator": "shuangquanshou",
-            "version": "v5.2",
+            "version": "v5.3",
             "deviation_score": round(self.deviation, 3),
             "drift_level": level,
             "drift_trend": drift_trend,
@@ -652,6 +715,8 @@ class DNAValidator:
             "immutable_core": list(self.profile.get("dna_core", {}).keys()),
             "surgery_mode": self._surgery_mode(),
             "surgery_plan": self.surgery_plan,
+            "hand_division": self._build_hand_division(),
+            "ming_hand_repair": self.generate_repair_patch(),
             "rewrite_patch": self._rewrite_patch_bundle(),
             "contamination_index": contamination_index,
             "identity_integrity": round(max(0.0, 1.0 - contamination_index), 3),
