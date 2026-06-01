@@ -107,7 +107,7 @@ python underone/scripts/install_host_skills.py --host custom --dest /path/to/pro
 
 | 文档 | 内容 |
 |------|------|
-| [CHANGELOG](../underone/CHANGELOG.md) | 版本变更记录（V1 → V10） |
+| [CHANGELOG](../underone/CHANGELOG.md) | 版本变更记录（V1 → V10.1） |
 | [CONTRIBUTING](../underone/CONTRIBUTING.md) | 贡献指南 |
 | [EFFICIENCY_QUANTIFICATION_REPORT](../underone/EFFICIENCY_QUANTIFICATION_REPORT.md) | A/B 对照实验完整报告 |
 

@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v10.1.0] - 2026-06-01
+
+### Fixed - 设定与文档一致性
+
+- **大罗洞观**：语录归属由"周圣"修正为"谷畸亭"（周圣实为风后奇门悟得者，属张冠李戴），同步修正 `SKILL.md`、注册表 `under_one/__init__.py`、`under-one.yaml` 三处
+- **风后奇门**：统一"八门"表述——文档与代码一致实现为**七门**（开/生/休/景/惊/杜/死，"伤门"并入"杜门"），并修正示例 emoji 字典缺键（改用 `.get` 兜底）
+
+### Added - 十技贴合度增强
+
+- **神机百炼 (v6.6)**：异术移植 `graft_manifest` — 自动嫁接成熟基底模板/专精技法/显式 graft 请求，并标记不可用技法
+- **六库仙贼 (v5.6)**：信息腐蚀（低质/污染单元量化）+ 无痕消化（高质洁净知识入库）
+- **通天箓 (v5.9)**：符种细分 — 六类符箓归入漫画符种家族（侦查/攻击/防御/加速/化形…），报告输出 `species_catalog`
+- **炁体源流 (v6.2)**：无限递归自省 `meta_reflect` + 炁婴自主进化轨迹
+- **大罗洞观**：时间维度演化 + 命运干涉点输出
+- **双全手**：性手/命手分区 + 命手积极修复方案
+- **拘灵遣将**：灵契经验值积累 + 灵体弱点识别
+- **修身炉**：`graft_capability` 赋能 + 与神机百炼渊源说明
+- **八卦阵**：原创身份与差异化定位说明
+
+### Verified
+
+- pytest 全量回归 **247 passed**
+- `under-one audit` 10/10 skill 结构与元数据 **0 warning**
+- CLI 冒烟 **10/10 PASS**
+- 新增《漫画对照分析报告》`under-one-manga-comparison-report.md`，记录修复与验证全过程
+
+### Docs
+
+- `docs/LORE.md`：风后奇门七门对齐表更新；新增「本轮增强对齐（v10.1）」小节与语录归属修正说明
+- `README.md` / `README.zh-CN.md`：技能速查表补充新增能力关键词
+
 ## [v10.0.0] - 2025-05-03
 
 ### Added - 八奇技完整版
