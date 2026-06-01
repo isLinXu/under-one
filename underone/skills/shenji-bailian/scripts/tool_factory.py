@@ -1212,6 +1212,47 @@ class ToolFactory:
             "contracts_present": [key for key, value in sections.items() if value],
         }
 
+    def _build_graft_manifest(self, template_key, specialization):
+        """异术移植（V6.6）：把成熟模式移植到新锻造的法器上。
+
+        呼应漫画神机百炼"将异术手段移植到机关人偶"的能力——
+        新器并非凭空生造，而是嫁接已有的成熟模式：
+          1. 自动移植：匹配到的基础模板 template_key（基底异术）；
+          2. 专精移植：specialization 对应的专精招式（若有）；
+          3. 显式移植：spec["graft"] 中点名索取的招式，按模板库校验可用性。
+
+        Returns:
+            dict: {transplanted: [...], requested: [...], unavailable: [...], lore: str}
+        """
+        available = set(TEMPLATES.keys())
+        transplanted = []
+        if template_key:
+            transplanted.append({"technique": template_key, "source": "base-template", "origin": "auto"})
+        if specialization and specialization not in ("general", "general-skill", "general-tool"):
+            transplanted.append({"technique": specialization, "source": "specialization", "origin": "auto"})
+
+        raw = self.raw_spec if isinstance(self.raw_spec, dict) else {}
+        requested = raw.get("graft", []) or raw.get("transplant", [])
+        if isinstance(requested, str):
+            requested = [requested]
+        requested = [str(g) for g in requested if str(g).strip()]
+
+        unavailable = []
+        for g in requested:
+            if g in available:
+                transplanted.append({"technique": g, "source": "graft-library", "origin": "explicit"})
+            else:
+                unavailable.append(g)
+
+        return {
+            "transplanted": transplanted,
+            "requested": requested,
+            "unavailable": unavailable,
+            "available_techniques": sorted(available),
+            "transplant_count": len(transplanted),
+            "lore": "异术移植：将已验证的成熟模式嫁接到新器，新器即承其能",
+        }
+
     def _build_delivery_contract(self, files, artifact_type, module_name, test_code, contract):
         if artifact_type == "skill":
             required_artifacts = [
@@ -2458,6 +2499,7 @@ def normalize_workflow_state(raw_state):
                 files[f"{module_name}.contract.md"] = contract
 
         forge_summary = self._build_forge_summary(template_key, mode_cfg)
+        graft_manifest = self._build_graft_manifest(template_key, specialization)
         delivery_contract = self._build_delivery_contract(
             files, artifact_type, module_name, test_code, contract
         )
@@ -2477,6 +2519,7 @@ def normalize_workflow_state(raw_state):
             "forge_mode": mode_cfg["name"],
             "forge_intent": forge_summary["forge_intent"],
             "forge_summary": forge_summary,
+            "graft_manifest": graft_manifest,
             "delivery_contract": delivery_contract,
             "inferred_spec": self.spec,
             "files": files,
