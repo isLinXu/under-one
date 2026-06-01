@@ -91,6 +91,7 @@ class PriorityEngine:
         self.task_history = task_history or []
         self.ranked = []
         self.monte_carlo = {}
+        self.burn_mode_enabled = False
         self.adaptive_weighting = {
             "enabled": False,
             "selected_template": None,
@@ -214,8 +215,13 @@ class PriorityEngine:
         return normalized, f"adaptive:{selected_template}"
 
     @record_metrics("fenghou-qimen")
-    def run(self):
-        """执行评分、映射、模拟和计划生成。"""
+    def run(self, burn=False):
+        """执行评分、映射、模拟和计划生成。
+
+        Args:
+            burn: 是否点燃"龟蝇体"燃烧模式（紧急下牺牲质量换速度）。默认关闭。
+        """
+        self.burn_mode_enabled = bool(burn)
         self._score_all()
         self._assign_gates()
         self._monte_carlo()
@@ -317,7 +323,7 @@ class PriorityEngine:
 
         return {
             "engine": "fenghou-qimen",
-            "version": "v5.1",
+            "version": "v5.2",
             "task_count": len(self.tasks),
             "active_template": self.active_template,
             "weights_used": self.weights,
@@ -327,6 +333,8 @@ class PriorityEngine:
             "execution_phases": execution_phases,
             "alternative_plans": alternative_plans,
             "global_strategy": global_strategy,
+            "luan_jin_tuo": self._build_luan_jin_tuo(plan),
+            "gui_ying_ti": self._build_gui_ying_ti(plan),
             "monte_carlo": self.monte_carlo,
             "buffer_recommendation": self.buffer_low if self.monte_carlo["on_time_rate"] < self.buffer_threshold else self.buffer_high,
             "quality_score": round(
@@ -347,6 +355,50 @@ class PriorityEngine:
                 1,
             ),
             "consistency_score": round(max(0.0, min(100.0, self.monte_carlo["on_time_rate"])), 1),
+        }
+
+    # ── V5.2 标志性招式：乱金柝（冻结）/ 龟蝇体（燃烧） ──────────
+    def _build_luan_jin_tuo(self, plan):
+        """乱金柝（扭曲时空 → 冻结资源）。
+
+        当气运逆（鲁棒性低）或存在大凶死门/阻塞杜门任务时，冻结这些低优先
+        任务的资源分配，令时间/资源向高优先任务集中——如同乱金柝冻结目标。
+        """
+        on_time = self.monte_carlo.get("on_time_rate", 100)
+        frozen = [
+            {"task": item["task"], "gate": item["gate"],
+             "reason": "大凶/阻塞，冻结资源以聚焦高优先"}
+            for item in plan if item["gate"] in ("死门", "杜门")
+        ]
+        triggered = on_time < self.robustness_medium or bool(frozen)
+        return {
+            "technique": "乱金柝",
+            "triggered": triggered,
+            "frozen_tasks": [f["task"] for f in frozen],
+            "frozen_detail": frozen,
+            "focus_tasks": [item["task"] for item in plan if item["gate"] in ("开门", "生门")],
+            "lore": (
+                "扭曲局部时空，冻结低优先任务，集中力量于关键命脉"
+                if triggered else "气运尚顺，无需冻结"
+            ),
+        }
+
+    def _build_gui_ying_ti(self, plan):
+        """龟蝇体（燃烧生命换爆发 → 燃烧模式）。
+
+        紧急模式下牺牲质量换速度：仅保留最高优先（开门/生门）任务、跳过验证
+        尾阵，全力冲刺。默认关闭，run(burn=True) 时点燃。
+        """
+        enabled = getattr(self, "burn_mode_enabled", False)
+        sprint = [item["task"] for item in plan if item["gate"] in ("开门", "生门")]
+        if not sprint and plan:
+            sprint = [plan[0]["task"]]
+        return {
+            "technique": "龟蝇体",
+            "enabled": enabled,
+            "sprint_tasks": sprint if enabled else [],
+            "sacrificed": "质量与验证尾阵（牺牲生命换机能爆发）" if enabled else None,
+            "lore": "燃烧生命，全力冲刺关键任务" if enabled else "未点燃，常态运行",
         }
 
     def _phase_bucket(self, task):
@@ -445,12 +497,15 @@ class PriorityEngine:
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python priority_engine.py <tasks.json> [template]")
+        print("用法: python priority_engine.py <tasks.json> [template] [--burn]")
         print('  tasks: [{"name":"任务A","urgency":5,"importance":5,...}, ...]')
         print('  template: balanced | urgency_priority | quality_priority | resource_limited | team_driven')
+        print('  --burn: 点燃龟蝇体燃烧模式（紧急下牺牲质量换速度）')
         sys.exit(1)
 
-    template = sys.argv[2] if len(sys.argv) > 2 else None
+    burn = "--burn" in sys.argv[2:]
+    rest = [a for a in sys.argv[2:] if a != "--burn"]
+    template = rest[0] if rest else None
 
     with open(sys.argv[1], "r", encoding="utf-8") as f:
         tasks = json.load(f)
@@ -474,7 +529,7 @@ def main():
             sys.exit(2)
 
     engine = PriorityEngine(tasks, template=template)
-    result = engine.run()
+    result = engine.run(burn=burn)
 
     out = Path("priority_plan.json")
     with open(out, "w", encoding="utf-8") as f:
