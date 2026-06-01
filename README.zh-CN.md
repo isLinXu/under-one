@@ -87,12 +87,12 @@
 
 | ID | 中文名 | 技能卡 | 核心能力 | 脚本 |
 |---|---|---|---|---|
-| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | 炁场诊断（炁熵检测）· 炁印快照 · 炁归修复契约 | `entropy_scanner.py` |
-| 📜 `command-factory` | 通天箓 | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 六种符箓 · 符阵拓扑排序 · 禁咒分级（速符/中阵/大阵法） | `fu_generator.py` |
+| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | 炁场诊断（炁熵检测）· 炁印快照 · 炁归修复契约 · 递归自省（炁婴进化） | `entropy_scanner.py` |
+| 📜 `command-factory` | 通天箓 | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 六种符箓 · 符种家族细分 · 符阵拓扑排序 · 禁咒分级（速符/中阵/大阵法） | `fu_generator.py` |
 | 🔭 `insight-radar` | 大罗洞观 | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 天眼图卷 · 洞若观火/似有所感/一线微光置信度 · 幻象识别 | `link_detector.py` |
-| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 铸胚→刻文→百炼成钢 · 器灵契约 · 自然语言直出 | `tool_factory.py` |
+| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 铸胚→刻文→百炼成钢 · 器灵契约 · 异术移植 · 自然语言直出 | `tool_factory.py` |
 | 🧭 `priority-engine` | 风后奇门 | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 九宫九维 · 七门排盘（开/生/休/景/惊/杜/死）· 蓍草占卜（蒙特卡洛） | `priority_engine.py` |
-| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | 六库分级 · 入库/待验/毒信 · 保鲜期 · 反刍调度 | `knowledge_digest.py` |
+| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | 六库分级 · 入库/待验/毒信 · 信息腐蚀/无痕消化 · 保鲜期 · 反刍调度 | `knowledge_digest.py` |
 | ✋ `persona-guard` | 双全手 | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | 灵魂烙印（DNA）· 走火入魔防护 · 人格分裂预警 · 手术四域 | `dna_validator.py` |
 | 👻 `tool-orchestrator` | 拘灵遣将 | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 百鬼夜行（并行）· 将帅双星（主副灵）· 护符/强制附体降级 · 反叛风险 | `dispatcher.py` |
 | ⚡ `ecosystem-hub` | 八卦阵 | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 相生协同 · 相克互斥仲裁 · 天人合一境界 · HTML 仪表盘 | `coordinator.py` |
