@@ -27,6 +27,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| **[LORE.md](./LORE.md)** | **🌟 世界观深度对齐手册：十技 × 原著设定完整映射、术语词典、隐喻补全（新）** |
 | [README_Full.md](./README_Full.md) | 早期完整中英双语项目介绍（原 `README_Final.md`，保留作归档） |
 | [README_Github.md](./README_Github.md) | GitHub Release 专用说明 |
 | [README_Hachigiki.md](./README_Hachigiki.md) | 八奇技世界观到工程的完整映射说明 |

@@ -86,16 +86,16 @@ It ships as **ten self-contained skills**. Each is a directory with a `SKILL.md`
 
 | ID | Codename | Card | Core capability | Script |
 |---|---|---|---|---|
-| ☯️ `context-guard` | 炁体源流 Qiti-Yuanliu | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | Detect drift · repair via DNA snapshot · 3-level distillation | `entropy_scanner.py` |
-| 📜 `command-factory` | 通天箓 Tongtian-Lu | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 6 talisman types · topological sort · curse-grading | `fu_generator.py` |
-| 🔭 `insight-radar` | 大罗洞观 Dalu-Dongguan | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 5 link types · A/B/C confidence · Mermaid output | `link_detector.py` |
-| 🔨 `tool-forge` | 神机百炼 Shenji-Bailian | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 4-phase evolution · auto test gen · Spirit Contract | `tool_factory.py` |
-| 🧭 `priority-engine` | 风后奇门 Fenghou-Qimen | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 9 dimensions · 8-Gates mapping · 100-iter Monte Carlo | `priority_engine.py` |
-| 🍃 `knowledge-digest` | 六库仙贼 Liuku-Xianzei | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | S/A/B/C credibility · freshness · Ebbinghaus review | `knowledge_digest.py` |
-| ✋ `persona-guard` | 双全手 Shuangquan-Shou | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | Soul Brand DNA · deviation · emotion timeline | `dna_validator.py` |
-| 👻 `tool-orchestrator` | 拘灵遣将 Juling-Qianjiang | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 8 spirit types · SLA · Night Parade parallel · protect/possess | `dispatcher.py` |
-| ⚡ `ecosystem-hub` | 八卦阵 Bagua-Zhen | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 10-skill bus · mutex arbiter · HTML dashboard | `coordinator.py` |
-| 🔥 `evolution-engine` | 修身炉 Xiushen-Lu | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
+| ☯️ `context-guard` | 炁体源流 Qiti-Yuanliu | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | Qi-field scan · Qi-Seal (DNA) snapshot · Qi-Restore contract | `entropy_scanner.py` |
+| 📜 `command-factory` | 通天箓 Tongtian-Lu | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 6 talisman types · array topology · curse-grading (quick-cast / mid-array / full-ritual) | `fu_generator.py` |
+| 🔭 `insight-radar` | 大罗洞观 Dalu-Dongguan | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | Heaven-Eye map · A/B/C (crystal-clear / sensed / faint-light) confidence · illusion detection | `link_detector.py` |
+| 🔨 `tool-forge` | 神机百炼 Shenji-Bailian | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | Blank-cast → Contract-etch → Hundred-Tempered steel · Spirit Contract (runtime_contract) | `tool_factory.py` |
+| 🧭 `priority-engine` | 风后奇门 Fenghou-Qimen | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 9-palace scoring · 7-Gate divination (Open/Life/Rest/View/Shock/Block/Death) · yarrow-stalk Monte Carlo | `priority_engine.py` |
+| 🍃 `knowledge-digest` | 六库仙贼 Liuku-Xianzei | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | Six-Vault tiering · inherit / quarantine / poison-signal queues · freshness · Ebbinghaus review | `knowledge_digest.py` |
+| ✋ `persona-guard` | 双全手 Shuangquan-Shou | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | Soul-Brand DNA · qi-deviation guard · persona-split (走火入魔) prevention · surgery on 4 domains | `dna_validator.py` |
+| 👻 `tool-orchestrator` | 拘灵遣将 Juling-Qianjiang | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | Night Parade (parallel) · Marshal-Vanguard dual-spirit · Talisman-Shield / Force-Possess fallback · rebellion risk | `dispatcher.py` |
+| ⚡ `ecosystem-hub` | 八卦阵 Bagua-Zhen | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | Mutual-generation synergy · mutex arbiter · Harmony-of-Heaven-and-Man peak state · HTML dashboard | `coordinator.py` |
+| 🔥 `evolution-engine` | 修身炉 Xiushen-Lu | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | 6-step Tribulation cycle · Qi-Gather / Refiner / Transformer / Seal-Rollback · failed-tribulation protection | `core_engine.py` |
 
 ## 6. Architecture
 
@@ -149,6 +149,11 @@ cd underone
 python -m under_one.cli validate-skill priority-engine --json
 cd ..
 ```
+
+> When running outside the repo or in a custom deployment, set the
+> `UNDER_ONE_SKILLS_DIR` environment variable to point at the `skills/`
+> directory (or its parent). The locator honors this override first, so skill
+> resolution no longer depends on the current working directory.
 
 ### Host install matrix
 

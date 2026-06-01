@@ -16,6 +16,8 @@ scope: repository-operating-contract
 
 UnderOne 是 10 个独立 agent skills 的工程化集合。中文名和八奇技设定是文化导航，不是运行时依赖。真正的目标是：让每个 skill 可以被单独阅读、单独安装、单独验证，并能稳定运行在 Codex、WorkBuddy、QClaw/OpenClaw 和第三方类 OpenClaw 产品中。
 
+**文化层**：命名体系源自《一人之下》八奇技，世界观对齐手册见 [`docs/LORE.md`](./docs/LORE.md)。进行文档撰写、命名决策、用户沟通时，应遵循 LORE.md 中的术语词典（如"炁"、"符箓"、"灵体"、"百鬼夜行"等），避免与文化基底割裂。
+
 ## 优先级
 
 1. 当前用户目标优先于历史目标。
@@ -44,15 +46,17 @@ UnderOne 是 10 个独立 agent skills 的工程化集合。中文名和八奇�
 - `bagua-zhen` 的真实路径是 `underone/skills/bagua-zhen`。
 - 不删除插图，不把视觉导航降级成纯文本附录。
 - 不提交无关运行产物、临时 JSON、`runtime_data/`、`underone/reports/`。
+- **世界观一致性**：新增/修改 skill 的名称、描述、触发词时，须与 `docs/LORE.md` 中的术语词典保持一致；不引入与原著设定割裂的新隐喻。
 
 ## Entry Docs
 
 1. [README.md](./README.md) - English 总览和安装入口。
 2. [README.zh-CN.md](./README.zh-CN.md) - 中文总览和安装入口。
-   重点章节：第 8 节“验证配方”和第 9 节“Skill 使用样例库 / Skill example gallery”。
+   重点章节：第 8 节”验证配方”和第 9 节”Skill 使用样例库 / Skill example gallery”。
 3. [docs/README.md](./docs/README.md) - 深度文档索引。
-4. [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md) - 宿主适配策略。
-5. [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md) - 单 skill 优化手册。
+4. [docs/LORE.md](./docs/LORE.md) - **世界观深度对齐手册**：十技 × 《一人之下》原著设定完整映射、术语词典、隐喻体系。命名/描述/注释时以此为参考源。
+5. [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md) - 宿主适配策略。
+6. [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md) - 单 skill 优化手册。
 
 ## 标准动作
 

@@ -83,19 +83,20 @@
 
 ## 5. 十大技能速查
 
+> 世界观深度对齐手册见 [`docs/LORE.md`](./docs/LORE.md)，含原著设定映射、隐喻词典与术语规范。
 
 | ID | 中文名 | 技能卡 | 核心能力 | 脚本 |
 |---|---|---|---|---|
-| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | 熵检测 · DNA 快照修复 · 三级蒸馏 | `entropy_scanner.py` |
-| 📜 `command-factory` | 通天箓 | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 6 种符箓 · 拓扑排序 · 禁咒分级 | `fu_generator.py` |
-| 🔭 `insight-radar` | 大罗洞观 | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 5 种链路 · A/B/C 置信度 · Mermaid 输出 | `link_detector.py` |
-| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 四阶段进化 · 自动生成测试 · 器灵契约 | `tool_factory.py` |
-| 🧭 `priority-engine` | 风后奇门 | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 九维度 · 八门映射 · 100 次蒙特卡洛 | `priority_engine.py` |
-| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | S/A/B/C 可信度 · 保鲜期 · 艾宾浩斯复习 | `knowledge_digest.py` |
-| ✋ `persona-guard` | 双全手 | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | 灵魂烙印 DNA · 漂移计算 · 情感时间线 | `dna_validator.py` |
-| 👻 `tool-orchestrator` | 拘灵遣将 | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 8 种灵体 · SLA · 百鬼夜行并行 · 降级/服灵 | `dispatcher.py` |
-| ⚡ `ecosystem-hub` | 八卦阵 | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 十技状态总线 · 互斥仲裁 · HTML 仪表盘 | `coordinator.py` |
-| 🔥 `evolution-engine` | 修身炉 | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | QiSource/Refiner/Transformer/Core/Rollback | `core_engine.py` |
+| ☯️ `context-guard` | 炁体源流 | <img src="./docs/skill-cards/08-qiti-yuanliu.png" width="160"> | 炁场诊断（炁熵检测）· 炁印快照 · 炁归修复契约 | `entropy_scanner.py` |
+| 📜 `command-factory` | 通天箓 | <img src="./docs/skill-cards/01-tongtian-lu.png" width="160"> | 六种符箓 · 符阵拓扑排序 · 禁咒分级（速符/中阵/大阵法） | `fu_generator.py` |
+| 🔭 `insight-radar` | 大罗洞观 | <img src="./docs/skill-cards/02-dalu-dongguan.png" width="160"> | 天眼图卷 · 洞若观火/似有所感/一线微光置信度 · 幻象识别 | `link_detector.py` |
+| 🔨 `tool-forge` | 神机百炼 | <img src="./docs/skill-cards/03-shenji-bailian.png" width="160"> | 铸胚→刻文→百炼成钢 · 器灵契约 · 自然语言直出 | `tool_factory.py` |
+| 🧭 `priority-engine` | 风后奇门 | <img src="./docs/skill-cards/04-fenghou-qimen.png" width="160"> | 九宫九维 · 七门排盘（开/生/休/景/惊/杜/死）· 蓍草占卜（蒙特卡洛） | `priority_engine.py` |
+| 🍃 `knowledge-digest` | 六库仙贼 | <img src="./docs/skill-cards/05-liuku-xianzei.png" width="160"> | 六库分级 · 入库/待验/毒信 · 保鲜期 · 反刍调度 | `knowledge_digest.py` |
+| ✋ `persona-guard` | 双全手 | <img src="./docs/skill-cards/06-shuangquan-shou.png" width="160"> | 灵魂烙印（DNA）· 走火入魔防护 · 人格分裂预警 · 手术四域 | `dna_validator.py` |
+| 👻 `tool-orchestrator` | 拘灵遣将 | <img src="./docs/skill-cards/07-juling-qianjiang.png" width="160"> | 百鬼夜行（并行）· 将帅双星（主副灵）· 护符/强制附体降级 · 反叛风险 | `dispatcher.py` |
+| ⚡ `ecosystem-hub` | 八卦阵 | <img src="./docs/skill-cards/09-ecosystem-hub.png" width="160"> | 相生协同 · 相克互斥仲裁 · 天人合一境界 · HTML 仪表盘 | `coordinator.py` |
+| 🔥 `evolution-engine` | 修身炉 | <img src="./docs/skill-cards/10-xiushen-lu.png" width="160"> | 渡劫六步法 · 采炁/炼师/化形/封印 · 渡劫失败回炉封印 | `core_engine.py` |
 
 ## 6. 协同架构
 
@@ -149,6 +150,10 @@ cd underone
 python -m under_one.cli validate-skill priority-engine --json
 cd ..
 ```
+
+> 在仓库外或自定义部署中运行时，可通过环境变量 `UNDER_ONE_SKILLS_DIR` 显式指定
+> skills 目录（指向 `skills/` 本身或其父目录均可），定位器会优先采用该路径，无需
+> 依赖当前工作目录。
 
 ### 宿主安装矩阵
 
