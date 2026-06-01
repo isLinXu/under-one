@@ -2,4 +2,6 @@ include under-one.yaml
 include README.md
 include LICENSE
 recursive-include under_one *.py
+recursive-include under_one py.typed
+recursive-include skills *.py *.md *.json *.txt *.yaml *.html
 recursive-include tests *.py

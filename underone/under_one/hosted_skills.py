@@ -7,7 +7,7 @@ import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from .skill_bundle import build_bundle_text, install_bundle, resolve_bundle_version, verify_installed_skill
 from .skill_lifecycle import validate_skill
@@ -58,6 +58,33 @@ HOST_ALIASES = {
     "source": "native",
 }
 
+BOOTSTRAP_PROFILE_FIELDS = (
+    "avg_quality",
+    "avg_completeness",
+    "avg_consistency",
+    "avg_human",
+    "success_rate",
+    "avg_duration",
+    "recommended_min_records",
+)
+
+CONTROL_PLANE_FIELDS = (
+    "role",
+    "scope",
+    "reads",
+    "writes",
+    "handoff_targets",
+    "mutation_gate",
+    "will_not",
+    "summary",
+)
+
+ENGINE_OPT_IN_FIELDS = (
+    "env",
+    "flag",
+    "redirect_entry",
+)
+
 
 def available_hosts() -> List[str]:
     return [name for name in HOST_PROFILES if name != "native"]
@@ -88,6 +115,98 @@ def get_host_profile(host: str) -> HostProfile:
     return HOST_PROFILES[resolve_host_name(host)]
 
 
+def _validate_bootstrap_profile(profile: Any) -> List[str]:
+    if profile is None:
+        return ["source metadata missing bootstrap_profile"]
+    if not isinstance(profile, dict):
+        return ["source metadata bootstrap_profile must be an object"]
+
+    warnings: List[str] = []
+    for field in BOOTSTRAP_PROFILE_FIELDS:
+        value = profile.get(field)
+        if not isinstance(value, (int, float)):
+            warnings.append(f"source metadata bootstrap_profile missing or invalid field: {field}")
+    return warnings
+
+
+def _validate_control_plane_contract(skill_name: str, contract: Any) -> List[str]:
+    if skill_name not in {"qiti-yuanliu", "bagua-zhen", "xiushen-lu"} and contract is None:
+        return []
+    if contract is None:
+        return ["source metadata missing control_plane_contract"]
+    if not isinstance(contract, dict):
+        return ["source metadata control_plane_contract must be an object"]
+
+    warnings: List[str] = []
+    for field in CONTROL_PLANE_FIELDS:
+        if field not in contract:
+            warnings.append(f"source metadata control_plane_contract missing field: {field}")
+    return warnings
+
+
+def _validate_engine_manifest(skill_name: str, manifest: Any) -> List[str]:
+    if skill_name != "xiushen-lu":
+        return []
+    if manifest is None:
+        return ["source metadata missing engine_manifest"]
+    if not isinstance(manifest, dict):
+        return ["source metadata engine_manifest must be an object"]
+    warnings: List[str] = []
+    if not isinstance(manifest.get("active_entry"), str):
+        warnings.append("source metadata engine_manifest missing field: active_entry")
+    for field in ("auxiliary_tools", "compatibility_shims", "deprecated_experiments"):
+        if not isinstance(manifest.get(field), list):
+            warnings.append(f"source metadata engine_manifest missing or invalid field: {field}")
+    experimental_opt_in = manifest.get("experimental_opt_in")
+    if experimental_opt_in is not None and not isinstance(experimental_opt_in, dict):
+        warnings.append("source metadata engine_manifest experimental_opt_in must be an object")
+    elif isinstance(experimental_opt_in, dict):
+        missing = [field for field in ENGINE_OPT_IN_FIELDS if not isinstance(experimental_opt_in.get(field), str)]
+        if missing:
+            warnings.append(
+                "source metadata engine_manifest experimental_opt_in missing or invalid fields: "
+                + ", ".join(missing)
+            )
+    return warnings
+
+
+def _validate_xiushen_engine_files(skill_dir: Path, manifest: Any) -> List[str]:
+    if skill_dir.name != "xiushen-lu" or not isinstance(manifest, dict):
+        return []
+
+    warnings: List[str] = []
+    active_entry = manifest.get("active_entry")
+    if isinstance(active_entry, str):
+        active_path = skill_dir / active_entry
+        if not active_path.exists():
+            warnings.append(f"engine manifest active_entry missing file: {active_entry}")
+
+    experimental_opt_in = manifest.get("experimental_opt_in") or {}
+    opt_in_tokens = []
+    if isinstance(experimental_opt_in, dict):
+        for field in ("env", "flag"):
+            value = experimental_opt_in.get(field)
+            if isinstance(value, str) and value:
+                opt_in_tokens.append(value)
+
+    for rel_path in manifest.get("deprecated_experiments", []):
+        if not isinstance(rel_path, str):
+            warnings.append("engine manifest deprecated_experiments must contain string paths")
+            continue
+        target = skill_dir / rel_path
+        if not target.exists():
+            warnings.append(f"engine manifest deprecated experiment missing file: {rel_path}")
+            continue
+        text = target.read_text(encoding="utf-8")
+        if 'ENGINE_STATUS = "deprecated-experiment"' not in text:
+            warnings.append(f"deprecated experiment missing ENGINE_STATUS marker: {rel_path}")
+        if 'REPLACED_BY = "core_engine.py"' not in text:
+            warnings.append(f"deprecated experiment missing REPLACED_BY marker: {rel_path}")
+        if opt_in_tokens and not any(token in text for token in opt_in_tokens):
+            warnings.append(f"deprecated experiment missing opt-in guard marker: {rel_path}")
+    return warnings
+
+
 def default_host_skills_root(host: str) -> Path:
     profile = get_host_profile(host)
     if profile.default_root_factory is None:
@@ -95,7 +214,7 @@ def default_host_skills_root(host: str) -> Path:
     return profile.default_root_factory()
 
 
-def resolve_host_target_root(host: str, target_root: Path | str | None = None) -> Path:
+def resolve_host_target_root(host: str, target_root: Optional[Union[Path, str]] = None) -> Path:
     if target_root is not None:
         return Path(target_root).expanduser().resolve()
     profile = get_host_profile(host)
@@ -278,6 +397,10 @@ def verify_host_skill_install(skill_dir: Path, host: str) -> Dict[str, Any]:
         for field in ("core", "agent_meaning", "cost", "boundary"):
             if not alignment.get(field):
                 warnings.append(f"source metadata alignment missing field: {field}")
+    warnings.extend(_validate_bootstrap_profile(meta_payload.get("bootstrap_profile")))
+    warnings.extend(_validate_control_plane_contract(skill_dir.name, meta_payload.get("control_plane_contract")))
+    warnings.extend(_validate_engine_manifest(skill_dir.name, meta_payload.get("engine_manifest")))
+    warnings.extend(_validate_xiushen_engine_files(skill_dir, meta_payload.get("engine_manifest")))
 
     return {
         "passed": len(errors) == 0,
@@ -319,10 +442,10 @@ def _augment_install_manifest(
 def install_host_skill(
     source_skill_dir: Path,
     host: str,
-    target_root: Path | None = None,
+    target_root: Optional[Path] = None,
     *,
     force: bool = False,
-    bundle_version: str | None = None,
+    bundle_version: Optional[str] = None,
 ) -> Dict[str, Any]:
     source_skill_dir = Path(source_skill_dir).resolve()
     profile = get_host_profile(host)
@@ -371,10 +494,10 @@ def install_host_skill(
 def install_and_validate_host_skill(
     source_skill_dir: Path,
     host: str,
-    target_root: Path | None = None,
+    target_root: Optional[Path] = None,
     *,
     force: bool = False,
-    bundle_version: str | None = None,
+    bundle_version: Optional[str] = None,
     include_source_validation: bool = True,
 ) -> Dict[str, Any]:
     source_skill_dir = Path(source_skill_dir).resolve()
@@ -428,10 +551,10 @@ def default_codex_skills_root() -> Path:
 
 def install_codex_skill(
     source_skill_dir: Path,
-    target_root: Path | None = None,
+    target_root: Optional[Path] = None,
     *,
     force: bool = False,
-    bundle_version: str | None = None,
+    bundle_version: Optional[str] = None,
 ) -> Dict[str, Any]:
     report = install_host_skill(
         source_skill_dir,
@@ -446,10 +569,10 @@ def install_codex_skill(
 
 def install_and_validate_codex_skill(
     source_skill_dir: Path,
-    target_root: Path | None = None,
+    target_root: Optional[Path] = None,
     *,
     force: bool = False,
-    bundle_version: str | None = None,
+    bundle_version: Optional[str] = None,
     include_source_validation: bool = True,
 ) -> Dict[str, Any]:
     report = install_and_validate_host_skill(

@@ -43,6 +43,39 @@ REQUIRED_ALIGNMENT_FIELDS = [
     "boundary",
 ]
 
+BOOTSTRAP_PROFILE_FIELDS = [
+    "avg_quality",
+    "avg_completeness",
+    "avg_consistency",
+    "avg_human",
+    "success_rate",
+    "avg_duration",
+    "recommended_min_records",
+]
+
+CONTROL_PLANE_FIELDS = [
+    "role",
+    "scope",
+    "reads",
+    "writes",
+    "handoff_targets",
+    "mutation_gate",
+    "will_not",
+    "summary",
+]
+
+ENGINE_OPT_IN_FIELDS = [
+    "env",
+    "flag",
+    "redirect_entry",
+]
+
+CONTROL_PLANE_SKILLS = {
+    "qiti-yuanliu",
+    "bagua-zhen",
+    "xiushen-lu",
+}
+
 
 @dataclass
 class SkillAuditResult:
@@ -233,6 +266,111 @@ def _validate_python_version(value: str) -> bool:
     return bool(re.fullmatch(r"\d+\.\d+", value))
 
 
+def _validate_bootstrap_profile(profile: Any) -> List[str]:
+    if profile is None:
+        return []
+    if not isinstance(profile, dict):
+        return ["metadata bootstrap_profile must be an object"]
+
+    warnings: List[str] = []
+    missing = [field for field in BOOTSTRAP_PROFILE_FIELDS if field not in profile]
+    if missing:
+        warnings.append("metadata bootstrap_profile missing fields: " + ", ".join(missing))
+
+    for field, value in profile.items():
+        if field not in BOOTSTRAP_PROFILE_FIELDS and field != "degradation_window":
+            warnings.append(f"metadata bootstrap_profile has unknown field: {field}")
+            continue
+        if not isinstance(value, (int, float)):
+            warnings.append(f"metadata bootstrap_profile field {field} must be numeric")
+    return warnings
+
+
+def _validate_control_plane_contract(skill_name: str, contract: Any) -> List[str]:
+    if contract is None:
+        return ["metadata missing control_plane_contract"] if skill_name in CONTROL_PLANE_SKILLS else []
+    if not isinstance(contract, dict):
+        return ["metadata control_plane_contract must be an object"]
+
+    warnings: List[str] = []
+    missing = [field for field in CONTROL_PLANE_FIELDS if field not in contract]
+    if missing:
+        warnings.append("metadata control_plane_contract missing fields: " + ", ".join(missing))
+    for field in ("reads", "writes", "handoff_targets", "will_not"):
+        value = contract.get(field)
+        if value is not None and not isinstance(value, list):
+            warnings.append(f"metadata control_plane_contract field {field} must be a list")
+    for field in ("role", "scope", "mutation_gate", "summary"):
+        value = contract.get(field)
+        if value is not None and not isinstance(value, str):
+            warnings.append(f"metadata control_plane_contract field {field} must be a string")
+    return warnings
+
+
+def _validate_engine_manifest(skill_name: str, manifest: Any) -> List[str]:
+    if skill_name != "xiushen-lu":
+        return []
+    if manifest is None:
+        return ["metadata missing engine_manifest"]
+    if not isinstance(manifest, dict):
+        return ["metadata engine_manifest must be an object"]
+    warnings: List[str] = []
+    if not isinstance(manifest.get("active_entry"), str):
+        warnings.append("metadata engine_manifest.active_entry must be a string")
+    for field in ("auxiliary_tools", "compatibility_shims", "deprecated_experiments"):
+        value = manifest.get(field)
+        if not isinstance(value, list):
+            warnings.append(f"metadata engine_manifest field {field} must be a list")
+    experimental_opt_in = manifest.get("experimental_opt_in")
+    if experimental_opt_in is not None and not isinstance(experimental_opt_in, dict):
+        warnings.append("metadata engine_manifest.experimental_opt_in must be an object")
+    elif isinstance(experimental_opt_in, dict):
+        missing = [field for field in ENGINE_OPT_IN_FIELDS if not isinstance(experimental_opt_in.get(field), str)]
+        if missing:
+            warnings.append(
+                "metadata engine_manifest.experimental_opt_in missing or invalid fields: "
+                + ", ".join(missing)
+            )
+    return warnings
+
+
+def _validate_xiushen_engine_files(skill_dir: Path, manifest: Any) -> List[str]:
+    if skill_dir.name != "xiushen-lu" or not isinstance(manifest, dict):
+        return []
+
+    warnings: List[str] = []
+    active_entry = manifest.get("active_entry")
+    if isinstance(active_entry, str):
+        active_path = skill_dir / active_entry
+        if not active_path.exists():
+            warnings.append(f"engine manifest active_entry missing file: {active_entry}")
+
+    experimental_opt_in = manifest.get("experimental_opt_in") or {}
+    opt_in_tokens = []
+    if isinstance(experimental_opt_in, dict):
+        for field in ("env", "flag"):
+            value = experimental_opt_in.get(field)
+            if isinstance(value, str) and value:
+                opt_in_tokens.append(value)
+
+    for rel_path in manifest.get("deprecated_experiments", []):
+        if not isinstance(rel_path, str):
+            warnings.append("engine manifest deprecated_experiments must contain string paths")
+            continue
+        target = skill_dir / rel_path
+        if not target.exists():
+            warnings.append(f"engine manifest deprecated experiment missing file: {rel_path}")
+            continue
+        text = target.read_text(encoding="utf-8")
+        if 'ENGINE_STATUS = "deprecated-experiment"' not in text:
+            warnings.append(f"deprecated experiment missing ENGINE_STATUS marker: {rel_path}")
+        if 'REPLACED_BY = "core_engine.py"' not in text:
+            warnings.append(f"deprecated experiment missing REPLACED_BY marker: {rel_path}")
+        if opt_in_tokens and not any(token in text for token in opt_in_tokens):
+            warnings.append(f"deprecated experiment missing opt-in guard marker: {rel_path}")
+    return warnings
+
+
 def audit_skill_dir(skill_dir: Path) -> SkillAuditResult:
     """Audit a single skill directory."""
     errors: List[str] = []
@@ -272,6 +410,10 @@ def audit_skill_dir(skill_dir: Path) -> SkillAuditResult:
                     warnings.append(
                         "metadata alignment missing fields: " + ", ".join(missing_alignment_fields)
                     )
+            warnings.extend(_validate_bootstrap_profile(meta.get("bootstrap_profile")))
+            warnings.extend(_validate_control_plane_contract(skill_dir.name, meta.get("control_plane_contract")))
+            warnings.extend(_validate_engine_manifest(skill_dir.name, meta.get("engine_manifest")))
+            warnings.extend(_validate_xiushen_engine_files(skill_dir, meta.get("engine_manifest")))
         except Exception as exc:
             errors.append(f"invalid _skillhub_meta.json: {exc}")
 

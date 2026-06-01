@@ -13,6 +13,7 @@ Usage:
     under-one install-host --host qclaw        # 安装到指定宿主
     under-one install-host --host custom --dest /tmp/custom-skills   # 第三方产品
     under-one hosts                            # 列出支持的宿主及别名
+    under-one metrics --serve                  # 启动 Prometheus /metrics 端点
     under-one providers                        # 列出可用 LLM 适配器
 """
 
@@ -21,6 +22,8 @@ import json
 import sys
 from pathlib import Path
 
+from .config import get_config, get_script_timeout
+from .metrics import create_prometheus_server, format_prometheus_metrics, get_all_skills_metrics, resolve_runtime_data_dir
 from .skill_bundle import install_bundle, verify_installed_skill
 from .skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
 from .hosted_skills import (
@@ -35,6 +38,8 @@ from .hosted_skills import (
     resolve_host_target_root,
 )
 from .skill_lifecycle import SKILL_TEST_TARGETS, validate_skill
+from .skill_locator import find_skills_dir
+from .exceptions import SkillExecutionError
 
 SKILL_MAP = {
     "context-guard":      ("qiti-yuanliu",       "scripts/entropy_scanner.py",   "本源自省"),
@@ -51,21 +56,16 @@ SKILL_MAP = {
 
 
 def find_skill_dir() -> Path:
-    """查找 skills 目录（underone/skills/）"""
-    candidates = [
-        # Python 包位于 underone/under_one/，skills 位于 underone/skills/
-        Path(__file__).parent.parent / "skills",
-        # 兼容：从 repo 根或其他上下文运行
-        Path.cwd() / "underone" / "skills",
-        Path.cwd() / "skills",
-        Path.cwd(),
-        Path.home() / ".under-one/skills",
-    ]
-    for c in candidates:
-        if (c / "qiti-yuanliu").exists():
-            return c
-    print("ERROR: 找不到 skills 目录。请确保在 under-one 仓库内运行，或 pip install -e underone/")
-    sys.exit(1)
+    """查找 skills 目录（underone/skills/）。
+
+    委托给共享的健壮定位器（支持 UNDER_ONE_SKILLS_DIR 覆盖），并保留 CLI 友好的
+    退出语义：定位失败时打印清晰错误并以非零状态退出。
+    """
+    try:
+        return find_skills_dir()
+    except SkillExecutionError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
 
 
 def cmd_list(args):
@@ -111,7 +111,7 @@ def cmd_scan(args):
         print(f"输入: {args.input}")
     print("-" * 40)
     
-    result = subprocess.run(cmd, timeout=60)
+    result = subprocess.run(cmd, timeout=get_script_timeout(dir_name))
     sys.exit(result.returncode)
 
 
@@ -127,8 +127,9 @@ def cmd_status(args):
         # Fallback: 简单扫描
         print("\n☯ 十技生态状态 (简化版)")
         print("-" * 40)
+        metrics_dir = resolve_runtime_data_dir()
         for name, (dir_name, _, desc) in SKILL_MAP.items():
-            metrics_file = Path("runtime_data") / f"{dir_name}_metrics.jsonl"
+            metrics_file = metrics_dir / f"{dir_name}_metrics.jsonl"
             count = 0
             if metrics_file.exists():
                 with open(metrics_file) as f:
@@ -197,7 +198,7 @@ def cmd_evolve(args):
         cmd.append(args.skill)
     
     print("🔥 启动修身炉自进化...")
-    subprocess.run(cmd, timeout=300)
+    subprocess.run(cmd, timeout=get_script_timeout("xiushen-lu", default=300))
 
 
 def cmd_bundles(args):
@@ -410,6 +411,50 @@ def cmd_validate_skill(args):
     sys.exit(0 if report["validation_passed"] else 1)
 
 
+def cmd_metrics(args):
+    """查看或导出运行时指标。"""
+    metrics_dir = Path(args.data_dir).expanduser() if args.data_dir else resolve_runtime_data_dir()
+    if args.serve:
+        server_cfg = get_config("runtime", "metrics_server", {}) or {}
+        host = args.host or server_cfg.get("host", "127.0.0.1")
+        port = args.port or int(server_cfg.get("port", 9465))
+        server = create_prometheus_server(host, port, metrics_dir)
+        actual_host, actual_port = server.server_address[:2]
+        print(f"Prometheus metrics serving at http://{actual_host}:{actual_port}/metrics")
+        try:
+            if args.once:
+                server.handle_request()
+            else:
+                server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nmetrics server stopped")
+        finally:
+            server.server_close()
+        return
+    if args.prometheus:
+        print(format_prometheus_metrics(metrics_dir), end="")
+        return
+
+    payload = get_all_skills_metrics(metrics_dir)
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    print("\n运行时指标")
+    print("-" * 40)
+    if not payload:
+        print(f"暂无指标: {metrics_dir}")
+        return
+    for skill_name, records in sorted(payload.items()):
+        latest = records[-1] if records else {}
+        print(
+            f"{skill_name:<22} runs={len(records):<3} "
+            f"latest_success={latest.get('success')} "
+            f"quality={latest.get('quality_score')} "
+            f"duration_ms={latest.get('duration_ms')}"
+        )
+
+
 def cmd_providers(args):
     """列出可用的 LLM 适配器"""
     try:
@@ -464,6 +509,7 @@ def main():
   under-one test-skill --path ~/.under-one/skills/fenghou-qimen
   under-one validate-skill priority-engine   # 单 skill 验证
   under-one validate-skill --path ~/.under-one/skills/fenghou-qimen
+  under-one metrics --serve                  # 启动 Prometheus /metrics 端点
   under-one providers                      # 列出 LLM 适配器
         """
     )
@@ -538,6 +584,17 @@ def main():
     p_validate.add_argument("--json", action="store_true", help="输出JSON结果")
     p_validate.add_argument("--output", help="将验证结果写入JSON文件")
     p_validate.set_defaults(func=cmd_validate_skill)
+
+    # metrics
+    p_metrics = subparsers.add_parser("metrics", help="查看或导出运行时指标")
+    p_metrics.add_argument("--data-dir", help="运行时指标目录")
+    p_metrics.add_argument("--json", action="store_true", help="输出JSON结果")
+    p_metrics.add_argument("--prometheus", action="store_true", help="输出 Prometheus text exposition")
+    p_metrics.add_argument("--serve", action="store_true", help="启动 Prometheus /metrics HTTP 端点")
+    p_metrics.add_argument("--host", help="metrics server 监听地址")
+    p_metrics.add_argument("--port", type=int, help="metrics server 监听端口")
+    p_metrics.add_argument("--once", action="store_true", help="仅处理一个 HTTP 请求后退出，便于测试")
+    p_metrics.set_defaults(func=cmd_metrics)
 
     # providers
     p_providers = subparsers.add_parser("providers", help="列出可用的 LLM 适配器")

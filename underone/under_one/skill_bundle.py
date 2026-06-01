@@ -24,7 +24,9 @@ EXCLUDE_SUFFIXES = {".pyc", ".health_report.json"}
 SHARED_PREFIX = "__shared__/"
 SHARED_HELPER_MODULES = {
     "metrics_collector": "metrics_collector.py",
+    "metrics_compat": "metrics_compat.py",
     "_skill_config": "_skill_config.py",
+    "_yaml_fallback": "_yaml_fallback.py",
     "skill_base": "skill_base.py",
 }
 
@@ -355,13 +357,22 @@ def _detect_shared_helpers(skill_dir: Path) -> list[str]:
         module: re.compile(rf"(^|\n)\s*(from|import)\s+{re.escape(module)}\b", flags=re.MULTILINE)
         for module in SHARED_HELPER_MODULES
     }
-    for script in skill_dir.rglob("*.py"):
-        if not script.is_file():
+    to_scan = [script for script in skill_dir.rglob("*.py") if script.is_file()]
+    scanned = set()
+    skills_root = skill_dir.parent
+    while to_scan:
+        script = to_scan.pop()
+        if script in scanned:
             continue
+        scanned.add(script)
         text = script.read_text(encoding="utf-8")
         for module, pattern in patterns.items():
             if pattern.search(text):
-                required.add(module)
+                if module not in required:
+                    required.add(module)
+                    helper_path = skills_root / SHARED_HELPER_MODULES[module]
+                    if helper_path.exists():
+                        to_scan.append(helper_path)
     return [SHARED_HELPER_MODULES[module] for module in sorted(required)]
 
 
@@ -399,7 +410,7 @@ def _build_self_test_text(parsed: ParsedSkillBundle) -> str:
     return SELF_TEST_TEMPLATE
 
 
-def resolve_bundle_version(skill_dir: Path, bundle_version: str | None = None) -> str:
+def resolve_bundle_version(skill_dir: Path, bundle_version: Optional[str] = None) -> str:
     """Resolve the bundle version, defaulting to the skill's own declared version."""
     if bundle_version:
         return bundle_version
@@ -425,7 +436,7 @@ def resolve_bundle_version(skill_dir: Path, bundle_version: str | None = None) -
     return "v0.0.0"
 
 
-def build_bundle_text(skill_dir: Path, bundle_version: str | None = None) -> str:
+def build_bundle_text(skill_dir: Path, bundle_version: Optional[str] = None) -> str:
     """Build a .skill bundle string from a source skill directory."""
     skill_dir = Path(skill_dir)
     files = list(iter_skill_files(skill_dir))
@@ -492,7 +503,7 @@ def parse_bundle_text(text: str) -> ParsedSkillBundle:
         raise ValueError("bundle metadata missing name")
 
     files: Dict[str, str] = {}
-    current_path: str | None = None
+    current_path: Optional[str] = None
     current_lines = []
 
     while idx < len(lines):
@@ -624,7 +635,7 @@ def verify_installed_skill(skill_dir: Path) -> Dict[str, object]:
     }
 
 
-def verify_bundle_roundtrip(skill_dir: Path, bundle_version: str | None = None) -> Dict[str, object]:
+def verify_bundle_roundtrip(skill_dir: Path, bundle_version: Optional[str] = None) -> Dict[str, object]:
     """Build a source skill into a bundle, install it into a temp dir, then validate/self-test it."""
     skill_dir = Path(skill_dir).resolve()
     with tempfile.TemporaryDirectory(prefix=f"{skill_dir.name}-bundle-") as tmp:

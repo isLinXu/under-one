@@ -9,8 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol
 
+from ..exceptions import LLMProviderError
 
-class LLMError(Exception):
+
+class LLMError(LLMProviderError):
     """LLM 调用统一异常。skills 捕获此异常触发降级（对应拘灵遣将的 fallback）。"""
 
 

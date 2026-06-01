@@ -9,18 +9,20 @@ JSON/Markdown reports under `underone/reports/`.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PACKAGE_ROOT = REPO_ROOT / "underone"
 SKILLS_ROOT = PACKAGE_ROOT / "skills"
 REPORTS_DIR = PACKAGE_ROOT / "reports"
 ARTIFACTS_DIR = PACKAGE_ROOT / "artifacts"
-RUNTIME_DIR = REPO_ROOT / "runtime_data"
+EVAL_RUNTIME_DIR = REPORTS_DIR / "_eval_runtime"
 
 sys.path.insert(0, str(PACKAGE_ROOT))
 
@@ -38,7 +40,7 @@ from under_one import (
 )
 from under_one.skill_bundle import verify_bundle_roundtrip
 from under_one.skill_audit import audit_skills_root, write_audit_report
-from skills.metrics_collector import get_recent_metrics
+from under_one.metrics import get_recent_metrics, resolve_runtime_data_dir
 
 
 SKILL_META = {
@@ -55,8 +57,9 @@ SKILL_META = {
 }
 
 
-def summarize_runtime(skill_name: str) -> Dict[str, Any]:
-    records = get_recent_metrics(skill_name, n=30, data_dir=RUNTIME_DIR)
+def summarize_runtime(skill_name: str, data_dir: Optional[Path] = None) -> Dict[str, Any]:
+    runtime_dir = resolve_runtime_data_dir(data_dir)
+    records = get_recent_metrics(skill_name, n=30, data_dir=runtime_dir)
     if not records:
         return {
             "record_count": 0,
@@ -69,9 +72,17 @@ def summarize_runtime(skill_name: str) -> Dict[str, Any]:
             "avg_error_count": 0.0,
         }
     durations = [r.get("duration_ms", 0) for r in records if isinstance(r.get("duration_ms", 0), (int, float))]
-    qualities = [r.get("quality_score", 0) for r in records if isinstance(r.get("quality_score", 0), (int, float))]
+    qualities = [
+        r.get("quality_score")
+        for r in records
+        if isinstance(r.get("quality_score"), (int, float)) and r.get("quality_score") >= 0
+    ]
     completeness = [r.get("output_completeness", 0) for r in records if isinstance(r.get("output_completeness", 0), (int, float))]
-    consistencies = [r.get("consistency_score", 0) for r in records if isinstance(r.get("consistency_score", 0), (int, float))]
+    consistencies = [
+        r.get("consistency_score")
+        for r in records
+        if isinstance(r.get("consistency_score"), (int, float)) and r.get("consistency_score") >= 0
+    ]
     successes = [1 if r.get("success") else 0 for r in records]
     errors = [r.get("error_count", 0) for r in records if isinstance(r.get("error_count", 0), (int, float))]
     human = [r.get("human_intervention", 0) for r in records if isinstance(r.get("human_intervention", 0), (int, float))]
@@ -386,7 +397,8 @@ def scenario_ecosystem_hub() -> Dict[str, Any]:
 
 
 def scenario_evolution_engine() -> Dict[str, Any]:
-    records = get_recent_metrics("qiti-yuanliu", n=20, data_dir=RUNTIME_DIR)
+    runtime_dir = resolve_runtime_data_dir()
+    records = get_recent_metrics("qiti-yuanliu", n=20, data_dir=runtime_dir)
     result = EvolutionEngine().run("qiti-yuanliu")
     first = (result.get("results") or [{}])[0]
     analysis = first.get("analysis", {})
@@ -425,7 +437,7 @@ SCENARIOS = {
 }
 
 
-def artifact_status(filename: str | None) -> Dict[str, Any]:
+def artifact_status(filename: Optional[str]) -> Dict[str, Any]:
     if not filename:
         return {"expected": None, "present": False}
     path = ARTIFACTS_DIR / filename
@@ -442,6 +454,34 @@ def load_skill_alignment(skill_name: str) -> Dict[str, Any]:
         return {}
     alignment = payload.get("alignment")
     return alignment if isinstance(alignment, dict) else {}
+
+
+def manual_gate_expected(skill_name: str, scenario: Dict[str, Any]) -> bool:
+    """Distinguish intentional governance review from real autonomy debt."""
+    if skill_name != "xiushen-lu":
+        return False
+    key_metrics = scenario.get("key_metrics") or {}
+    status = key_metrics.get("status")
+    planned_type = key_metrics.get("planned_evolution_type")
+    return status == "planned" and planned_type not in {None, "none"}
+
+
+def normalize_runtime_for_evaluation(
+    skill_name: str,
+    runtime: Dict[str, Any],
+    scenario: Dict[str, Any],
+) -> Dict[str, Any]:
+    normalized = dict(runtime)
+    raw_human = float(normalized.get("avg_human_intervention", 0.0) or 0.0)
+    gate_expected = manual_gate_expected(skill_name, scenario)
+    gate_allowance = 1.0 if gate_expected else 0.0
+    effective_human = max(0.0, raw_human - gate_allowance)
+    normalized["manual_gate_expected"] = gate_expected
+    normalized["effective_human_intervention"] = round(effective_human, 2)
+    normalized["human_intervention_interpretation"] = (
+        "manual_gate" if gate_expected and raw_human > 0 else "observed"
+    )
+    return normalized
 
 
 def build_recommendations(
@@ -469,8 +509,9 @@ def build_recommendations(
         recs.append(f"Average consistency score is {runtime['avg_consistency']}; reduce conflicting branches and normalize output structure.")
     if runtime.get("avg_error_count", 0) > 0.2:
         recs.append(f"Average error count is {runtime['avg_error_count']}; tighten input validation and recovery paths.")
-    if runtime.get("avg_human_intervention", 0) > 0.25:
-        recs.append(f"Average human intervention is {runtime['avg_human_intervention']}; improve autonomy before expanding scope.")
+    effective_human = runtime.get("effective_human_intervention", runtime.get("avg_human_intervention", 0))
+    if effective_human > 0.25:
+        recs.append(f"Effective human intervention is {effective_human}; improve autonomy before expanding scope.")
     if audit_item.get("warnings"):
         recs.append("Governance warnings remain; fix documentation or metadata drift before distribution.")
     if (
@@ -501,6 +542,8 @@ def build_recommendations(
         recs.append("Keep evolution analysis read-only by default and add an explicit mutation gate after validation.")
     if skill_name == "xiushen-lu" and scenario["key_metrics"].get("planned_evolution_type") == "bootstrap":
         recs.append("Cold-start mode is active; prioritize seeding representative runtime traces instead of forcing auto-evolution.")
+    if skill_name == "xiushen-lu" and runtime.get("manual_gate_expected"):
+        recs.append("Plan-only mode is correctly enforcing a human mutation gate; measure apply-mode autonomy separately in a sandbox.")
     if skill_name == "xiushen-lu" and runtime.get("avg_completeness", 100) < 95:
         recs.append("Improve evolution coverage so more target skills reach analyzed or planned states before the cycle closes.")
     if skill_name == "xiushen-lu" and runtime.get("avg_consistency", 100) < 85:
@@ -512,61 +555,98 @@ def build_recommendations(
     return recs
 
 
+def _prepare_isolated_runtime_dir() -> Path:
+    if EVAL_RUNTIME_DIR.exists():
+        shutil.rmtree(EVAL_RUNTIME_DIR, ignore_errors=True)
+    EVAL_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    return EVAL_RUNTIME_DIR
+
+
+def _prepare_isolated_adaptive_file(runtime_dir: Path) -> Path:
+    adaptive_file = runtime_dir / "adaptive_thresholds.json"
+    if adaptive_file.exists():
+        adaptive_file.unlink()
+    return adaptive_file
+
+
 def evaluate_all() -> Dict[str, Any]:
     audit_report = audit_skills_root(SKILLS_ROOT)
     audit_by_skill = {item["skill"]: item for item in audit_report["results"]}
     evaluations: List[Dict[str, Any]] = []
+    runtime_dir = _prepare_isolated_runtime_dir()
+    adaptive_file = _prepare_isolated_adaptive_file(runtime_dir)
+    previous_runtime_dir = os.environ.get("UNDER_ONE_RUNTIME_DIR")
+    previous_adaptive_file = os.environ.get("UNDER_ONE_ADAPTIVE_THRESHOLDS_FILE")
+    os.environ["UNDER_ONE_RUNTIME_DIR"] = str(runtime_dir)
+    os.environ["UNDER_ONE_ADAPTIVE_THRESHOLDS_FILE"] = str(adaptive_file)
 
-    for skill_name, meta in SKILL_META.items():
-        scenario_result = SCENARIOS[skill_name]()
-        runtime = summarize_runtime(skill_name)
-        artifact = artifact_status(meta["artifact"])
-        alignment = load_skill_alignment(skill_name)
-        audit_item = audit_by_skill[skill_name]
-        independent = verify_bundle_roundtrip(SKILLS_ROOT / skill_name)
-        effectiveness_score = 100
-        if runtime.get("record_count", 0):
-            autonomy_score = max(0.0, 100.0 - runtime.get("avg_human_intervention", 0.0) * 100.0)
-            effectiveness_score = round(
-                max(
-                    0,
-                    min(
-                        100,
-                        0.30 * runtime.get("success_rate", 0)
-                        + 0.25 * runtime.get("avg_quality", 0)
-                        + 0.20 * runtime.get("avg_completeness", runtime.get("avg_quality", 0))
-                        + 0.15 * runtime.get("avg_consistency", runtime.get("avg_quality", 0))
-                        + 0.10 * autonomy_score,
-                    ),
-                ),
-                1,
+    try:
+        for skill_name, meta in SKILL_META.items():
+            scenario_result = SCENARIOS[skill_name]()
+            runtime = normalize_runtime_for_evaluation(
+                skill_name,
+                summarize_runtime(skill_name, data_dir=runtime_dir),
+                scenario_result,
             )
-        if not scenario_result["passed"]:
-            effectiveness_score = max(0, round(effectiveness_score - 35, 1))
-        if not independent["passed"]:
-            effectiveness_score = max(0, round(effectiveness_score - 15, 1))
-        evaluations.append(
-            {
-                "skill": skill_name,
-                "label": meta["label"],
-                "cn_name": meta["cn"],
-                "validation_passed": scenario_result["passed"] and audit_item["ok"] and independent["passed"],
-                "effectiveness_score": effectiveness_score,
-                "test_count": meta["test_count"],
-                "scenario": scenario_result,
-                "runtime": runtime,
-                "artifact": artifact,
-                "artifact_status": artifact,
-                "alignment": alignment,
-                "independent_lifecycle": independent,
-                "audit": {
-                    "ok": audit_item["ok"],
-                    "warnings": audit_item["warnings"],
-                    "errors": audit_item["errors"],
-                },
-                "recommendations": build_recommendations(skill_name, runtime, scenario_result, audit_item, independent),
-            }
-        )
+            artifact = artifact_status(meta["artifact"])
+            alignment = load_skill_alignment(skill_name)
+            audit_item = audit_by_skill[skill_name]
+            independent = verify_bundle_roundtrip(SKILLS_ROOT / skill_name)
+            effectiveness_score = 100
+            if runtime.get("record_count", 0):
+                autonomy_score = max(
+                    0.0,
+                    100.0 - runtime.get("effective_human_intervention", runtime.get("avg_human_intervention", 0.0)) * 100.0,
+                )
+                effectiveness_score = round(
+                    max(
+                        0,
+                        min(
+                            100,
+                            0.30 * runtime.get("success_rate", 0)
+                            + 0.25 * runtime.get("avg_quality", 0)
+                            + 0.20 * runtime.get("avg_completeness", runtime.get("avg_quality", 0))
+                            + 0.15 * runtime.get("avg_consistency", runtime.get("avg_quality", 0))
+                            + 0.10 * autonomy_score,
+                        ),
+                    ),
+                    1,
+                )
+            if not scenario_result["passed"]:
+                effectiveness_score = max(0, round(effectiveness_score - 35, 1))
+            if not independent["passed"]:
+                effectiveness_score = max(0, round(effectiveness_score - 15, 1))
+            evaluations.append(
+                {
+                    "skill": skill_name,
+                    "label": meta["label"],
+                    "cn_name": meta["cn"],
+                    "validation_passed": scenario_result["passed"] and audit_item["ok"] and independent["passed"],
+                    "effectiveness_score": effectiveness_score,
+                    "test_count": meta["test_count"],
+                    "scenario": scenario_result,
+                    "runtime": runtime,
+                    "artifact": artifact,
+                    "artifact_status": artifact,
+                    "alignment": alignment,
+                    "independent_lifecycle": independent,
+                    "audit": {
+                        "ok": audit_item["ok"],
+                        "warnings": audit_item["warnings"],
+                        "errors": audit_item["errors"],
+                    },
+                    "recommendations": build_recommendations(skill_name, runtime, scenario_result, audit_item, independent),
+                }
+            )
+    finally:
+        if previous_runtime_dir is None:
+            os.environ.pop("UNDER_ONE_RUNTIME_DIR", None)
+        else:
+            os.environ["UNDER_ONE_RUNTIME_DIR"] = previous_runtime_dir
+        if previous_adaptive_file is None:
+            os.environ.pop("UNDER_ONE_ADAPTIVE_THRESHOLDS_FILE", None)
+        else:
+            os.environ["UNDER_ONE_ADAPTIVE_THRESHOLDS_FILE"] = previous_adaptive_file
 
     avg_score = round(statistics.mean(item["effectiveness_score"] for item in evaluations), 1)
     passed = sum(1 for item in evaluations if item["validation_passed"])
@@ -578,6 +658,8 @@ def evaluate_all() -> Dict[str, Any]:
         "validation_total": len(evaluations),
         "average_effectiveness_score": avg_score,
         "average_score": avg_score,
+        "runtime_mode": "isolated",
+        "runtime_dir": str(runtime_dir),
         "audit_summary": {
             "ok": audit_report["ok"],
             "warning_count": audit_report["warning_count"],

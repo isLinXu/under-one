@@ -23,20 +23,19 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=[
         # 配置系统依赖完整 YAML 语义；缺失时会导致 CI 与宿主行为不一致。
         "PyYAML>=6.0",
     ],
     extras_require={
-        "dev": ["pytest>=7.0", "pytest-cov", "black", "flake8"],
+        "dev": ["pytest>=7.0", "pytest-cov", "ruff>=0.1", "mypy"],
         "viz": ["matplotlib>=3.5", "numpy>=1.21"],
         "openai": ["openai>=1.0"],
         "anthropic": ["anthropic>=0.34"],
@@ -49,7 +48,8 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "under_one": ["under-one.yaml"],
+        "under_one": ["py.typed"],
+        "skills": ["**/*"],
     },
     zip_safe=False,
 )
