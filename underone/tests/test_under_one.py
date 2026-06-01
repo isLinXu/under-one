@@ -5,10 +5,13 @@ under-one.skills 核心测试套件
 """
 
 import json
+import os
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.request import urlopen
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -17,18 +20,29 @@ import pytest
 
 import skills.check_versions as skill_version_checker
 import skills._skill_config as skill_config
+import scripts.evaluate_skills as evaluate_module
+import under_one.config as config_module
 
 from under_one import (
-    load_config, BaseSkill,
+    load_config, reload_config, redact_config, BaseSkill,
     CommandFactory, ContextGuard, EvolutionEngine, InsightRadar,
     EcosystemHub, KnowledgeDigest, PersonaGuard, PriorityEngine, ToolForge, ToolOrchestrator,
 )
+import under_one as under_one_pkg
+from under_one.skill_locator import SKILLS_DIR_ENV, find_skills_dir, looks_like_skills_root
+from under_one.exceptions import InputValidationError, LLMProviderError, SkillExecutionError, UnderOneError
 from under_one.skill_bundle import build_bundle_text, install_bundle, parse_bundle_text, resolve_bundle_version, verify_bundle_roundtrip
 from under_one.skill_audit import audit_skill_dir, audit_skills_root, write_audit_report
 from under_one.codex_skills import build_codex_skill_markdown, install_codex_skill
 from scripts.evaluate_skills import evaluate_all
 from scripts.build_skill_bundles import precheck_skill
-from skills.metrics_collector import get_recent_metrics, record_metrics
+from skills.metrics_collector import (
+    create_prometheus_server,
+    format_prometheus_metrics,
+    get_recent_metrics,
+    record_metric_manual,
+    record_metrics,
+)
 
 
 class TestConfig:
@@ -54,6 +68,33 @@ class TestConfig:
         monkeypatch.setattr(skill_config, "_CONFIG_PATH_CANDIDATES", [])
         assert skill_config._find_config() == config_path
         assert skill_config.get_threshold("entropy_warning", 5) == 7
+
+    def test_config_env_override_and_redaction(self, tmp_path, monkeypatch):
+        """配置应支持环境变量覆盖，并在诊断输出中遮蔽敏感值。"""
+        config_path = tmp_path / "under-one.yaml"
+        config_path.write_text(
+            "config_version: 1\nruntime:\n  script_timeout_seconds: 60\nllm:\n  api_key: plain\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("UNDER_ONE__RUNTIME__SCRIPT_TIMEOUT_SECONDS", "9")
+        config_module.clear_config_cache()
+
+        cfg = load_config(config_path)
+        assert cfg["runtime"]["script_timeout_seconds"] == 9
+        redacted = redact_config(cfg)
+        assert redacted["llm"]["api_key"] == "***REDACTED***"
+
+    def test_config_hot_reload_honors_mtime_when_enabled(self, tmp_path, monkeypatch):
+        """热更新开启时，同一路径配置修改后应重新读取。"""
+        config_path = tmp_path / "under-one.yaml"
+        config_path.write_text("config_version: 1\nruntime:\n  script_timeout_seconds: 3\n", encoding="utf-8")
+        monkeypatch.setenv("UNDER_ONE_CONFIG_RELOAD", "1")
+        config_module.clear_config_cache()
+
+        assert load_config(config_path)["runtime"]["script_timeout_seconds"] == 3
+        config_path.write_text("config_version: 1\nruntime:\n  script_timeout_seconds: 4\n", encoding="utf-8")
+        assert load_config(config_path)["runtime"]["script_timeout_seconds"] == 4
+        assert reload_config(config_path)["runtime"]["script_timeout_seconds"] == 4
 
 
 class TestBaseSkill:
@@ -125,6 +166,110 @@ class TestBaseSkill:
         assert record["consistency_score"] == 91.0
         assert record["human_intervention"] == 1.0
         assert record["output_completeness"] == 95.0
+
+    def test_metrics_collector_marks_unassessed_quality(self, tmp_path, monkeypatch):
+        """无法推断质量分时应写入 None，而不是伪造 85 分。"""
+        monkeypatch.chdir(tmp_path)
+
+        @record_metrics("unassessed-metric-skill")
+        def run_unassessed():
+            return {"success": True}
+
+        run_unassessed()
+        record = get_recent_metrics("unassessed-metric-skill", n=1)[0]
+        assert record["quality_score"] is None
+        assert record["quality_assessed"] is False
+
+    def test_metrics_collector_records_resource_snapshot(self, tmp_path, monkeypatch):
+        """metrics_collector 应记录进程资源快照字段。"""
+        monkeypatch.chdir(tmp_path)
+
+        @record_metrics("resource-metric-skill")
+        def run_resource_sample():
+            return {"quality_score": 91}
+
+        run_resource_sample()
+        record = get_recent_metrics("resource-metric-skill", n=1)[0]
+        assert "peak_memory_mb" in record
+        assert "cpu_time_ms" in record
+        assert "resource_warnings" in record
+        assert record["resource_budget_exceeded"] in {True, False}
+
+    def test_manual_metric_flags_resource_budget_exceeded(self, tmp_path, monkeypatch):
+        """手动指标记录应按 runtime.resource_limits 标出预算越界。"""
+        monkeypatch.setenv("UNDER_ONE__RUNTIME__RESOURCE_LIMITS__MAX_DURATION_MS", "1")
+        config_module.clear_config_cache()
+        try:
+            record_metric_manual(
+                "budget-metric-skill",
+                duration_ms=25,
+                success=True,
+                quality_score=90,
+                data_dir=tmp_path,
+            )
+            record = get_recent_metrics("budget-metric-skill", n=1, data_dir=tmp_path)[0]
+            assert record["resource_budget_exceeded"] is True
+            assert any(item["type"] == "duration_limit" for item in record["resource_warnings"])
+        finally:
+            config_module.clear_config_cache()
+
+    def test_metrics_export_respects_runtime_dir_env(self, tmp_path, monkeypatch):
+        """BaseSkill 导出的 metrics 应支持隔离 runtime 目录。"""
+        runtime_dir = tmp_path / "isolated-runtime"
+        monkeypatch.setenv("UNDER_ONE_RUNTIME_DIR", str(runtime_dir))
+
+        class DummySkill(BaseSkill):
+            skill_name = "env-skill"
+
+            def run(self, data):
+                return {"success": True, "quality_score": 93}
+
+        DummySkill().export_metrics({"success": True, "quality_score": 93})
+
+        metrics_file = runtime_dir / "env-skill_metrics.jsonl"
+        assert metrics_file.exists()
+        record = json.loads(metrics_file.read_text(encoding="utf-8").splitlines()[0])
+        assert record["quality_score"] == 93
+
+    def test_prometheus_metrics_export_skips_corrupt_lines(self, tmp_path):
+        """Prometheus 文本导出应跳过损坏 JSONL 行。"""
+        runtime_dir = tmp_path / "runtime"
+        runtime_dir.mkdir()
+        metrics_file = runtime_dir / "demo_metrics.jsonl"
+        metrics_file.write_text(
+            '{"skill_name":"demo","success":true,"duration_ms":10,"quality_score":90,"output_completeness":95}\n'
+            '{broken\n',
+            encoding="utf-8",
+        )
+        text = format_prometheus_metrics(runtime_dir)
+        assert 'under_one_skill_runs_total{skill_name="demo",success="true"} 1' in text
+        assert 'under_one_skill_quality_score_avg{skill_name="demo"} 90.000' in text
+
+    def test_prometheus_http_server_serves_metrics(self, tmp_path):
+        """Prometheus HTTP 端点应暴露 /metrics。"""
+        runtime_dir = tmp_path / "runtime"
+        runtime_dir.mkdir()
+        (runtime_dir / "demo_metrics.jsonl").write_text(
+            '{"skill_name":"demo","success":true,"duration_ms":10,"quality_score":90}\n',
+            encoding="utf-8",
+        )
+        server = create_prometheus_server("127.0.0.1", 0, runtime_dir)
+        thread = threading.Thread(target=server.handle_request)
+        thread.start()
+        try:
+            host, port = server.server_address[:2]
+            body = urlopen(f"http://{host}:{port}/metrics", timeout=3).read().decode("utf-8")
+        finally:
+            thread.join(timeout=3)
+            server.server_close()
+        assert 'under_one_skill_runs_total{skill_name="demo",success="true"} 1' in body
+        assert "under_one_skill_resource_budget_exceeded_total" in body
+
+    def test_exception_hierarchy_is_exported(self):
+        """统一异常体系应可被 SDK 调用方稳定捕获。"""
+        assert issubclass(SkillExecutionError, UnderOneError)
+        assert issubclass(InputValidationError, UnderOneError)
+        assert issubclass(LLMProviderError, UnderOneError)
 
 
 class TestSkillWrappers:
@@ -509,6 +654,51 @@ class TestEvaluationReport:
         assert all("avg_consistency" in item["runtime"] for item in report["skills"])
         assert all("avg_human_intervention" in item["runtime"] for item in report["skills"])
 
+    def test_evaluate_all_uses_isolated_runtime_snapshot(self, tmp_path, monkeypatch):
+        """评估报告不应被外部 runtime 历史数据污染。"""
+        polluted_runtime = tmp_path / "polluted-runtime"
+        polluted_runtime.mkdir()
+        polluted_metric = {
+            "skill_name": "qiti-yuanliu",
+            "timestamp": "2026-05-14T00:00:00",
+            "duration_ms": 1,
+            "success": True,
+            "quality_score": 1.0,
+            "error_count": 0,
+            "human_intervention": 1.0,
+            "output_completeness": 1.0,
+            "consistency_score": 1.0,
+        }
+        (polluted_runtime / "qiti-yuanliu_metrics.jsonl").write_text(
+            "\n".join(json.dumps(polluted_metric, ensure_ascii=False) for _ in range(12)) + "\n",
+            encoding="utf-8",
+        )
+
+        reports_dir = tmp_path / "reports"
+        monkeypatch.setenv("UNDER_ONE_RUNTIME_DIR", str(polluted_runtime))
+        monkeypatch.setattr(evaluate_module, "REPORTS_DIR", reports_dir)
+        monkeypatch.setattr(evaluate_module, "EVAL_RUNTIME_DIR", reports_dir / "_eval_runtime")
+
+        report = evaluate_module.evaluate_all()
+        qiti = next(item for item in report["skills"] if item["skill"] == "qiti-yuanliu")
+
+        assert report["runtime_mode"] == "isolated"
+        assert Path(report["runtime_dir"]) == reports_dir / "_eval_runtime"
+        assert qiti["runtime"]["record_count"] == 1
+        assert qiti["runtime"]["avg_quality"] > 1.0
+        assert os.environ.get("UNDER_ONE_RUNTIME_DIR") == str(polluted_runtime)
+
+    def test_evaluate_all_treats_xiushenlu_manual_gate_as_governance_not_low_autonomy(self):
+        """修身炉 plan-only 的人工变更门不应被误判为自治能力缺陷。"""
+        report = evaluate_all()
+        xiushen = next(item for item in report["skills"] if item["skill"] == "xiushen-lu")
+
+        assert xiushen["runtime"]["avg_human_intervention"] == 1.0
+        assert xiushen["runtime"]["manual_gate_expected"] is True
+        assert xiushen["runtime"]["effective_human_intervention"] == 0.0
+        assert xiushen["runtime"]["human_intervention_interpretation"] == "manual_gate"
+        assert not any("improve autonomy before expanding scope" in rec for rec in xiushen["recommendations"])
+
 
 class TestSkillBundleLifecycle:
     """单 skill 安装与生命周期测试"""
@@ -683,7 +873,7 @@ class TestSkillBundleLifecycle:
         assert "__shared__/metrics_collector.py" in parsed.files
         assert "__shared__/_skill_config.py" in parsed.files
         assert "tests/standalone_smoke.py" in parsed.files
-        assert parsed.version == "v0.1.0"
+        assert parsed.version == "v6.1"
 
     def test_resolve_bundle_version_prefers_skill_metadata(self, tmp_path):
         """bundle 默认版本应跟随 skill metadata，而不是硬编码框架版本。"""
@@ -924,6 +1114,92 @@ class TestSkillGovernance:
             for field in ["core", "agent_meaning", "cost", "boundary"]:
                 assert alignment.get(field), f"{skill_dir.name}:{field}"
 
+    def test_all_real_skills_expose_bootstrap_profiles(self):
+        """每个真实 skill 都应携带冷启动画像，便于独立安装后复现。"""
+        skills_root = Path(__file__).parent.parent / "skills"
+        required = [
+            "avg_quality",
+            "avg_completeness",
+            "avg_consistency",
+            "avg_human",
+            "success_rate",
+            "avg_duration",
+            "recommended_min_records",
+        ]
+        for skill_dir in skills_root.iterdir():
+            if not skill_dir.is_dir() or skill_dir.name.startswith("."):
+                continue
+            meta_path = skill_dir / "_skillhub_meta.json"
+            if not meta_path.exists():
+                continue
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            profile = payload.get("bootstrap_profile")
+            assert isinstance(profile, dict), skill_dir.name
+            for field in required:
+                assert isinstance(profile.get(field), (int, float)), f"{skill_dir.name}:{field}"
+
+    def test_control_plane_skills_expose_control_plane_contracts(self):
+        """三大控制层 skill 应显式声明 observer / coordinator / evolver 边界协议。"""
+        skills_root = Path(__file__).parent.parent / "skills"
+        expected_roles = {
+            "qiti-yuanliu": "observer",
+            "bagua-zhen": "coordinator",
+            "xiushen-lu": "evolver",
+        }
+        for skill_name, role in expected_roles.items():
+            payload = json.loads((skills_root / skill_name / "_skillhub_meta.json").read_text(encoding="utf-8"))
+            contract = payload.get("control_plane_contract")
+            assert isinstance(contract, dict), skill_name
+            assert contract.get("role") == role, skill_name
+            assert isinstance(contract.get("reads"), list), skill_name
+            assert isinstance(contract.get("writes"), list), skill_name
+            assert isinstance(contract.get("will_not"), list), skill_name
+
+    def test_xiushen_meta_exposes_engine_manifest(self):
+        """修身炉应明确唯一入口与实验/辅助脚本分层。"""
+        skills_root = Path(__file__).parent.parent / "skills"
+        payload = json.loads((skills_root / "xiushen-lu" / "_skillhub_meta.json").read_text(encoding="utf-8"))
+        manifest = payload.get("engine_manifest")
+        assert isinstance(manifest, dict)
+        assert manifest["active_entry"] == "scripts/core_engine.py"
+        assert "scripts/xiushenlu_verifier.py" in manifest["auxiliary_tools"]
+        assert "scripts/v8_engine.py" in manifest["deprecated_experiments"]
+        assert manifest["experimental_opt_in"]["env"] == "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS"
+        assert manifest["experimental_opt_in"]["flag"] == "--allow-experimental-entry"
+        assert manifest["experimental_opt_in"]["redirect_entry"] == "scripts/core_engine.py"
+
+    def test_xiushen_deprecated_engines_require_explicit_opt_in(self):
+        """实验引擎默认应拒绝作为生产入口运行，并提示回到 core_engine。"""
+        import subprocess
+
+        scripts_root = Path(__file__).parent.parent / "skills" / "xiushen-lu" / "scripts"
+        for script_name in ("v8_engine.py", "universal_engine.py"):
+            proc = subprocess.run(
+                [sys.executable, str(scripts_root / script_name)],
+                capture_output=True,
+                text=True,
+                cwd=str(scripts_root),
+            )
+            assert proc.returncode == 2, script_name
+            assert "core_engine.py" in proc.stderr, script_name
+            assert "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS" in proc.stderr, script_name
+            assert "--allow-experimental-entry" in proc.stderr, script_name
+
+    def test_xiushen_deprecated_engines_can_be_opted_in_explicitly(self):
+        """显式实验模式下，旧引擎应继续暴露自身用法而不是直接拦截。"""
+        import subprocess
+
+        scripts_root = Path(__file__).parent.parent / "skills" / "xiushen-lu" / "scripts"
+        for script_name in ("v8_engine.py", "universal_engine.py"):
+            proc = subprocess.run(
+                [sys.executable, str(scripts_root / script_name), "--allow-experimental-entry"],
+                capture_output=True,
+                text=True,
+                cwd=str(scripts_root),
+            )
+            assert proc.returncode == 1, script_name
+            assert "用法" in proc.stdout, script_name
+
     def test_audit_single_skill(self):
         """单个skill审计应通过且无结构错误"""
         skill_dir = Path(__file__).parent.parent / "skills" / "fenghou-qimen"
@@ -975,6 +1251,43 @@ class TestSkillGovernance:
         result = audit_skill_dir(skill_dir)
         assert result.ok is True
         assert any("missing recommended sections" in item for item in result.warnings)
+
+    def test_audit_warns_on_invalid_bootstrap_profile(self, tmp_path):
+        """bootstrap_profile 类型不对时应给出 warning，帮助第三方 skill 自查。"""
+        skill_dir = tmp_path / "demo-skill"
+        scripts_dir = skill_dir / "scripts"
+        scripts_dir.mkdir(parents=True)
+
+        (skill_dir / "_skillhub_meta.json").write_text(
+            json.dumps(
+                {
+                    "id": "demo-skill",
+                    "name": "演示技能",
+                    "version": "1.0",
+                    "entry": "scripts/demo.py",
+                    "description": "demo",
+                    "triggers": ["demo"],
+                    "inputs": ["input.json"],
+                    "outputs": ["output.json"],
+                    "min_python": "3.8",
+                    "bootstrap_profile": {"avg_quality": "high"},
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (scripts_dir / "demo.py").write_text(
+            "from metrics_collector import record_metrics\n@record_metrics('demo-skill')\ndef main():\n    return {}\n",
+            encoding="utf-8",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            "---\nmetadata:\n  name: \"demo-skill\"\n  version: \"1.0\"\n---\n\n# Demo\n\n## 触发词\n- demo\n\n## 功能概述\ntext\n\n## 工作流程\n1. step\n\n## 输入输出\ninput.json -> output.json\n\n## API接口\napi\n\n## 使用示例\n```json\n{}\n```\n\n## 测试方法\npytest\n\n## 架构设计\n```mermaid\ngraph LR\nA-->B\n```\n```json\n{}\n```\n```json\n{}\n```\n",
+            encoding="utf-8",
+        )
+
+        result = audit_skill_dir(skill_dir)
+        assert result.ok is True
+        assert any("bootstrap_profile field avg_quality must be numeric" in item for item in result.warnings)
 
     def test_bundle_precheck_passes_for_real_skill(self):
         """真实skill在打包前校验应通过"""
@@ -1046,6 +1359,82 @@ class TestSkillScripts:
                 errors.append(f"{script.name}: {e}")
         
         assert not errors, f"Syntax errors: {errors}"
+
+
+class TestSkillLocator:
+    """skills 目录定位器测试：环境变量覆盖、哨兵校验、清晰错误。"""
+
+    def test_find_skills_dir_resolves_package_layout_by_default(self, monkeypatch):
+        """无环境变量时应解析到随包发布的 skills 目录。"""
+        monkeypatch.delenv(SKILLS_DIR_ENV, raising=False)
+        skills_dir = find_skills_dir()
+        assert looks_like_skills_root(skills_dir)
+        assert (skills_dir / "qiti-yuanliu").is_dir()
+
+    def test_env_override_accepts_skills_dir_directly(self, monkeypatch):
+        """UNDER_ONE_SKILLS_DIR 指向 skills 目录本身时应被采用。"""
+        real = find_skills_dir()
+        monkeypatch.setenv(SKILLS_DIR_ENV, str(real))
+        assert find_skills_dir() == real
+
+    def test_env_override_accepts_parent_dir(self, monkeypatch):
+        """UNDER_ONE_SKILLS_DIR 指向父目录时应自动下探到其 skills/ 子目录。"""
+        real = find_skills_dir()
+        monkeypatch.setenv(SKILLS_DIR_ENV, str(real.parent))
+        assert find_skills_dir() == real
+
+    def test_missing_skills_dir_raises_with_searched_paths(self, tmp_path, monkeypatch):
+        """完全找不到时应抛出 SkillExecutionError 并列出已搜索路径。"""
+        monkeypatch.setenv(SKILLS_DIR_ENV, str(tmp_path / "nope"))
+        monkeypatch.chdir(tmp_path)
+        # 屏蔽随包默认候选，制造彻底缺失场景。
+        monkeypatch.setattr(
+            "under_one.skill_locator._default_candidates",
+            lambda: [tmp_path / "missing-a", tmp_path / "missing-b"],
+        )
+        with pytest.raises(SkillExecutionError) as excinfo:
+            find_skills_dir()
+        message = str(excinfo.value)
+        assert SKILLS_DIR_ENV in message
+        assert "missing-a" in message
+
+    def test_looks_like_skills_root_rejects_partial_dir(self, tmp_path):
+        """仅含部分 skill 目录的路径不应被误判为 skills 根。"""
+        (tmp_path / "qiti-yuanliu").mkdir()
+        assert looks_like_skills_root(tmp_path) is False
+
+
+class TestInvokeSkillFallback:
+    """_invoke_skill 统一回退与可观测性测试。"""
+
+    def test_falls_back_and_logs_when_in_process_load_fails(self, caplog):
+        """进程内执行抛错时应回退到 fallback，并记录 warning 以保留可观测性。"""
+        sentinel = {"success": True, "via": "fallback"}
+
+        def runner(_mod):
+            raise RuntimeError("boom")
+
+        with caplog.at_level("WARNING", logger="under-one.runtime"):
+            result = under_one_pkg._invoke_skill(
+                "tongtian-lu",
+                "fu_generator.py",
+                module_runner=runner,
+                fallback=lambda: sentinel,
+            )
+
+        assert result is sentinel
+        assert any("falling back to subprocess" in record.getMessage() for record in caplog.records)
+
+    def test_uses_in_process_result_when_module_runs(self):
+        """进程内执行成功时应直接返回其结果，不触发回退。"""
+        marker = {"success": True, "via": "in-process"}
+        result = under_one_pkg._invoke_skill(
+            "tongtian-lu",
+            "fu_generator.py",
+            module_runner=lambda _mod: marker,
+            fallback=lambda: {"via": "fallback"},
+        )
+        assert result == marker
 
 
 if __name__ == "__main__":

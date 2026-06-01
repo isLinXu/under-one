@@ -47,6 +47,20 @@ def test_mock_chat_uses_last_user_message():
     assert "摘要" in resp.content or "[mock" in resp.content
 
 
+def test_mock_combines_patterns_and_supports_registration():
+    c = MockClient(latency_ms=0)
+    combined = c.complete("请总结一下，并按优先级排序")
+    assert "摘要" in combined.content
+    assert "优先级" in combined.content
+
+    original_count = len(MockClient._MOCK_PATTERNS)
+    try:
+        MockClient.register_pattern(["roadmap"], "[mock] roadmap response")
+        assert "roadmap response" in c.complete("build a roadmap").content
+    finally:
+        del MockClient._MOCK_PATTERNS[original_count:]
+
+
 def test_get_client_defaults_to_mock_when_no_keys(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

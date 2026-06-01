@@ -7,6 +7,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -97,6 +98,7 @@ QiSourceV7 = core_engine.QiSourceV7
 RefinerV7 = core_engine.RefinerV7
 RollbackV7 = core_engine.RollbackV7
 XiuShenLuCoreV7 = core_engine.XiuShenLuCoreV7
+bootstrap_profiles = _import_skill("xiushen_lu.scripts.bootstrap_profiles")
 xiushenlu_verifier = _import_skill("xiushen_lu.scripts.xiushenlu_verifier")
 
 
@@ -201,6 +203,36 @@ class TestContextGuard:
         report = scanner.scan()
         assert report["repair_handoff"]["target_skill"] == "dalu-dongguan"
 
+    def test_repair_handoff_can_drive_dalu_dongguan_trace(self):
+        """repair_handoff 应能转换为大罗洞观可执行的跨段追踪输入。"""
+        context = [
+            {"role": "user", "content": "先按 React 方案推进，目标是重构登录流程。", "round": 1},
+            {"role": "assistant", "content": "收到，采用 React 重构登录流程。", "round": 2},
+            {"role": "user", "content": "不对，这不是这个方案，请改回 Vue 登录流程。", "round": 3},
+            {"role": "assistant", "content": "我会改回 Vue 登录流程。", "round": 4},
+            {"role": "user", "content": "不对，之前说的是 React，不是 Vue。", "round": 5},
+        ]
+        report = QiTiScanner(context).scan()
+        handoff = report["repair_handoff"]
+        assert handoff["target_skill"] == "dalu-dongguan"
+        assert handoff["action"] == "cross_segment_trace"
+
+        contradiction_rounds = set(handoff["contradiction_rounds"])
+        segments = [
+            {
+                "id": f"round-{item['round']}",
+                "source": f"qiti-yuanliu:{item['round']}",
+                "content": item["content"],
+            }
+            for item in context
+            if item["round"] in contradiction_rounds or item["round"] == 1
+        ]
+        trace = LinkDetector(segments).detect()
+        assert trace["detector"] == "dalu-dongguan"
+        assert trace["segment_count"] == len(segments)
+        assert trace["entity_count"] > 0
+        assert "hallucination_risk" in trace
+
     def test_self_evolution_extracts_origin_and_rules(self):
         """炁体源流应输出目标锚点、自进化阶段与规则候选。"""
         context = [
@@ -256,6 +288,10 @@ class TestContextGuard:
         assert contract["operating_mode"] in ["guarded", "adaptive"]
         assert contract["freeze_self_evolution"] is False
         assert escalation["manual_review_required"] is False
+        assert report["control_plane_contract"]["role"] == "observer"
+        assert report["control_plane_status"]["role"] == "observer"
+        assert report["control_plane_status"]["phase"] == "guarded-observe"
+        assert report["control_plane_status"]["writes_applied"] is False
         assert report["execution_contract"]["resume_ready"] is True
         assert report["execution_contract"]["next_owner"] == "qiti-yuanliu"
         assert len(report["priority_actions"]) >= 3
@@ -277,6 +313,31 @@ class TestContextGuard:
         assert report["execution_contract"]["manual_review_required"] is False
         assert not any(item["id"] == "repair-handoff" for item in report["risk_hotspots"])
         assert report["human_intervention"] == 0
+
+    def test_correction_round_uses_weighted_contradiction_impact(self):
+        """同一轮的纠偏信号应触发修复，但不应被线性三次惩罚。"""
+        context = [
+            {"role": "user", "content": "我们先用 React。", "round": 1},
+            {"role": "assistant", "content": "好的，前端采用 React。", "round": 2},
+            {"role": "user", "content": "不对，改成 Vue。", "round": 3},
+        ]
+        report = QiTiScanner(context).scan()
+        assert report["repair_handoff"]["triggered"] is True
+        assert report["metrics"]["contradiction_impact"] < 3.0
+        assert report["metrics"]["consistency"] > 55
+
+    def test_acknowledged_correction_gets_resolution_credit(self):
+        """纠偏被后续 assistant 明确承接后，应下调未修复冲击度。"""
+        context = [
+            {"role": "user", "content": "我们先用 React。", "round": 1},
+            {"role": "assistant", "content": "好的，前端采用 React。", "round": 2},
+            {"role": "user", "content": "不对，改成 Vue。", "round": 3},
+            {"role": "assistant", "content": "已切换为 Vue，并以 Vue 作为当前前端方案。", "round": 4},
+        ]
+        report = QiTiScanner(context).scan()
+        assert report["repair_handoff"]["triggered"] is True
+        assert report["metrics"]["contradiction_impact"] < 1.7
+        assert report["metrics"]["consistency"] >= 80
 
     def test_config_can_override_clarification_and_hard_reset_markers(self, monkeypatch):
         """澄清词与强制重置词应可通过配置独立调参。"""
@@ -307,6 +368,40 @@ class TestContextGuard:
         assert scanner.hard_reset_markers == ["整个作废"]
         assert scanner._classify_correction_mode("口径修正，目标改为用户留存分析。", "user") == "clarification"
         assert scanner._classify_correction_mode("整个作废，这条路线不要了。", "user") == "hard_reset"
+
+    def test_optional_llm_semantic_contradiction_signal(self, monkeypatch):
+        """可选 LLM 适配层应能补上规则检测遗漏的语义矛盾。"""
+        custom_cfg = {
+            "semantic_contradiction": {
+                "enabled": True,
+                "provider": "fake",
+                "threshold": 0.8,
+                "max_context_chars": 500,
+            }
+        }
+
+        class FakeClient:
+            provider = "fake"
+            model = "semantic-test"
+
+            def complete(self, prompt, **kwargs):
+                return SimpleNamespace(content='{"score": 0.86, "reason": "成本预算冲突"}', provider="fake", model="semantic-test")
+
+        monkeypatch.setattr(
+            entropy_scanner,
+            "get_skill_config",
+            lambda skill_name, key=None, default=None: custom_cfg if skill_name == "qitiyuanliu" and key is None else default,
+        )
+        monkeypatch.setattr(entropy_scanner, "get_llm_client", lambda provider=None, **kwargs: FakeClient())
+
+        context = [
+            {"role": "user", "content": "这个方案成本太高，需要压缩投入。", "round": 1},
+            {"role": "assistant", "content": "收到，会优先控制成本。", "round": 2},
+            {"role": "user", "content": "预算不是问题，不用考虑投入。", "round": 3},
+        ]
+        report = QiTiScanner(context).scan()
+        assert report["metrics"]["entropy_components"]["semantic_llm"]["score"] == 0.86
+        assert any(alert["type"] == "semantic_llm" for alert in report["alerts"])
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +490,17 @@ class TestPriorityEngine:
         assert "risk_averse" in result["alternative_plans"]
         assert result["global_strategy"] in ["idle", "staggered-push", "parallel-breakthrough", "containment-first", "steady-advance"]
 
+    def test_adaptive_weights_select_template_from_task_profile(self):
+        """自适应权重应能按任务类型选择模板并记录原因。"""
+        tasks = [
+            {"name": "紧急线上故障修复", "urgency": 5, "importance": 4, "history_success": 2.0},
+            {"name": "补充事故复盘", "urgency": 4, "importance": 3, "history_success": 2.5},
+        ]
+        result = PriorityEngine(tasks, template="adaptive").run()
+        assert result["active_template"] == "adaptive:urgency_priority"
+        assert result["adaptive_weighting"]["enabled"] is True
+        assert result["weights_used"]["urgency"] > result["weights_used"]["importance"]
+
     def test_empty_tasks(self):
         """空任务列表应优雅处理"""
         engine = PriorityEngine([])
@@ -481,6 +587,15 @@ class TestInsightRadar:
         assert any(signal["type"] == "effect_without_support" for signal in result["anomaly_signals"])
         assert result["hidden_insights"]
         assert result["hallucination_risk"]["level"] in ["medium", "high"]
+
+    def test_semantic_group_similarity_links_cost_and_budget(self):
+        """语义组扩展应识别成本/预算这类非字面重合关联。"""
+        segments = [
+            {"source": "A", "content": "这个方案成本太高，需要压缩费用。"},
+            {"source": "B", "content": "预算不是问题，但要解释投入产出。"},
+        ]
+        result = LinkDetector(segments).detect()
+        assert any(link["type"] == "语义关联" for link in result["links"])
 
 
 # ---------------------------------------------------------------------------
@@ -582,6 +697,9 @@ class TestKnowledgeDigest:
         assert result["portfolio_diagnostics"]["inheritance_readiness"]["ready_rate"] > 0
         assert len(result["refinement_queue"]) >= 1
         assert result["priority_actions"][0]["id"] in ["review-quarantine", "run-refinement-queue"]
+        assert result["delivery_contract"]["ready_to_deliver"] is True
+        assert result["delivery_contract"]["ready_to_commit_to_memory"] is False
+        assert len(result["coverage_gaps"]) >= 1
 
     def test_portfolio_diagnostics_detect_source_concentration(self):
         """知识组合诊断应识别单一来源过度集中的风险。"""
@@ -604,6 +722,28 @@ class TestKnowledgeDigest:
         assert diversity["dominant_source"] == "同一来源"
         assert diversity["concentration_level"] == "high"
         assert any(action["id"] == "diversify-sources" for action in result["priority_actions"])
+
+    def test_delivery_contract_can_commit_clean_high_quality_batch(self):
+        """当知识批次质量高且无阻塞时，应允许直接进入长期继承。"""
+        items = [
+            {
+                "source": "官方文档",
+                "content": "结论：缓存命中率提升到83%，实验结果表明平均延迟下降29%，适合在生产查询链路继续部署。",
+                "credibility": "S",
+                "category": "技术方案",
+            },
+            {
+                "source": "测试报告",
+                "content": "关键发现：回归测试样本显示错误率下降42%，建议将该方案复用到高频接口。",
+                "credibility": "A",
+                "category": "技术方案",
+            },
+        ]
+        result = KnowledgeDigest(items).digest()
+        assert result["delivery_contract"]["ready_to_deliver"] is True
+        assert result["delivery_contract"]["ready_to_commit_to_memory"] is True
+        assert result["delivery_contract"]["follow_up_mode"] == "commit-to-memory"
+        assert result["output_completeness"] >= 95
 
 
 # ---------------------------------------------------------------------------
@@ -951,6 +1091,8 @@ class TestCommandFactoryPackets:
         assert len(result["command_packets"]) >= 2
         assert result["dispatch_contract"]["recommended_skill"] == "juling-qianjiang"
         assert result["dispatch_contract"]["packet_count"] == len(result["command_packets"])
+        assert result["delivery_contract"]["ready_to_dispatch"] is True
+        assert result["output_completeness"] >= 90
 
     def test_limit_conflict_raises_rebellion_alert(self):
         """当任务触犯灵体边界时应产生反叛风险警报。"""
@@ -1016,6 +1158,8 @@ class TestToolForge:
         assert len(result["files"]) == 3
         assert "json_cleaner.py" in result["files"]
         assert "test_json_cleaner.py" in result["files"]
+        assert result["delivery_contract"]["ready_to_deliver"] is True
+        assert result["output_completeness"] >= 95
 
     def test_tool_code_has_main(self):
         """工具代码应含main函数"""
@@ -1100,6 +1244,9 @@ class TestToolForge:
         skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
         readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
         assert '"standalone_validation"' in skill_meta
+        assert '"bootstrap_profile"' in skill_meta
+        assert '"control_plane_contract"' in skill_meta
+        assert '"alignment"' in skill_meta
         assert "retrieval" in result["inferred_spec"]["sections"]["tool_contract"]["tags"]
         assert "总结" in result["inferred_spec"]["sections"]["tool_contract"]["triggers"]
         assert "专精操作提示" in readme
@@ -1131,6 +1278,7 @@ class TestToolForge:
         skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
         readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
         assert '"runtime_contract"' in skill_meta
+        assert '"bootstrap_profile"' in skill_meta
         assert '"required_output_keys"' in skill_meta
         assert "非数值记录" in readme
 
@@ -1160,6 +1308,7 @@ class TestToolForge:
         skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
         readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
         assert '"runtime_contract"' in skill_meta
+        assert '"bootstrap_profile"' in skill_meta
         assert '"required_files"' in skill_meta
         assert "允许域名" in readme
 
@@ -1187,6 +1336,7 @@ class TestToolForge:
         skill_meta = next(content for name, content in result["files"].items() if name.endswith("/_skillhub_meta.json"))
         readme = next(content for name, content in result["files"].items() if name.endswith("/README.md"))
         assert '"runtime_contract"' in skill_meta
+        assert '"bootstrap_profile"' in skill_meta
         assert '"workflow_state"' in skill_meta
         assert "未知步骤" in readme
 
@@ -1593,16 +1743,23 @@ class TestEcosystemHub:
         """协调输出应含关键字段"""
         import tempfile
         import os
+        fallback_cwd = Path(__file__).parent.parent
         with tempfile.TemporaryDirectory() as tmpdir:
             os.chdir(tmpdir)
-            report = coordinate(skills_dir="/dev/null")
-            assert "ecosystem_level" in report
-            assert "average_quality" in report
-            assert "skill_states" in report
-            assert "weakest_skills" in report
-            assert "optimization_queue" in report
-            assert "governance_summary" in report
-            assert report["coordinator"] == "bagua-zhen"
+            try:
+                report = coordinate(skills_dir="/dev/null")
+                assert "ecosystem_level" in report
+                assert "average_quality" in report
+                assert "skill_states" in report
+                assert "weakest_skills" in report
+                assert "optimization_queue" in report
+                assert "governance_summary" in report
+                assert report["coordinator"] == "bagua-zhen"
+                assert report["control_plane_status"]["role"] == "coordinator"
+                assert report["control_plane_status"]["phase"] in ["ecosystem-report", "ecosystem-coordination"]
+                assert report["control_plane_status"]["writes_applied"] is False
+            finally:
+                os.chdir(fallback_cwd)
 
     def test_load_metrics_skips_invalid_json(self, tmp_path):
         """损坏的metrics行应被跳过而不是使协调器失败"""
@@ -1662,6 +1819,32 @@ class TestEcosystemHub:
         assert tuple(sorted(("qiti-yuanliu", "fenghou-qimen"))) in {
             tuple(sorted(pair)) for pair in synergy_pairs
         }
+
+    def test_dynamic_relationship_requires_solo_baseline_for_both_skills(self, tmp_path, monkeypatch):
+        """若某一方没有足够 solo 基线，八卦阵不应学习出伪协同关系。"""
+        runtime_dir = tmp_path / "runtime_data"
+        runtime_dir.mkdir()
+        monkeypatch.setenv("UNDER_ONE_RUNTIME_DIR", str(runtime_dir))
+
+        def write_metrics(skill_name, hours, quality):
+            records = [
+                {
+                    "timestamp": f"2026-05-14T{hour:02d}:00:00",
+                    "success": True,
+                    "quality_score": quality,
+                    "error_count": 0,
+                }
+                for hour in hours
+            ]
+            (runtime_dir / f"{skill_name}_metrics.jsonl").write_text(
+                "\n".join(json.dumps(item, ensure_ascii=False) for item in records) + "\n",
+                encoding="utf-8",
+            )
+
+        write_metrics("qiti-yuanliu", [1, 2, 10, 11], 90)
+        write_metrics("tongtian-lu", [10, 11], 95)
+        relationships = coordinator._load_dynamic_relationships(min_cooccurrence=2)
+        assert "qiti-yuanliu__tongtian-lu" not in relationships
 
     def test_coordinate_builds_optimization_queue_for_weak_skills(self, tmp_path):
         """生态报告应把最弱 skill 排到优化队列前列。"""
@@ -1938,6 +2121,9 @@ class TestEvolutionEngine:
             assert result["human_intervention"] == 1.0
             assert result["execution_policy"]["mode"] == "plan-only"
             assert result["execution_policy"]["manual_gate_required"] is True
+            assert result["control_plane_status"]["role"] == "evolver"
+            assert result["control_plane_status"]["phase"] == "plan-only"
+            assert result["control_plane_status"]["writes_applied"] is False
             assert result["evolution_backlog"][0]["skill"] == "test-skill"
             assert result["evolution_backlog"][0]["requires_approval"] is True
             assert "test-skill" in result["pattern_summary"]["critical_skills"]
@@ -1973,6 +2159,146 @@ class TestEvolutionEngine:
         assert backlog_item["evolution_type"] == "bootstrap"
         assert any("冷启动阶段" in blocker for blocker in backlog_item["blockers"])
         assert result["execution_policy"]["next_targets"][0] == "cold-skill"
+
+    def test_bootstrap_analysis_counts_standalone_tests_and_blends_sparse_runtime(self, tmp_path):
+        """冷启动分析应识别 skill/tests 中的独立测试，并对稀疏样本做保守混合。"""
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        skill_path = skills_dir / "bootstrap-skill"
+        skill_path.mkdir()
+        (skill_path / "SKILL.md").write_text("---\nmetadata:\n  version: v1.0.0\n---\n", encoding="utf-8")
+        (skill_path / "_skillhub_meta.json").write_text('{"id":"bootstrap-skill"}', encoding="utf-8")
+        scripts = skill_path / "scripts"
+        scripts.mkdir()
+        (scripts / "run.py").write_text("print('ok')\n", encoding="utf-8")
+        tests_dir = skill_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "standalone_smoke.py").write_text("def test_smoke():\n    assert True\n", encoding="utf-8")
+
+        runtime_dir = tmp_path / "runtime_data"
+        runtime_dir.mkdir()
+        metrics_file = runtime_dir / "bootstrap-skill_metrics.jsonl"
+        metrics_file.write_text(
+            "\n".join(
+                json.dumps(
+                    {
+                        "success": True,
+                        "error_count": 0,
+                        "human_intervention": 0,
+                        "quality_score": 42,
+                        "output_completeness": 30,
+                        "consistency_score": 35,
+                    }
+                )
+                for _ in range(2)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        core = XiuShenLuCoreV7(str(skills_dir), data_dir=str(runtime_dir), apply_changes=False)
+        result = core.run_evolution_cycle("bootstrap-skill")
+        analysis = result["results"][0]["analysis"]
+        assert analysis["bootstrap_mode"] is True
+        assert analysis["bootstrap_signals"]["test_count"] == 1
+        assert analysis["bootstrap_signals"]["observed_weight"] > 0
+        assert analysis["avg_consistency_score"] > 35.0
+        assert analysis["avg_output_completeness"] > 30.0
+
+    def test_bootstrap_analysis_uses_known_skill_profile_when_available(self, tmp_path):
+        """已知 skill 的冷启动分析应使用画像基线，而不只依赖结构猜测。"""
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        skill_path = skills_dir / "qiti-yuanliu"
+        skill_path.mkdir()
+        (skill_path / "SKILL.md").write_text("---\nmetadata:\n  version: v0.1.0\n---\n", encoding="utf-8")
+        (skill_path / "_skillhub_meta.json").write_text('{"id":"qiti-yuanliu"}', encoding="utf-8")
+        scripts = skill_path / "scripts"
+        scripts.mkdir()
+        (scripts / "run.py").write_text("print('ok')\n", encoding="utf-8")
+
+        runtime_dir = tmp_path / "runtime_data"
+        runtime_dir.mkdir()
+        metrics_file = runtime_dir / "qiti-yuanliu_metrics.jsonl"
+        metrics_file.write_text(
+            "\n".join(
+                json.dumps(
+                    {
+                        "success": True,
+                        "error_count": 0,
+                        "human_intervention": 0,
+                        "quality_score": 60,
+                        "output_completeness": 55,
+                        "consistency_score": 50,
+                    }
+                )
+                for _ in range(2)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        core = XiuShenLuCoreV7(str(skills_dir), data_dir=str(runtime_dir), apply_changes=False)
+        result = core.run_evolution_cycle("qiti-yuanliu")
+        analysis = result["results"][0]["analysis"]
+        assert analysis["bootstrap_mode"] is True
+        assert analysis["bootstrap_signals"]["profile_applied"] is True
+        assert analysis["bootstrap_signals"]["baseline_source"] == "profiled"
+        assert analysis["bootstrap_signals"]["recommended_min_records"] >= 10
+        assert analysis["avg_quality"] > 60.0
+        assert analysis["avg_consistency_score"] > 50.0
+
+    def test_bootstrap_profile_reads_custom_meta_for_third_party_skill(self, tmp_path):
+        """第三方 skill 只要在 _skillhub_meta.json 中声明 bootstrap_profile，就应被修身炉识别。"""
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        skill_path = skills_dir / "custom-skill"
+        skill_path.mkdir()
+        (skill_path / "SKILL.md").write_text("---\nmetadata:\n  version: v0.1.0\n---\n", encoding="utf-8")
+        (skill_path / "_skillhub_meta.json").write_text(
+            json.dumps(
+                {
+                    "id": "custom-skill",
+                    "bootstrap_profile": {
+                        "avg_quality": 91,
+                        "avg_completeness": 93,
+                        "avg_consistency": 90,
+                        "avg_human": 0.03,
+                        "success_rate": 0.95,
+                        "avg_duration": 640,
+                        "recommended_min_records": 14,
+                        "degradation_window": 4,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        scripts = skill_path / "scripts"
+        scripts.mkdir()
+        (scripts / "run.py").write_text("print('ok')\n", encoding="utf-8")
+
+        profile = bootstrap_profiles.get_bootstrap_profile("custom-skill", skills_root=skills_dir)
+        assert profile is not None
+        assert profile["avg_quality"] == 91
+        assert profile["recommended_min_records"] == 14
+
+        runtime_dir = tmp_path / "runtime_data"
+        runtime_dir.mkdir()
+        core = XiuShenLuCoreV7(str(skills_dir), data_dir=str(runtime_dir), apply_changes=False)
+        result = core.run_evolution_cycle("custom-skill")
+        analysis = result["results"][0]["analysis"]
+        assert analysis["bootstrap_signals"]["profile_applied"] is True
+        assert analysis["bootstrap_signals"]["recommended_min_records"] == 14
+        assert analysis["avg_quality"] >= 80.0
+
+    def test_bootstrap_profile_generator_is_deterministic(self):
+        """播种画像应可重复生成，便于独立安装后的稳定复现。"""
+        records_a = bootstrap_profiles.generate_profile_records("qiti-yuanliu", n=4, seed=1234)
+        records_b = bootstrap_profiles.generate_profile_records("qiti-yuanliu", n=4, seed=1234)
+        assert records_a == records_b
+        assert len(records_a) == 4
+        assert all(item["skill_name"] == "qiti-yuanliu" for item in records_a)
+        assert all("output_completeness" in item for item in records_a)
 
     def test_run_cycle_isolates_target_errors(self, tmp_path, monkeypatch):
         """单个skill分析失败不应拖垮整个进化周期"""
