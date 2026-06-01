@@ -235,7 +235,7 @@ _SKILL_QUOTES: Dict[str, Dict[str, Any]] = {
     },
     "dalu-dongguan": {
         "name_cn": "大罗洞观",
-        "master": "周圣",
+        "master": "谷畸亭",
         "quotes": {
             "deep_insight": "「大罗洞观，洞见一切」——隐藏关联无所遁形",
             "link_found": "「我看到了……那条线」——发现跨段关联",
@@ -773,8 +773,8 @@ class CommandFactory(BaseSkill):
 class InsightRadar(BaseSkill):
     """大罗洞观 — 全局洞察雷达。跨文档/跨轮次发现隐藏关联。
     
-    周圣所悟八奇技——大罗洞观，洞见一切暗线。
-    如同漫画中周圣能看穿一切隐藏的关联，此技可发现跨段文本间的
+    谷畸亭所悟八奇技——大罗洞观，洞见一切暗线。
+    如同漫画中谷畸亭能看穿一切隐藏的关联，此技可发现跨段文本间的
     因果链、矛盾点与深层联系。
     """
     skill_name = "dalu-dongguan"
