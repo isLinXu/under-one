@@ -849,6 +849,68 @@ class XiuShenLuCoreV7:
         self.skills_dir = Path(skills_dir)
         self.apply_changes = apply_changes
 
+    def _read_skill_tags(self, skill_name: str) -> set:
+        """读取目标 skill 的 metadata tags（用于判断能力是否已存在）。"""
+        path = self.skills_dir / skill_name / "SKILL.md"
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return set()
+        tags = set()
+        m = re.search(r"tags:\s*\[([^\]]*)\]", text)
+        if m:
+            for raw in m.group(1).split(","):
+                tag = raw.strip().strip("'\"")
+                if tag:
+                    tags.add(tag)
+        return tags
+
+    def graft_capability(self, target_skill: str, capability: str,
+                         source_skill: Optional[str] = None) -> Dict:
+        """赋予全新能力（V7.2，呼应修身炉"化普通人为异人"）。
+
+        从其他 skill（源）萃取一类能力模式，为不具备该能力的目标 skill 培育
+        "新能力萌芽"。默认只产出赋能蓝图（read-only），不落盘——落地需经渡劫验证。
+
+        Args:
+            target_skill: 受炼目标 skill 目录名。
+            capability: 拟赋予的新能力标签。
+            source_skill: 可选的能力来源 skill（萃取其成熟模式）。
+        Returns:
+            dict: 含 status / seed / lineage 的赋能报告。
+        """
+        target_path = self.skills_dir / target_skill
+        result = {
+            "engine": "xiushen-lu",
+            "operation": "graft_capability",
+            "lineage": "源自神机百炼——马仙洪以神机百炼造出修身炉",
+            "target": target_skill,
+            "capability": capability,
+            "source": source_skill,
+            "applied": False,
+            "seed": None,
+        }
+        if not (target_path / "SKILL.md").exists():
+            result["status"] = "target_not_found"
+            return result
+        if capability in self._read_skill_tags(target_skill):
+            result["status"] = "already_present"
+            return result
+        result["status"] = "seed_ready"
+        result["seed"] = {
+            "capability": capability,
+            "graft_from": source_skill,
+            "stages": [
+                "采炁(萃取源能力模式)",
+                "炼师(评估目标适配)",
+                "入炉(培育能力萌芽)",
+                "试炼(验证新能力)",
+                "出炉(赋能完成)",
+            ],
+            "guardrail": "赋能为高风险渡劫，验证不过则回炉封印（RollbackV7），修为归零",
+        }
+        return result
+
     @record_metrics("xiushen-lu", quality_fn=_evolution_quality)
     def run_evolution_cycle(self, skill_name: Optional[str] = None) -> Dict:
         results = []
