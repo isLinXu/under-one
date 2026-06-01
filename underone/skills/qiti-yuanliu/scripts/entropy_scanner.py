@@ -491,6 +491,98 @@ class QiTiScanner:
         self._calc_health_score()
         return self._generate_report()
 
+    # ── V6.2 无限递归自省（炁婴自主进化） ──────────────────────────
+    def meta_reflect(self, report=None, max_depth=5):
+        """无限递归自省（呼应漫画"无限炁"+"炁婴自主行动"）。
+
+        炁体源流不止诊断上下文，还会回头审视"自己这次诊断是否自洽"——
+        如同张怀义的炁婴拥有自主意志、能反观自身。逐层对诊断结果再诊断，
+        直到炁场归一（meta_entropy 收敛为 0）或达到 max_depth。
+
+        Args:
+            report: 一阶诊断报告；为 None 时自动执行 scan()。
+            max_depth: 递归自省的最大层数（有界"无限"，防止失控）。
+        Returns:
+            dict: 含 reflection_chain / converged / qi_baby_evolution 的元诊断报告。
+        """
+        if report is None:
+            report = self.scan()
+
+        chain = []
+        current = report
+        depth = 0
+        while depth < max_depth:
+            findings = self._reflect_once(current)
+            chain.append({
+                "depth": depth + 1,
+                "meta_entropy": findings["meta_entropy"],
+                "dissonances": findings["dissonances"],
+            })
+            if findings["meta_entropy"] == 0:
+                break
+            me = findings["meta_entropy"]
+            current = {
+                "metrics": {
+                    "entropy": me,
+                    "entropy_level": "green" if me < 1 else "yellow" if me < 3 else "red",
+                    "health_score": max(0, 100 - me * 15),
+                    "health_level": "good" if me < 2 else "warning",
+                    "consistency": max(0, 100 - me * 20),
+                },
+                "alerts": [{"type": "meta", "message": d} for d in findings["dissonances"]],
+            }
+            depth += 1
+
+        converged = chain[-1]["meta_entropy"] == 0
+        return {
+            "scanner": "qiti-yuanliu",
+            "mode": "meta_reflect",
+            "reflection_depth": len(chain),
+            "converged": converged,
+            "reflection_chain": chain,
+            "meta_health": "炁场归一" if converged else "炁婴仍在迭代",
+            "qi_baby_evolution": self._build_qi_baby_evolution(chain, converged),
+        }
+
+    def _reflect_once(self, report):
+        """对单层报告做二阶审视，统计诊断自身的失谐点。"""
+        metrics = report.get("metrics", {})
+        alerts = report.get("alerts", [])
+        dissonances = []
+
+        health_level = metrics.get("health_level")
+        entropy_level = metrics.get("entropy_level")
+        health_score = metrics.get("health_score", 100)
+        consistency = metrics.get("consistency", 100)
+
+        if health_level in ("good", "excellent") and entropy_level == "red":
+            dissonances.append("一阶诊断自相矛盾：health 良好但 entropy 为 red")
+        if health_level in ("warning", "danger") and entropy_level == "green":
+            dissonances.append("一阶诊断自相矛盾：health 告警但 entropy 为 green")
+        if health_score >= 75 and len(alerts) >= 3:
+            dissonances.append(f"健康分 {health_score} 偏高，却有 {len(alerts)} 条告警，可能漏判")
+        if abs(health_score - consistency) >= 40:
+            dissonances.append(f"健康分({health_score})与一致性({consistency})背离过大")
+
+        return {"meta_entropy": len(dissonances), "dissonances": dissonances}
+
+    def _build_qi_baby_evolution(self, chain, converged):
+        """炁婴自主进化建议。"""
+        steps = []
+        if converged:
+            steps.append("炁场已归一，炁婴进化稳定，可固化本轮自修正规则")
+        else:
+            steps.append("炁婴仍在迭代：诊断层间存在残余失谐，建议移交 dalu-dongguan 做跨段追踪")
+        if len(chain) > 1:
+            steps.append(
+                f"经 {len(chain)} 层递归自省，meta_entropy 由 {chain[0]['meta_entropy']} 收敛至 {chain[-1]['meta_entropy']}"
+            )
+        return {
+            "autonomous": True,
+            "lore": "炁婴拥有自主意志，反观自身直至炁场归一",
+            "steps": steps,
+        }
+
     def _calc_entropy(self):
         """V5.3 语义级熵计算"""
         # 基础熵组件
