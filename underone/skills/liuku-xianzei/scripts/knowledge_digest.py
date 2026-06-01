@@ -757,6 +757,59 @@ class KnowledgeDigest:
             "retention_lore": "尸魔封印",               # V5.5: 隔离队列→尸魔封印
         }
 
+    def _build_information_erosion(self):
+        """信息腐蚀（V5.6）：低质/被污染的信息如口水般侵蚀本库炁机。
+
+        呼应漫画六库仙贼"口水附炁腐蚀万物"——低消化率与高污染单元会
+        持续腐蚀知识库的整体炁机，需评估腐蚀压力并预警扩散。
+        """
+        total = len(self.units) or 1
+        low_units = [u for u in self.units if u["digestion_level"] == "低"]
+        tainted = [u for u in self.units if u.get("contamination_level") in ("高", "中")]
+        # 腐蚀压力：低质单元 0.6 权重 + 污染单元 0.4 权重，归一到 0-1
+        erosion = (len(low_units) * 0.6 + len(tainted) * 0.4) / total
+        erosion = round(min(1.0, erosion), 3)
+        level = "高" if erosion >= 0.5 else "中" if erosion >= 0.2 else "低"
+        corrosive_sources = sorted({u["source"] for u in low_units + tainted})
+        return {
+            "erosion_pressure": erosion,
+            "level": level,
+            "corrosive_unit_count": len({id(u) for u in low_units + tainted}),
+            "corrosive_sources": corrosive_sources,
+            "spreading": level == "高",
+            "lore": "信息腐蚀：低质信息如口水附炁腐蚀万物，需及时封印以免侵蚀本库",
+            "recommendation": (
+                "腐蚀扩散风险高，立即隔离腐蚀源并二次炼化"
+                if level == "高"
+                else "存在轻度腐蚀，定期复核腐蚀源"
+                if level == "中"
+                else "炁机清朗，无明显腐蚀"
+            ),
+        }
+
+    def _build_trace_free_digestion(self):
+        """无痕消化（V5.6）：高质知识气息与天地同化，消化时几乎不扰动既有结构。
+
+        呼应漫画六库仙贼"气息可与天地同化、几乎消失"——优质且洁净的知识
+        应被平滑吸收，对原有知识结构的扰动趋近于零。
+        """
+        total = len(self.units) or 1
+        trace_free_units = [
+            u for u in self.units
+            if u["digestion_level"] == "高" and u.get("contamination_level") == "低"
+        ]
+        rate = round(len(trace_free_units) / total * 100, 1)
+        # 扰动指数：非无痕单元占比越高，吸收对结构的扰动越大
+        disturbance = round(1.0 - len(trace_free_units) / total, 3)
+        return {
+            "trace_free_count": len(trace_free_units),
+            "trace_free_rate": rate,
+            "disturbance_index": disturbance,
+            "seamless": rate >= 60.0,
+            "concepts": [u["concept"] for u in trace_free_units[:5]],
+            "lore": "无痕消化：高质知识气息与天地同化，几乎不扰动既有炁脉",
+        }
+
     def _build_report(self):
         rates = [u["digestion_rate"] for u in self.units]
         avg_rate = sum(rates) / len(rates) if rates else 0
@@ -882,7 +935,7 @@ class KnowledgeDigest:
 
         return {
             "digester": "liuku-xianzei",
-            "version": "v5.5",
+            "version": "v5.6",
             "lore_mapping": {                              # V5.5: 六库仙贼世界观映射
                 "digestion_lore": {"高": "炁化完成", "中": "炼化中", "低": "未入炁"},
                 "contamination_lore": {"高": "尸魔侵蚀", "中": "炁机浑浊", "低": "炁机清朗"},
@@ -898,6 +951,8 @@ class KnowledgeDigest:
             "inheritance_queue": self.inheritance_queue,
             "quarantine_queue": self.quarantine_queue,
             "contamination_risk": self.contamination_risk,
+            "information_erosion": self._build_information_erosion(),
+            "trace_free_digestion": self._build_trace_free_digestion(),
             "portfolio_diagnostics": portfolio_diagnostics,
             "refinement_queue": refinement_queue,
             "priority_actions": priority_actions,

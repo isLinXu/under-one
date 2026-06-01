@@ -1,7 +1,7 @@
 {
   "id": "liuku-xianzei",
   "name": "六库仙贼",
-  "version": "v5.5",
+  "version": "v5.6",
   "type": "script",
   "entry": "scripts/knowledge_digest.py",
   "language": "python",
