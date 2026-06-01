@@ -1,6 +1,7 @@
 # under-one.skills 全局配置文件
 # 放置位置: 项目根目录 /under-one.yaml
 # 所有 skill 脚本通过 _skill_config.py 自动读取此文件
+config_version: 1
 
 # ═══════════════════════════════════════════════════════════
 # 全局阈值配置
@@ -20,10 +21,29 @@ thresholds:
   short_text_limit: 50
   max_task_desc_length: 2000
 
+runtime:
+  script_timeout_seconds: 60
+  metrics_server:
+    host: "127.0.0.1"
+    port: 9465
+  resource_limits:
+    warn_duration_ms: 10000
+    max_duration_ms: 60000
+    warn_peak_memory_mb: 512
+    max_peak_memory_mb: 1024
+
 # ═══════════════════════════════════════════════════════════
 # 生态协调器配置 (bagua-zhen)
 # ═══════════════════════════════════════════════════════════
 baguazhen:
+  control_plane_role: "coordinator"
+  control_plane_scope: "ecosystem-readonly"
+  control_plane_reads: ["runtime_data", "shared_relationships"]
+  control_plane_writes: ["ecosystem_report", "dashboard_artifacts"]
+  control_plane_handoff_targets: ["juling-qianjiang", "xiushen-lu"]
+  control_plane_mutation_gate: "report-only"
+  control_plane_will_not: ["write_skills", "persist_thresholds", "rewrite_goal_anchor"]
+  control_plane_summary: "负责聚合、仲裁与监控，不直接修改单个 skill 的内部实现。"
   mutex_pairs:
     - ["tongtian-lu", "shenji-bailian"]
     - ["qiti-yuanliu", "fenghou-qimen"]
@@ -57,13 +77,15 @@ fenghouqimen:
   buffer_recommendation_low: "增加20%应急资源"
   buffer_recommendation_high: "无需额外缓冲"
   
-  # 八门阈值映射
+  # 八门阈值映射（完整七门体系，原著奇门遁甲八门：开/生/休/景/惊/杜/死，伤门合并入杜门）
   gates:
-    开门: [4.5, 999]
-    生门: [4.0, 4.5]
-    景门: [3.2, 4.0]
-    杜门: [2.5, 3.2]
-    死门: [0.0, 2.5]
+    开门: [4.5, 999]   # 大吉，立即启动
+    生门: [4.2, 4.5]   # 吉，重点推进
+    休门: [3.6, 4.2]   # 半吉，稳步推进，择机而动
+    景门: [3.2, 3.6]   # 中平，审视后执行
+    惊门: [2.8, 3.2]   # 半凶，谨慎评估，防范变局
+    杜门: [2.5, 2.8]   # 凶，绕过障碍/延后
+    死门: [0.0, 2.5]   # 大凶，终止释放资源
   
   # 九维度权重配置（支持动态模板）
   weights:
@@ -117,6 +139,12 @@ fenghouqimen:
       time_pressure: 0.10
       environment_readiness: 0.05
       team_match: 0.25
+
+  adaptive_weights:
+    enabled: true
+    low_success_threshold: 2.6
+    high_success_threshold: 4.2
+    history_boost: 0.05
 
 # ═══════════════════════════════════════════════════════════
 # 多工具调度器配置 (juling-qianjiang)
@@ -219,6 +247,14 @@ julingqianjiang:
 # 上下文稳态扫描器配置 (qiti-yuanliu)
 # ═══════════════════════════════════════════════════════════
 qitiyuanliu:
+  control_plane_role: "observer"
+  control_plane_scope: "context-diagnosis"
+  control_plane_reads: ["context", "runtime_data"]
+  control_plane_writes: ["runtime_data", "health_report"]
+  control_plane_handoff_targets: ["dalu-dongguan", "xiushen-lu"]
+  control_plane_mutation_gate: "diagnose-and-handoff-only"
+  control_plane_will_not: ["write_skills", "persist_thresholds", "override_ecosystem_policy"]
+  control_plane_summary: "负责诊断、稳态契约与 handoff，不直接改写 skill 代码或全局阈值。"
   # 上下文窗口大小
   context_window: 5
 
@@ -295,6 +331,13 @@ qitiyuanliu:
     action: "cross_segment_trace"
     reason: "repeated_contradictions"
     evidence_limit: 3
+
+  semantic_contradiction:
+    enabled: false
+    provider: null
+    model: null
+    threshold: 0.72
+    max_context_chars: 3000
 
   # ── 意图漂移检测 ──
   intent_shift:
@@ -820,6 +863,18 @@ daludongguan:
     A: 0.8
     B: 0.5
 
+  semantic_expansion:
+    group_weight: 0.35
+    group_pair_bonus: 0.12
+
+  semantic_groups:
+    cost: ["成本", "预算", "费用", "价格", "支出", "开销", "cost", "budget", "price"]
+    performance: ["性能", "延迟", "速度", "吞吐", "响应", "加载", "卡顿", "performance", "latency", "speed"]
+    risk: ["风险", "隐患", "异常", "失败", "缺陷", "漏洞", "risk", "failure", "defect"]
+    quality: ["质量", "可靠", "稳定", "测试", "验证", "准确", "quality", "reliable", "test"]
+    resource: ["资源", "人手", "算力", "内存", "容量", "配额", "resource", "quota", "capacity"]
+    schedule: ["排期", "周期", "截止", "延期", "时间", "里程碑", "schedule", "deadline", "timeline"]
+
   temporal_markers:
     start: ["首先", "最初", "一开始", "前期", "第一步"]
     progress: ["然后", "接着", "随后", "之后", "此后", "继而", "接下来", "第二步", "第三步"]
@@ -1019,6 +1074,14 @@ tongtianlu:
 # 修身炉配置 (xiushen-lu)
 # ═══════════════════════════════════════════════════════════
 xiushenlu:
+  control_plane_role: "evolver"
+  control_plane_scope: "cross-skill-evolution"
+  control_plane_reads: ["runtime_data", "skills", "shared_knowledge"]
+  control_plane_writes: ["evolution_report", "adaptive_thresholds", "skills_when_apply"]
+  control_plane_handoff_targets: []
+  control_plane_mutation_gate: "explicit-apply-only"
+  control_plane_will_not: ["rewrite_live_context", "bypass_manual_gate", "mutate_without_backup"]
+  control_plane_summary: "负责分析与提出跨 skill 演化建议，仅在显式 apply 模式下改写技能内容。"
   min_history_records: 10
   backup_retention: 7
   auto_rollback_on_syntax_error: true
@@ -1049,3 +1112,58 @@ paths:
   runtime_data: "runtime_data"
   skill_backups: "skill_backups_v7"
   reports: "."
+
+# ═══════════════════════════════════════════════════════════
+# 异人风味系统配置 (flavor)
+# ═══════════════════════════════════════════════════════════
+# 为十技注入《一人之下》漫画原作的趣味灵魂
+# 可通过此配置控制风味系统的行为
+flavor:
+  # 是否启用异人语录（在结果中注入角色台词）
+  quotes_enabled: true
+  # 是否启用境界系统（修炼境界名称）
+  realms_enabled: true
+  # 是否启用八奇技共鸣检测
+  resonance_enabled: true
+  # 语录输出模式: "full"=完整语录, "short"=仅语录内容, "none"=关闭
+  quote_mode: "full"
+  # 境界输出模式: "full"=含分数+境界名, "name_only"=仅境界名
+  realm_mode: "full"
+
+  # 十技与八奇技的对应关系（漫画原作映射）
+  # 八奇技：炁体源流、通天箓、大罗洞观、神机百炼、风后奇门、六库仙贼、双全手、拘灵遣将
+  # 额外两技：八卦阵（阵法中枢）、修身炉（自进化引擎）
+  skill_master_map:
+    qiti-yuanliu: "张怀义"
+    tongtian-lu: "郑子布"
+    dalu-dongguan: "周圣"
+    shenji-bailian: "马仙洪"
+    fenghou-qimen: "王也"
+    liuku-xianzei: "巴伦"
+    shuangquanshou: "吕良"
+    juling-qianjiang: "风正豪"
+    bagua-zhen: "十技共修"
+    xiushen-lu: "马仙洪（造物主）"
+
+  # 八奇技共鸣对（当两个Skill同时活跃时触发特殊效果）
+  resonance_pairs:
+    - pair: ["qiti-yuanliu", "dalu-dongguan"]
+      name: "炁观共鸣"
+      desc: "炁体源流诊断 + 大罗洞观追踪 = 全链路诊断修复闭环"
+      quote: "「炁体归源，洞观万象——诊断与追踪合一，矛盾无所遁形」"
+    - pair: ["tongtian-lu", "shenji-bailian"]
+      name: "符炉共鸣"
+      desc: "通天箓拆解 + 神机百炼锻造 = 任务拆解→工具生成全链路"
+      quote: "「符箓引路，神机锻造——指令即出，利器即成」"
+    - pair: ["fenghou-qimen", "juling-qianjiang"]
+      name: "奇将共鸣"
+      desc: "风后奇门排盘 + 拘灵遣将调度 = 优先级驱动+工具编排"
+      quote: "「奇门定序，遣将执行——排兵布阵，万灵听令」"
+    - pair: ["qiti-yuanliu", "shuangquanshou"]
+      name: "炁手共鸣"
+      desc: "炁体源流自省 + 双全手护栏 = 上下文健康+人格一致性双重保障"
+      quote: "「内观炁体，外守双全——内外兼修，万法不侵」"
+    - pair: ["liuku-xianzei", "dalu-dongguan"]
+      name: "贼观共鸣"
+      desc: "六库仙贼消化 + 大罗洞观关联 = 知识消化+关联发现深度理解"
+      quote: "「吞纳万物，洞观其根——消化与洞察合一，知识化为真知」"
