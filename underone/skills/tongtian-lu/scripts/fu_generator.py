@@ -90,6 +90,21 @@ FU_TEMPLATES = {
     },
 }
 
+# V5.9 符种细分：将六类功能符箓归入漫画符种家族（攻击/防御/封印/加速/化形/侦查/治疗）
+FU_SPECIES = {
+    "analysis":       {"family": "侦查型", "manga_ref": "洞察符（解析洞察）"},
+    "retrieval":      {"family": "侦查型", "manga_ref": "探查符（信息查找）"},
+    "decision":       {"family": "攻击型", "manga_ref": "五雷符（果断决断）"},
+    "verification":   {"family": "防御型", "manga_ref": "五力士符（防御校验）"},
+    "transformation": {"family": "化形型", "manga_ref": "化形符（格式变换）"},
+    "creation":       {"family": "加速型", "manga_ref": "戴院长咒（加速产出）"},
+}
+# 保留家族（按需触发）：封印型用于高禁咒任务封锁，治疗型用于修复类任务
+FU_SPECIES_RESERVED = {
+    "封印型": "封经符（高危封锁）",
+    "治疗型": "命手符（修复恢复）",
+}
+
 DIMENSION_KEYWORDS = {
     "analysis": ["分析", "提取", "解析", "拆解", "关键词", "情感"],
     "creation": ["写", "生成", "创建", "改写", "润色", "翻译"],
@@ -256,6 +271,9 @@ class FuGenerator:
         fu = FU_TEMPLATES[dim].copy()
         fu["dimension"] = dim
         fu["activation_reason"] = reason
+        species = FU_SPECIES.get(dim, {"family": "侦查型", "manga_ref": "通用符"})
+        fu["species"] = species["family"]
+        fu["manga_ref"] = species["manga_ref"]
         self.fu_list.append(fu)
 
     def _detect_dimensions(self):
@@ -599,6 +617,26 @@ class FuGenerator:
             "objective": self.task[:120],
         }
 
+    def _build_species_catalog(self):
+        """符种细分（V5.9）：统计本次符阵的符种家族分布。
+
+        呼应漫画通天箓符种极其丰富——按攻击/防御/封印/加速/化形/侦查/治疗
+        等家族归类本次生成的符箓，让符阵的"招式构成"一目了然。
+        """
+        breakdown = {}
+        for fu in self.fu_list:
+            fam = fu.get("species", "侦查型")
+            breakdown[fam] = breakdown.get(fam, 0) + 1
+        catalog = {sp["family"]: sp["manga_ref"] for sp in FU_SPECIES.values()}
+        catalog.update(FU_SPECIES_RESERVED)
+        return {
+            "breakdown": breakdown,
+            "active_families": sorted(breakdown.keys()),
+            "catalog": catalog,
+            "reserved_families": list(FU_SPECIES_RESERVED.keys()),
+            "lore": "符种细分：各门派视若珍宝的符箓，通天箓当豆子一样撒",
+        }
+
     def _build_delivery_contract(self, command_packets, dispatch_contract, ritual_summary):
         contracts_present = ritual_summary.get("contracts_present", [])
         missing_sections = [
@@ -695,12 +733,13 @@ class FuGenerator:
         )
         return {
             "generator": "tongtian-lu",
-            "version": "v5.8",
+            "version": "v5.9",
             "task": self.task[:80],
             "orchestration_mode": self.mode_cfg.get("name", "balanced-array"),
             "ritual_intent": ritual_summary["ritual_intent"],
             "dimension_count": len(self.fu_list),
             "talisman_list": self.fu_list,
+            "species_catalog": self._build_species_catalog(),
             "curse_level": self.curse_level,
             "risk_alignment": risk_alignment,
             "conflicts": self.conflicts,
@@ -742,11 +781,61 @@ class FuGenerator:
         }
 
 
+def speak(sentence, mode=None):
+    """言出法随（V5.9）：一句自然语言即刻成符，无需结构化 spec、无需前置准备。
+
+    呼应漫画通天箓的最新解读——本质是顶级"言出法随"，规则上的因果巫术：
+    传统符箓需设坛、行炁、备料数时至数日（对应结构化 spec 的前置工序），
+    通天箓废除一切准备，徒手凭空、一句话直出符阵。
+
+    Args:
+        sentence: 自然语言任务描述（非空字符串）。
+        mode: 可选编排模式 quick-cast / balanced-array / full-ritual。
+    Returns:
+        dict: 在标准符阵计划上附加 `incantation` 与 `paradigm` 字段。
+    """
+    if not isinstance(sentence, str) or not sentence.strip():
+        raise ValueError("言出法随需要一句非空的自然语言任务描述")
+    if mode:
+        gen = FuGenerator({
+            "task": {"description": sentence},
+            "execution_contract": {"orchestration_mode": mode},
+        })
+    else:
+        gen = FuGenerator(sentence)
+    result = gen.generate()
+    result["incantation"] = sentence.strip()
+    result["paradigm"] = "言出法随：废除一切准备工序，一句成符"
+    return result
+
+
 def main():
     if len(sys.argv) < 2:
         print("用法: python fu_generator.py '<任务描述>' 或 python fu_generator.py <task.txt>")
+        print("      python fu_generator.py --speak '<一句话>' [模式]   # 言出法随：一句直出符阵")
         print("示例: python fu_generator.py '分析竞品数据并生成报告'")
         sys.exit(1)
+
+    # 言出法随：--speak 一句话即刻成符
+    if sys.argv[1] == "--speak":
+        if len(sys.argv) < 3 or not sys.argv[2].strip():
+            print("错误: --speak 需要一句非空的任务描述")
+            sys.exit(2)
+        mode = sys.argv[3] if len(sys.argv) > 3 else None
+        result = speak(sys.argv[2], mode)
+        out = Path("fu_plan.json")
+        out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("=" * 55)
+        print("通天箓 · 言出法随")
+        print("=" * 55)
+        print(f"  咒言: {result['incantation']}")
+        print(f"  范式: {result['paradigm']}")
+        print(f"  编排模式: {result['orchestration_mode']}")
+        print(f"  符箓数: {result['dimension_count']} | 禁咒: {result['curse_level']}")
+        print(f"  拓扑序: {' -> '.join(result['topology'])}")
+        print("=" * 55)
+        print(f"详细计划已保存: {out}")
+        return
 
     arg = sys.argv[1]
     # 自动识别结构化 JSON / 任务文件 / 直接任务描述
