@@ -247,6 +247,27 @@ class TestContextGuard:
         assert len(self_evolution["rule_candidates"]) >= 1
         assert any("用户纠偏" in item["rule"] for item in self_evolution["rule_candidates"])
 
+    def test_meta_reflect_converges_on_consistent_report(self):
+        """无限递归自省：自洽的诊断应收敛（炁场归一）。"""
+        scanner = QiTiScanner([{"role": "user", "content": "请帮我分析竞品数据", "round": 1}])
+        meta = scanner.meta_reflect()
+        assert meta["mode"] == "meta_reflect"
+        assert meta["converged"] is True
+        assert meta["reflection_depth"] >= 1
+        assert meta["qi_baby_evolution"]["autonomous"] is True
+
+    def test_meta_reflect_detects_diagnostic_dissonance(self):
+        """二阶审视应识别一阶诊断的自相矛盾。"""
+        scanner = QiTiScanner([{"role": "user", "content": "x", "round": 1}])
+        fake = {
+            "metrics": {"health_level": "good", "entropy_level": "red",
+                        "health_score": 90, "consistency": 90},
+            "alerts": [],
+        }
+        findings = scanner._reflect_once(fake)
+        assert findings["meta_entropy"] >= 1
+        assert any("矛盾" in d for d in findings["dissonances"])
+
     def test_stability_contract_freezes_high_risk_context(self):
         """高风险上下文应输出冻结式稳态契约与修复计划。"""
         context = [
@@ -501,6 +522,32 @@ class TestPriorityEngine:
         assert result["adaptive_weighting"]["enabled"] is True
         assert result["weights_used"]["urgency"] > result["weights_used"]["importance"]
 
+    def test_luan_jin_tuo_freezes_dead_gate_tasks(self):
+        """乱金柝：存在死门/杜门任务时应冻结其资源以聚焦高优先。"""
+        tasks = [
+            {"name": "紧急修复", "urgency": 5, "importance": 5, "dependency": 1},
+            {"name": "可有可无", "urgency": 1, "importance": 1, "dependency": 1},
+        ]
+        result = PriorityEngine(tasks).run()
+        ljt = result["luan_jin_tuo"]
+        assert ljt["technique"] == "乱金柝"
+        dead = [p["task"] for p in result["execution_plan"] if p["gate"] in ("死门", "杜门")]
+        if dead:
+            assert ljt["triggered"] is True
+            assert set(ljt["frozen_tasks"]) == set(dead)
+
+    def test_gui_ying_ti_burn_mode_off_by_default(self):
+        """龟蝇体：默认不点燃，run(burn=True) 时才进入燃烧模式。"""
+        tasks = [{"name": "冲刺任务", "urgency": 5, "importance": 5, "dependency": 1}]
+        normal = PriorityEngine(tasks).run()
+        assert normal["gui_ying_ti"]["enabled"] is False
+        assert normal["gui_ying_ti"]["sprint_tasks"] == []
+
+        burned = PriorityEngine(tasks).run(burn=True)
+        assert burned["gui_ying_ti"]["enabled"] is True
+        assert burned["gui_ying_ti"]["sprint_tasks"]
+        assert burned["gui_ying_ti"]["sacrificed"]
+
     def test_empty_tasks(self):
         """空任务列表应优雅处理"""
         engine = PriorityEngine([])
@@ -597,6 +644,31 @@ class TestInsightRadar:
         result = LinkDetector(segments).detect()
         assert any(link["type"] == "语义关联" for link in result["links"])
 
+    def test_temporal_evolution_tracks_entity_across_time(self):
+        """超越时间的认知：同一实体跨多个时间点应被追踪为演变轨迹。"""
+        segments = [
+            {"source": "Q1", "content": '第一季度"用户增长"强劲。', "round": 1},
+            {"source": "Q2", "content": '第二季度"用户增长"开始放缓。', "round": 2},
+            {"source": "Q3", "content": '第三季度"用户增长"基本停滞。', "round": 3},
+        ]
+        result = LinkDetector(segments).detect()
+        evo = result["temporal_evolution"]
+        assert any(e["entity"] == "用户增长" and e["span"] >= 2 for e in evo)
+        target = next(e for e in evo if e["entity"] == "用户增长")
+        assert target["trajectory"] == ["Q1", "Q2", "Q3"]
+
+    def test_fate_intervention_for_strong_links(self):
+        """命运干涉：A 级（高置信度）关联应主动给出干预建议而非仅报告。"""
+        segments = [
+            {"source": "A", "content": "用户 增长 放缓 营收 下降 严重"},
+            {"source": "B", "content": "用户 增长 放缓 营收 下降 严重 问题"},
+        ]
+        result = LinkDetector(segments).detect()
+        a_links = [l for l in result["links"] if l["confidence"] == "A"]
+        assert a_links, "期望至少一条 A 级关联"
+        assert result["fate_interventions"], "A 级关联应触发命运干涉建议"
+        assert all("建议" in fi["intervention"] for fi in result["fate_interventions"])
+
 
 # ---------------------------------------------------------------------------
 # 4. 六库仙贼 (knowledge-digest)
@@ -636,6 +708,29 @@ class TestKnowledgeDigest:
         units = result["knowledge_units"]
         assert units[0]["freshness_days"] == 7
         assert units[1]["freshness_days"] == 1095
+
+    def test_information_erosion_flags_low_quality_pressure(self):
+        """信息腐蚀：大量低质/可疑信息应抬高腐蚀压力。"""
+        items = [
+            {"source": "匿名贴", "content": "听说很快", "credibility": "C"},
+            {"source": "小道消息", "content": "据说有用", "credibility": "C"},
+            {"source": "传言", "content": "好像可以", "credibility": "C"},
+        ]
+        result = KnowledgeDigest(items).digest()
+        erosion = result["information_erosion"]
+        assert erosion["level"] in ("中", "高")
+        assert erosion["erosion_pressure"] > 0
+        assert erosion["corrosive_sources"]
+
+    def test_trace_free_digestion_for_high_quality(self):
+        """无痕消化：高质洁净知识应被平滑吸收，扰动指数低。"""
+        items = [
+            {"source": "官方文档", "content": "核心结论：数据证明该方案有效，已在生产验证。", "credibility": "S", "category": "技术方案"},
+        ]
+        result = KnowledgeDigest(items).digest()
+        tf = result["trace_free_digestion"]
+        assert "trace_free_rate" in tf
+        assert 0.0 <= tf["disturbance_index"] <= 1.0
 
     def test_digestion_level_distribution(self):
         """分布计数应正确"""
@@ -865,6 +960,53 @@ class TestPersonaGuard:
         assert result["approval_contract"]["approval_status"] == "blocked"
         assert result["priority_actions"][0]["blocking"] is True
 
+    def test_hand_division_classifies_xing_and_ming(self):
+        """性手/命手分区：记忆域归性手，感知域归命手。"""
+        memory_profile = {
+            "current_style": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_expectation": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_core": {"诚信": "不编造"},
+            "requested_change": {"type": "记忆修订", "target": "更新用户偏好", "patch": {"user_preference": "效率"}},
+            "memory_state": {"user_preference": "完整"},
+            "history": [],
+        }
+        result = DNAValidator(memory_profile).validate()
+        mem_item = next(i for i in result["surgery_plan"] if i["domain"] == "memory")
+        assert mem_item["hand"] == "性手"
+        assert "memory" in result["hand_division"]["性手"]["domains"]
+
+    def test_ming_hand_generates_applicable_repair_patch(self):
+        """命手积极修复：偏离基线时应生成可应用的修复 patch。"""
+        profile = {
+            "current_style": {"tone": 5, "formality": 1, "detail_level": 3, "structure": 3},
+            "dna_expectation": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_core": {"诚信": "不编造"},
+            "requested_change": {},
+            "history": [],
+        }
+        result = DNAValidator(profile).validate()
+        repair = result["ming_hand_repair"]
+        assert repair["hand"] == "命手"
+        assert repair["applicable"] is True
+        assert repair["op_count"] >= 2
+        assert all(op["op"] == "restore" for op in repair["ops"])
+        restored = {op["field"] for op in repair["ops"]}
+        assert "style.tone" in restored and "style.formality" in restored
+
+    def test_ming_hand_repair_blocked_when_sealed(self):
+        """触犯核心DNA封印时，命手积极修复应不可应用（防走火入魔）。"""
+        profile = {
+            "current_style": {"tone": 5, "formality": 1, "detail_level": 3, "structure": 3},
+            "dna_expectation": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_core": {"诚信": "不编造"},
+            "requested_change": {"type": "记忆伪造", "target": "编造用户已确认偏好"},
+            "history": [],
+        }
+        result = DNAValidator(profile).validate()
+        assert result["surgery_mode"] == "seal"
+        assert result["ming_hand_repair"]["applicable"] is False
+        assert result["ming_hand_repair"]["blocked_reason"]
+
 
 # ---------------------------------------------------------------------------
 # 6. 拘灵遣将 (tool-orchestrator)
@@ -924,6 +1066,38 @@ class TestToolOrchestrator:
         ]
         matched = match_spirit(tasks[0], spirits)
         assert matched["id"] == "searcher"
+
+    def test_soul_pact_permanent_strengthening(self):
+        """灵契：成功服灵后积累经验值，永久提升匹配精度并体现在打分明细。"""
+        dispatcher.reset_soul_pacts()
+        try:
+            assert dispatcher.soul_pact_bonus("google", "search") == 0.0
+            for _ in range(3):
+                dispatcher.record_soul_pact("google", "search")
+            bonus = dispatcher.soul_pact_bonus("google", "search")
+            assert bonus > 0
+            spirits = [{"id": "google", "capabilities": ["search"], "available": True}]
+            ranked = rank_spirits({"type": "search"}, spirits)
+            assert ranked[0]["_match_detail"]["soul_pact"] == bonus
+        finally:
+            dispatcher.reset_soul_pacts()
+
+    def test_soul_pact_zero_by_default(self):
+        """无灵契时加成为 0，不影响既有排序行为。"""
+        dispatcher.reset_soul_pacts()
+        ranked = rank_spirits({"type": "search"}, [{"id": "g", "capabilities": ["search"]}])
+        assert ranked[0]["_match_detail"]["soul_pact"] == 0.0
+
+    def test_identify_spirit_weakness(self):
+        """灵体弱点识别：缺能力/不可用/低质量应被刻画为不完整。"""
+        spirit = {"id": "weak", "capabilities": ["search"], "available": False, "quality_score": 0.4}
+        prof = dispatcher.identify_spirit_weakness(spirit, required_capabilities=["search", "analysis"])
+        types = {w["type"] for w in prof["weaknesses"]}
+        assert "capability_gap" in types
+        assert "unavailable" in types
+        assert "low_quality" in types
+        assert prof["is_complete"] is False
+        assert prof["completeness"] == 0.5
 
     def test_empty_tasks(self):
         """空任务列表应返回0质量"""
@@ -1149,6 +1323,28 @@ class TestCommandFactoryPackets:
 
 class TestToolForge:
     """工具锻造测试"""
+
+    def test_graft_manifest_auto_transplants_base_template(self):
+        """异术移植：锻造结果应记录自动移植的基底模板。"""
+        factory = ToolFactory("生成一个用于校验 JSON 输入并输出结果的 CLI 工具")
+        result = factory.forge()
+        gm = result["graft_manifest"]
+        assert gm["transplant_count"] >= 1
+        assert any(t["origin"] == "auto" for t in gm["transplanted"])
+
+    def test_graft_manifest_honors_explicit_graft_request(self):
+        """异术移植：spec.graft 中可用招式应被移植，不可用的进入 unavailable。"""
+        available = list(tool_factory.TEMPLATES.keys())
+        assert available, "需要至少一个可用模板"
+        spec = {
+            "name": "grafted-tool",
+            "description": "演示异术移植",
+            "graft": [available[0], "不存在的异术xyz"],
+        }
+        result = ToolFactory(spec).forge()
+        gm = result["graft_manifest"]
+        assert any(t["technique"] == available[0] and t["origin"] == "explicit" for t in gm["transplanted"])
+        assert "不存在的异术xyz" in gm["unavailable"]
 
     def test_forge_generates_files(self):
         """应生成3个文件"""
@@ -1643,6 +1839,15 @@ class TestCommandFactory:
         result = gen.generate()
         assert any(f["type"] == "分析箓" for f in result["talisman_list"])
 
+    def test_species_catalog_classifies_talismans(self):
+        """符种细分：每枚符箓应被归入符种家族，并产出家族分布。"""
+        result = FuGenerator("搜索资料并分析后生成报告").generate()
+        catalog = result["species_catalog"]
+        assert all("species" in fu and "manga_ref" in fu for fu in result["talisman_list"])
+        assert catalog["breakdown"]
+        assert set(catalog["active_families"]).issubset(set(catalog["catalog"].keys()))
+        assert "封印型" in catalog["reserved_families"]
+
     def test_detect_creation_dimension(self):
         """生成关键词应产生创作箓"""
         gen = FuGenerator("生成一份报告")
@@ -1711,6 +1916,25 @@ class TestCommandFactory:
         gen = FuGenerator(spec)
         result = gen.generate()
         assert all(fu["dimension"] != "creation" for fu in result["talisman_list"])
+
+    def test_yan_chu_fa_sui_speak_one_sentence(self):
+        """言出法随：一句话直出符阵，附咒言与范式标记。"""
+        result = fu_generator.speak("搜索竞品资料并分析后生成报告")
+        assert result["incantation"] == "搜索竞品资料并分析后生成报告"
+        assert "言出法随" in result["paradigm"]
+        assert result["dimension_count"] >= 1
+        assert len(result["topology"]) >= 1
+
+    def test_yan_chu_fa_sui_respects_mode(self):
+        """言出法随可指定编排模式。"""
+        result = fu_generator.speak("搜索、分析、对比、汇总四步走", mode="quick-cast")
+        assert result["orchestration_mode"] == "quick-cast"
+        assert result["dimension_count"] <= 2
+
+    def test_yan_chu_fa_sui_rejects_empty(self):
+        """空咒言应被拒绝。"""
+        with pytest.raises(ValueError):
+            fu_generator.speak("   ")
 
 
 # ---------------------------------------------------------------------------
@@ -2084,6 +2308,37 @@ class TestEvolutionEngine:
         core.transformer.backup_dir.mkdir(exist_ok=True)
         result = core._validate("invalid")
         assert result["passed"] is False
+
+    def test_graft_capability_seed_for_new_capability(self, tmp_path):
+        """赋能：为不具备某能力的目标 skill 产出新能力萌芽蓝图（read-only）。"""
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        sp = skills_dir / "alpha"
+        sp.mkdir()
+        (sp / "SKILL.md").write_text(
+            "---\nmetadata:\n  name: alpha\n  tags: ['search', 'parse']\n---\n",
+            encoding="utf-8",
+        )
+        core = XiuShenLuCoreV7(str(skills_dir))
+        res = core.graft_capability("alpha", "vision", source_skill="beta")
+        assert res["status"] == "seed_ready"
+        assert res["seed"]["capability"] == "vision"
+        assert res["seed"]["graft_from"] == "beta"
+        assert res["applied"] is False
+        assert "神机百炼" in res["lineage"]
+
+    def test_graft_capability_detects_existing_and_missing(self, tmp_path):
+        """赋能：已具备的能力不重复赋予；目标不存在应报告。"""
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        sp = skills_dir / "alpha"
+        sp.mkdir()
+        (sp / "SKILL.md").write_text(
+            "---\nmetadata:\n  tags: ['search', 'vision']\n---\n", encoding="utf-8"
+        )
+        core = XiuShenLuCoreV7(str(skills_dir))
+        assert core.graft_capability("alpha", "vision")["status"] == "already_present"
+        assert core.graft_capability("ghost", "vision")["status"] == "target_not_found"
 
     def test_run_cycle_defaults_to_plan_only(self, tmp_path):
         """默认进化周期应只生成计划，不直接改写skill"""
