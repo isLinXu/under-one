@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-under-one.skills V10 八卦阵生态中枢 (Bagua-Zhen V10 Coordinator)
+under-one.skills V10.2 八卦阵生态中枢 (Bagua-Zhen V10.2 Coordinator)
 用途: 八奇技skill生态系统的中央协调器
 - 扫描所有skill状态
 - 互斥检测与仲裁
 - 效能聚合评分
-- V10: 生态健康报告 + 联动调度 + 十技全景
+- V10.2: 生态健康报告 + 联动调度 + 十技全景 + 动态关系学习
 
 Usage:
     python coordinator.py [skills_dir]
@@ -18,36 +18,80 @@ from itertools import combinations
 
 # 运行时指标收集
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(SKILLS_ROOT))
-try:
-    from metrics_collector import record_metrics
-except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
 
-# V10.1: 支持从 under-one.yaml 读取互斥/协同矩阵
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 try:
-    from _skill_config import get_skill_config
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics, resolve_runtime_data_dir
 except ImportError:
-    def get_skill_config(_section, _key=None, default=None):
-        return default
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics, resolve_runtime_data_dir
+
+    try:
+        from _skill_config import get_skill_config
+    except ImportError:
+        def get_skill_config(_section, _key=None, default=None):
+            return default
+
+try:
+    from skills.control_plane_protocol import build_control_plane_status, get_control_plane_contract
+except ImportError:
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    try:
+        from control_plane_protocol import build_control_plane_status, get_control_plane_contract
+    except ImportError:
+        def get_control_plane_contract(_skill_name, skill_dir=None):
+            return {}
+
+        def build_control_plane_status(
+            skill_name,
+            *,
+            phase,
+            manual_gate_required,
+            skill_dir=None,
+            writes_applied=False,
+            next_owner=None,
+            handoff_targets=None,
+            note=None,
+        ):
+            return {
+                "role": None,
+                "scope": None,
+                "mutation_gate": None,
+                "reads": [],
+                "writes": [],
+                "will_not": [],
+                "phase": phase,
+                "manual_gate_required": manual_gate_required,
+                "writes_applied": writes_applied,
+                "next_owner": next_owner or skill_name,
+                "handoff_targets": handoff_targets or [],
+                "blocked_writes": [],
+                "summary": None,
+                "note": note,
+            }
 
 SKILL_NAMES = [
     "qiti-yuanliu", "tongtian-lu", "dalu-dongguan", "shenji-bailian",
     "fenghou-qimen", "liuku-xianzei", "shuangquanshou", "juling-qianjiang",
     "bagua-zhen", "xiushen-lu",
 ]
-VERSION = "v0.1.0"
+VERSION = "v10.2"
 
 # 从配置读取互斥/协同矩阵，回退到硬编码默认值
 _cfg_mutex = get_skill_config("baguazhen", "mutex_pairs", [])
 _cfg_synergy = get_skill_config("baguazhen", "synergy_pairs", [])
 _cfg_min_cooccurrence = get_skill_config("baguazhen", "min_cooccurrence_for_dynamic", 3)
+_cfg_min_solo_records = get_skill_config("baguazhen", "min_solo_records_for_dynamic", 2)
 _cfg_cache_ttl = get_skill_config("baguazhen", "cache_ttl_seconds", 3600)
 _cfg_prefer_dynamic = get_skill_config("baguazhen", "prefer_dynamic_overrides", True)
 _cfg_dynamic_ignore_pairs = get_skill_config("baguazhen", "dynamic_ignore_pairs", [])
+_cfg_dynamic_ignore_skills = get_skill_config(
+    "baguazhen",
+    "dynamic_ignore_skills",
+    ["bagua-zhen", "xiushen-lu"],
+)
 
 MUTEX_PAIRS = [
     tuple(p) for p in _cfg_mutex
@@ -65,8 +109,14 @@ SYNERGY_PAIRS = [
     ("qiti-yuanliu", "shuangquanshou"),
 ]
 
-# V10.2: 动态关系缓存文件
-DYNAMIC_REL_FILE = Path("runtime_data") / "_dynamic_relationships.json"
+def _runtime_dir() -> Path:
+    runtime_dir = resolve_runtime_data_dir()
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    return runtime_dir
+
+
+def _dynamic_relationships_file() -> Path:
+    return _runtime_dir() / "_dynamic_relationships.json"
 
 
 def _pair_key(pair) -> tuple[str, str]:
@@ -74,6 +124,13 @@ def _pair_key(pair) -> tuple[str, str]:
 
 
 IGNORED_DYNAMIC_PAIRS = {_pair_key(pair) for pair in _cfg_dynamic_ignore_pairs}
+IGNORED_DYNAMIC_SKILLS = set(_cfg_dynamic_ignore_skills or [])
+
+
+def _dynamic_pair_allowed(a: str, b: str) -> bool:
+    if a in IGNORED_DYNAMIC_SKILLS or b in IGNORED_DYNAMIC_SKILLS:
+        return False
+    return _pair_key((a, b)) not in IGNORED_DYNAMIC_PAIRS
 
 
 def _filter_dynamic_relationships(relationships: dict) -> dict:
@@ -82,7 +139,7 @@ def _filter_dynamic_relationships(relationships: dict) -> dict:
         pair = rel.get("pair", [])
         if len(pair) != 2:
             continue
-        if _pair_key(pair) in IGNORED_DYNAMIC_PAIRS:
+        if not _dynamic_pair_allowed(pair[0], pair[1]):
             continue
         filtered[key] = rel
     return filtered
@@ -270,9 +327,10 @@ def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
     5. 若共现时质量显著升高 -> 标记协同
     """
     # 优先使用缓存（如果1小时内已更新）
-    if DYNAMIC_REL_FILE.exists():
+    dynamic_rel_file = _dynamic_relationships_file()
+    if dynamic_rel_file.exists():
         try:
-            with open(DYNAMIC_REL_FILE, "r", encoding="utf-8") as f:
+            with open(dynamic_rel_file, "r", encoding="utf-8") as f:
                 cached = json.load(f)
             cached_time = datetime.fromisoformat(cached.get("updated_at", "2000-01-01"))
             if (datetime.now() - cached_time).total_seconds() < _cfg_cache_ttl:
@@ -288,7 +346,7 @@ def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
     # 计算共现统计
     rel_stats = {}
     for a, b in combinations(SKILL_NAMES, 2):
-        if _pair_key((a, b)) in IGNORED_DYNAMIC_PAIRS:
+        if not _dynamic_pair_allowed(a, b):
             continue
         rec_a = all_records.get(a, [])
         rec_b = all_records.get(b, [])
@@ -319,8 +377,15 @@ def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
         co_a = [r for r in rec_a if r.get("timestamp", "")[:13] in cooccurrence_hours]
         co_b = [r for r in rec_b if r.get("timestamp", "")[:13] in cooccurrence_hours]
 
+        if len(solo_a) < _cfg_min_solo_records or len(solo_b) < _cfg_min_solo_records:
+            continue
+
         def _avg_quality(recs):
-            vals = [r.get("quality_score", 0) for r in recs if r.get("quality_score") is not None]
+            vals = [
+                r.get("quality_score")
+                for r in recs
+                if isinstance(r.get("quality_score"), (int, float)) and r.get("quality_score") >= 0
+            ]
             return sum(vals) / len(vals) if vals else 0
 
         def _avg_errors(recs):
@@ -387,8 +452,9 @@ def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
 
     # 缓存结果
     try:
-        DYNAMIC_REL_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(DYNAMIC_REL_FILE, "w", encoding="utf-8") as f:
+        dynamic_rel_file = _dynamic_relationships_file()
+        dynamic_rel_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(dynamic_rel_file, "w", encoding="utf-8") as f:
             json.dump({
                 "updated_at": datetime.now().isoformat(),
                 "relationships": relationships,
@@ -401,7 +467,7 @@ def _load_dynamic_relationships(min_cooccurrence: int = 3) -> dict:
 
 
 def load_metrics(skill_name: str) -> list:
-    file_path = Path("runtime_data") / f"{skill_name}_metrics.jsonl"
+    file_path = _runtime_dir() / f"{skill_name}_metrics.jsonl"
     if not file_path.exists():
         return []
     records = []
@@ -424,13 +490,23 @@ def calc_stats(records):
     if not records:
         return {"success_rate": 0, "quality": 85, "errors": 0, "human_intervention": 0, "output_completeness": 0, "consistency_score": 85, "n": 0}
     n = len(records)
+    def _avg_numeric(key, default=0, fallback_key=None):
+        values = []
+        for record in records:
+            raw = record.get(key)
+            if raw is None and fallback_key:
+                raw = record.get(fallback_key)
+            if isinstance(raw, (int, float)) and raw >= 0:
+                values.append(float(raw))
+        return round(sum(values) / len(values), 1) if values else default
+
     return {
         "success_rate": round(sum(1 for r in records if r.get("success")) / n * 100, 1),
-        "quality": round(sum(r.get("quality_score", 0) for r in records) / n, 1),
+        "quality": _avg_numeric("quality_score", 0),
         "errors": round(sum(r.get("error_count", 0) for r in records) / n, 2),
         "human_intervention": round(sum(r.get("human_intervention", 0) for r in records) / n, 2),
-        "output_completeness": round(sum(r.get("output_completeness", 0) for r in records) / n, 1),
-        "consistency_score": round(sum(r.get("consistency_score", r.get("quality_score", 0)) for r in records) / n, 1),
+        "output_completeness": _avg_numeric("output_completeness", 0),
+        "consistency_score": _avg_numeric("consistency_score", 0, fallback_key="quality_score"),
         "n": n,
     }
 
@@ -491,9 +567,20 @@ def coordinate(skills_dir: str = None):
     human_signals = [s["human_intervention"] for s in states.values() if s["n"] > 0]
     avg = sum(scores) / len(scores) if scores else 85
     avg_human = sum(human_signals) / len(human_signals) if human_signals else 0
-    level = "阵法大成" if avg >= 90 else "阵法稳固" if avg >= 75 else "阵法松动"
+    # 天人合一境界：所有10技活跃且无互斥冲突时，可达最高境界
+    all_active_no_mutex = (active_count == 10 and len(mutex_found) == 0)
+    if all_active_no_mutex and avg >= 90:
+        level = "天人合一"  # 十技归一，炁机贯通，天地同频
+    elif avg >= 90:
+        level = "阵法大成"  # 八卦运转圆满，炁机畅通
+    elif avg >= 75:
+        level = "阵法稳固"  # 阵法稳固，偶有震动但无崩阵之忧
+    else:
+        level = "阵法松动"  # 阵脚松动，某方位气场紊乱，需拨乱反正
 
     # 打印全景
+    if level == "天人合一":
+        print(f"\n✨ 十技归一 · 天人合一 ✨")
     print(f"\n生态状态: {level} | 平均分: {avg:.1f} | 人工介入: {avg_human:.2f} | 活跃: {active_count}/10")
     if mutex_found:
         print(f"互斥检测: {len(mutex_found)} 对skill同时活跃")
@@ -515,9 +602,21 @@ def coordinate(skills_dir: str = None):
     weakest_skills = _build_weakest_skills(states)
     ecosystem_hotspots = _build_ecosystem_hotspots(states, mutex_found, weakest_skills)
     optimization_queue = _build_optimization_queue(weakest_skills, ecosystem_hotspots)
+    control_plane_status = build_control_plane_status(
+        "bagua-zhen",
+        phase="ecosystem-report" if not optimization_queue else "ecosystem-coordination",
+        manual_gate_required=bool(optimization_queue),
+        skill_dir=Path(__file__).resolve().parent.parent,
+        writes_applied=False,
+        next_owner=optimization_queue[0]["skill"] if optimization_queue else "bagua-zhen",
+        handoff_targets=[item["skill"] for item in optimization_queue[:3] if item.get("skill")],
+        note="report_only",
+    )
     report = {
         "coordinator": "bagua-zhen",
         "version": VERSION,
+        "control_plane_contract": get_control_plane_contract("bagua-zhen", skill_dir=Path(__file__).resolve().parent.parent),
+        "control_plane_status": control_plane_status,
         "ecosystem_level": level,
         "average_quality": round(avg, 1),
         "ecosystem_quality": _ecosystem_quality({
@@ -537,6 +636,8 @@ def coordinate(skills_dir: str = None):
         "relationship_policy": {
             "prefer_dynamic_overrides": _cfg_prefer_dynamic,
             "dynamic_ignore_pairs": sorted([list(pair) for pair in IGNORED_DYNAMIC_PAIRS]),
+            "dynamic_ignore_skills": sorted(IGNORED_DYNAMIC_SKILLS),
+            "min_solo_records_for_dynamic": _cfg_min_solo_records,
         },
         "weakest_skills": weakest_skills,
         "ecosystem_hotspots": ecosystem_hotspots,

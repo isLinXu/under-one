@@ -1,7 +1,7 @@
 {
   "id": "shenji-bailian",
   "name": "神机百炼",
-  "version": "v0.1.0",
+  "version": "v6.5",
   "type": "script",
   "entry": "scripts/tool_factory.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["*.py", "*.md", "*_skillhub_meta.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 95.0,
+    "avg_completeness": 96.0,
+    "avg_consistency": 93.0,
+    "avg_human": 0.01,
+    "success_rate": 0.97,
+    "avg_duration": 1180.0,
+    "recommended_min_records": 8,
+    "degradation_window": 3
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "工具与技能造物",

@@ -14,27 +14,28 @@ import sys
 import re
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # 运行时指标收集
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics, resolve_runtime_data_dir
+    from under_one.validation import validate_json_list
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics, resolve_runtime_data_dir
 
-# 配置加载
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-try:
-    from _skill_config import validate_json_list, get_skill_config
-except ImportError:
-    def validate_json_list(data, item_schema, skill_name="skill"):
-        if not isinstance(data, list):
-            return False, ["<root> must be a list"]
-        return True, []
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+    try:
+        from _skill_config import validate_json_list, get_skill_config
+    except ImportError:
+        def validate_json_list(data, item_schema, skill_name="skill"):
+            if not isinstance(data, list):
+                return False, ["<root> must be a list"]
+            return True, []
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 # 全局调用计数器（用于负载均衡）
@@ -200,7 +201,7 @@ def load_spirits_source(path: str) -> list:
     raise ValueError("spirits source must be a JSON object/list or soul.md markdown")
 
 
-def _build_soul_binding(task: dict, spirit: dict, role: str = "primary", support_spirits: list | None = None) -> dict | None:
+def _build_soul_binding(task: dict, spirit: dict, role: str = "primary", support_spirits: Optional[list] = None) -> Optional[dict]:
     """为 soul.md 来源的 spirit 生成非破坏式附体建议。"""
     if spirit.get("source_type") != "soul_markdown":
         return None
@@ -236,7 +237,7 @@ def _build_soul_binding(task: dict, spirit: dict, role: str = "primary", support
     }
 
 
-def _resolve_formation(cfg: dict, formation: str | None = None) -> dict:
+def _resolve_formation(cfg: dict, formation: Optional[str] = None) -> dict:
     """解析当前附体阵型配置。"""
     formations = cfg.get("formations", {})
     selected = formation or cfg.get("formation", "dual-attunement")
@@ -468,8 +469,8 @@ def _build_command_packet(
     formation_cfg: dict,
     strategy: str,
     cfg: dict,
-    backup_candidates: list | None = None,
-    fallback_entry: dict | None = None,
+    backup_candidates: Optional[list] = None,
+    fallback_entry: Optional[dict] = None,
 ) -> dict:
     objective = _task_objective(task)
     capability = _resolve_capability(task, spirit, cfg.get("capability_aliases", {}))
@@ -536,7 +537,7 @@ def _build_execution_checkpoints(
     spirit: dict,
     support_spirits: list,
     authority_mode: str,
-    fallback_entry: dict | None = None,
+    fallback_entry: Optional[dict] = None,
 ) -> list:
     """生成执行检查点，帮助上层 agent 在关键阶段做守门。"""
     checkpoints = [
@@ -597,7 +598,7 @@ def _build_recovery_plan(
     rebellion_risk: dict,
     authority_mode: str,
     strategy: str,
-    fallback_entry: dict | None = None,
+    fallback_entry: Optional[dict] = None,
 ) -> dict:
     """生成失败恢复计划，避免多灵体执行在异常时失控。"""
     risk_level = rebellion_risk.get("level", "low")
@@ -639,7 +640,7 @@ def _build_escalation_contract(
     spirit: dict,
     rebellion_risk: dict,
     authority_mode: str,
-    fallback_entry: dict | None,
+    fallback_entry: Optional[dict],
     recovery_plan: dict,
 ) -> dict:
     """定义何时必须升级到更高控制层或人工确认。"""
@@ -819,7 +820,7 @@ def fallback_possess(spirit: dict, task: dict = None, cfg: dict = None) -> dict:
 
 
 @record_metrics("juling-qianjiang")
-def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: str | None = None) -> dict:
+def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: Optional[str] = None) -> dict:
     """V9.1调度核心 - 多维度评分匹配"""
     global _call_counts
     
@@ -963,7 +964,7 @@ def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: s
     governance_summary = _build_governance_summary(plan, command_plan, fallback_log)
     
     return {
-        "version": "v0.1.0",
+        "version": "v9.8",
         "plan": plan,
         "fallback_log": fallback_log,
         "fallback_count": len(fallback_log),
@@ -1050,8 +1051,8 @@ def main():
         print(f"\n负载状态: {result['load_balance_state']}")
     
     # 导出metrics
-    metrics_dir = Path("runtime_data")
-    metrics_dir.mkdir(exist_ok=True)
+    metrics_dir = resolve_runtime_data_dir()
+    metrics_dir.mkdir(parents=True, exist_ok=True)
     metrics = {
         "skill_name": "juling-qianjiang",
         "timestamp": datetime.now().isoformat(),

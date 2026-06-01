@@ -22,10 +22,18 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+try:
+    from metrics_collector import resolve_runtime_data_dir
+except ImportError:
+    def resolve_runtime_data_dir(data_dir=None) -> Path:
+        return Path(data_dir or "runtime_data").expanduser()
+
 
 # ── Global Paths ──
-RUNTIME_DIR = Path("runtime_data")
-RUNTIME_DIR.mkdir(exist_ok=True)
+def _runtime_dir() -> Path:
+    runtime_dir = resolve_runtime_data_dir()
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    return runtime_dir
 
 
 class HachiConfig:
@@ -180,14 +188,14 @@ def export_metrics(skill_name: str, result: Dict):
         "consistency_score": result.get("consistency_score", 90),
         "duration_ms": result.get("duration_ms", 0),
     }
-    file_path = RUNTIME_DIR / f"{skill_name}_metrics.jsonl"
+    file_path = _runtime_dir() / f"{skill_name}_metrics.jsonl"
     with open(file_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(metrics, ensure_ascii=False) + "\n")
 
 
 def load_jsonl(name: str, n: int = 100) -> list:
     """加载最近n条metrics记录"""
-    file_path = RUNTIME_DIR / f"{name}_metrics.jsonl"
+    file_path = _runtime_dir() / f"{name}_metrics.jsonl"
     if not file_path.exists():
         return []
     with open(file_path, "r", encoding="utf-8") as f:

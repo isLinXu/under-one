@@ -1,7 +1,7 @@
 {
   "id": "liuku-xianzei",
   "name": "六库仙贼",
-  "version": "v0.1.0",
+  "version": "v5.5",
   "type": "script",
   "entry": "scripts/knowledge_digest.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["digest_report.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 84.0,
+    "avg_completeness": 88.0,
+    "avg_consistency": 83.0,
+    "avg_human": 0.07,
+    "success_rate": 0.91,
+    "avg_duration": 980.0,
+    "recommended_min_records": 12,
+    "degradation_window": 5
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "信息吸收、消化与保鲜",

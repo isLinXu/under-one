@@ -1,7 +1,7 @@
 {
   "id": "tongtian-lu",
   "name": "通天箓",
-  "version": "v0.1.0",
+  "version": "v5.8",
   "type": "script",
   "entry": "scripts/fu_generator.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["fu_plan.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 91.0,
+    "avg_completeness": 93.0,
+    "avg_consistency": 90.0,
+    "avg_human": 0.02,
+    "success_rate": 0.96,
+    "avg_duration": 760.0,
+    "recommended_min_records": 10,
+    "degradation_window": 4
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "结构化指令外放与任务拆解",

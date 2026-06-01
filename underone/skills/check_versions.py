@@ -17,11 +17,14 @@ from pathlib import Path
 from typing import Optional
 
 SKILLS_ROOT = Path(__file__).resolve().parent
-VERSION_PATTERN = re.compile(r'version\s*:\s*["\']?(v?\d+\.\d+\.\d+)["\']?', re.IGNORECASE)
+VERSION_PATTERN = re.compile(r'version\s*:\s*["\']?(v?\d+\.\d+(?:\.\d+)?)["\']?', re.IGNORECASE)
 SCRIPT_VERSION_PATTERN = re.compile(r'[Vv](\d+\.\d+(?:\.\d+)?)')
 SCRIPT_CURRENT_VERSION_PATTERNS = [
-    re.compile(r'VERSION\s*=\s*["\'](v?\d+\.\d+\.\d+)["\']'),
-    re.compile(r'"version"\s*:\s*["\'](v?\d+\.\d+\.\d+)["\']'),
+    re.compile(r'VERSION\s*=\s*["\'](v?\d+\.\d+(?:\.\d+)?)["\']'),
+    re.compile(r'版本\s*:\s*[Vv](\d+\.\d+(?:\.\d+)?)'),
+]
+SCRIPT_EMBEDDED_VERSION_PATTERNS = [
+    re.compile(r'"version"\s*:\s*["\'](v?\d+\.\d+(?:\.\d+)?)["\']'),
 ]
 
 
@@ -83,11 +86,13 @@ def extract_script_version(skill_path: Path) -> Optional[str]:
         main_script = candidate if candidate.exists() else scripts[0]
 
     content = main_script.read_text(encoding="utf-8")
+    header = "\n".join(content.splitlines()[:80])
     for pattern in SCRIPT_CURRENT_VERSION_PATTERNS:
-        match = pattern.search(content)
+        match = pattern.search(header)
         if match:
-            return match.group(1)
-    match = SCRIPT_VERSION_PATTERN.search(content)
+            version = match.group(1)
+            return version if version.lower().startswith("v") else f"v{version}"
+    match = SCRIPT_VERSION_PATTERN.search(header)
     return f"v{match.group(1)}" if match else None
 
 

@@ -17,19 +17,20 @@ import re
 from pathlib import Path
 
 # 运行时指标收集
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
 
-try:
-    from _skill_config import get_skill_config
-except ImportError:
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+    try:
+        from _skill_config import get_skill_config
+    except ImportError:
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 FU_TEMPLATES = {
@@ -598,6 +599,50 @@ class FuGenerator:
             "objective": self.task[:120],
         }
 
+    def _build_delivery_contract(self, command_packets, dispatch_contract, ritual_summary):
+        contracts_present = ritual_summary.get("contracts_present", [])
+        missing_sections = [
+            key for key in ("task", "talisman_contract", "risk_contract", "execution_contract")
+            if key not in contracts_present
+        ]
+        ready_to_dispatch = bool(self.topology and command_packets and dispatch_contract)
+        return {
+            "ready_to_dispatch": ready_to_dispatch,
+            "required_outputs": [
+                "talisman_list",
+                "topology",
+                "command_packets",
+                "dispatch_contract",
+                "execution_plan",
+            ],
+            "present_outputs": [
+                name for name in (
+                    "talisman_list",
+                    "topology",
+                    "command_packets",
+                    "dispatch_contract",
+                    "execution_plan",
+                )
+                if (
+                    (name == "talisman_list" and bool(self.fu_list))
+                    or (name == "topology" and bool(self.topology))
+                    or (name == "command_packets" and bool(command_packets))
+                    or (name == "dispatch_contract" and bool(dispatch_contract))
+                    or (name == "execution_plan")
+                )
+            ],
+            "missing_sections": missing_sections,
+            "blocking_conflicts": [
+                conflict["type"] for conflict in self.conflicts if conflict.get("severity") == "high"
+            ],
+            "contract_coverage": {
+                "task_defined": "task" in contracts_present,
+                "risk_budget_defined": "risk_contract" in contracts_present,
+                "execution_defined": "execution_contract" in contracts_present,
+                "dispatch_defined": bool(dispatch_contract),
+            },
+        }
+
     def _output(self):
         total_sla = sum(fu.get("avg_sla", 15) for fu in self.fu_list)
         # adapter_insertions: 只有数据流不兼容和格式不匹配需要插入适配器
@@ -637,9 +682,20 @@ class FuGenerator:
         }
         command_packets = self._build_command_packets()
         dispatch_contract = self._build_dispatch_contract(command_packets, mode)
+        delivery_contract = self._build_delivery_contract(command_packets, dispatch_contract, ritual_summary)
+        completeness_score = min(
+            100.0,
+            64.0
+            + len(self.topology) * 4.0
+            + len(command_packets) * 4.0
+            + (6.0 if dispatch_contract else 0.0)
+            + (4.0 if ritual_summary else 0.0)
+            + (4.0 if delivery_contract.get("ready_to_dispatch") else 0.0)
+            + (4.0 if not delivery_contract.get("blocking_conflicts") else 0.0),
+        )
         return {
             "generator": "tongtian-lu",
-            "version": "v0.1.0",
+            "version": "v5.8",
             "task": self.task[:80],
             "orchestration_mode": self.mode_cfg.get("name", "balanced-array"),
             "ritual_intent": ritual_summary["ritual_intent"],
@@ -651,6 +707,7 @@ class FuGenerator:
             "topology": self.topology,
             "command_packets": command_packets,
             "dispatch_contract": dispatch_contract,
+            "delivery_contract": delivery_contract,
             "ritual_summary": ritual_summary,
             "quality_score": round(
                 max(
@@ -667,7 +724,7 @@ class FuGenerator:
                 1,
             ),
             "human_intervention": 1 if risk_alignment == "exceeds_budget" or any(c.get("severity") == "high" for c in self.conflicts) else 0,
-            "output_completeness": round(min(100.0, 60.0 + len(self.topology) * 6.0 + len(command_packets) * 5.0), 1),
+            "output_completeness": round(completeness_score, 1),
             "consistency_score": round(max(0.0, 100.0 - len(self.conflicts) * 8.0), 1),
             "execution_plan": {
                 "mode": mode,

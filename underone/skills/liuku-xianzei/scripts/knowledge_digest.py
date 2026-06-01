@@ -4,7 +4,7 @@
 用途: 评估信息消化率，生成知识单元，计算保鲜期
 输入: JSON [{"source":"来源","content":"文本","credibility":"S"}]
 输出: JSON {digest_rate,knowledge_units,freshness_schedule}
-版本: V5.4 — 配置化重构 + 梯度评分 + 信息密度因子 + 污染风险分层
+版本: V5.5 — 世界观深度注入：炁化吸收/尸魔侵蚀/炁机循环隐喻体系
 """
 
 import json
@@ -17,30 +17,39 @@ from collections import Counter
 # ── 路径设置 ───────────────────────────────────────────────
 SKILL_ROOT = Path(__file__).resolve().parent.parent  # liuku-xianzei/
 SKILLS_ROOT = SKILL_ROOT.parent                       # skills/
-sys.path.insert(0, str(SKILLS_ROOT))
 
 # ── 依赖导入（带降级） ─────────────────────────────────────
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
+    from under_one.validation import validate_json_list
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
 
-try:
-    from _skill_config import validate_json_list, get_skill_config
-except ImportError:
-    def validate_json_list(data, item_schema, skill_name="skill"):
-        if not isinstance(data, list):
-            return False, ["<root> must be a list"]
-        return True, []
+    try:
+        from _skill_config import validate_json_list, get_skill_config
+    except ImportError:
+        def validate_json_list(data, item_schema, skill_name="skill"):
+            if not isinstance(data, list):
+                return False, ["<root> must be a list"]
+            return True, []
 
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 class KnowledgeDigest:
-    """V5.4 知识消化器 — 配置化 + 梯度评分 + 信息密度因子 + 污染风险分层"""
+    """V5.5 知识消化器 — 配置化 + 梯度评分 + 信息密度因子 + 污染风险分层
+
+    六库仙贼隐喻映射:
+      digestion_level: high → "炁化完成", medium → "炼化中", low → "未入炁"
+      contamination:   high → "尸魔侵蚀", medium → "炁机浑浊", low → "炁机清朗"
+      quarantine_queue → "尸魔封印"（被污染的知识暂时隔离）
+      inheritance_queue → "炁化归元"（纯净炁写入长期记忆）
+      review_schedule   → "炁机循环"（按周期重新炁化以维持活性）
+    """
 
     # ── 硬编码默认值（配置不可用时回退） ────────────────────
     _DEFAULT_CREDIBILITY_WEIGHT = {"S": 1.5, "A": 1.2, "B": 1.0, "C": 0.6}
@@ -565,6 +574,116 @@ class KnowledgeDigest:
         actions.sort(key=lambda item: (self._priority_rank(item.get("priority")), item.get("id", "")))
         return actions
 
+    def _build_coverage_gaps(self):
+        gaps = []
+        low_digest_units = [unit["concept"] for unit in self.units if unit.get("digestion_level") == "低"][:5]
+        if low_digest_units:
+            gaps.append(
+                {
+                    "type": "low_digestion_units",
+                    "severity": "high",
+                    "count": len(low_digest_units),
+                    "examples": low_digest_units,
+                    "action": "补充核心论点、证据和应用场景后再二次炼化。",
+                }
+            )
+
+        weak_evidence_units = [
+            unit["concept"]
+            for unit in self.units
+            if unit.get("evidence_matches", 0) == 0
+            and unit.get("semantic_profile", {}).get("numeric_markers", 0) == 0
+        ][:5]
+        if weak_evidence_units:
+            gaps.append(
+                {
+                    "type": "missing_evidence",
+                    "severity": "medium",
+                    "count": len(weak_evidence_units),
+                    "examples": weak_evidence_units,
+                    "action": "补充数据、实验或案例证据，再重新评估消化率。",
+                }
+            )
+
+        weak_application_units = [
+            unit["concept"] for unit in self.units if unit.get("application_matches", 0) == 0
+        ][:5]
+        if weak_application_units:
+            gaps.append(
+                {
+                    "type": "missing_application",
+                    "severity": "medium",
+                    "count": len(weak_application_units),
+                    "examples": weak_application_units,
+                    "action": "补齐适用场景或落地动作，避免知识只能停留在摘要层。",
+                }
+            )
+
+        if self.quarantine_queue:
+            gaps.append(
+                {
+                    "type": "quarantine_backlog",
+                    "severity": "critical" if self.contamination_risk.get("level") == "high" else "high",
+                    "count": len(self.quarantine_queue),
+                    "examples": [item["concept"] for item in self.quarantine_queue[:3]],
+                    "action": "先复核隔离队列，再决定是否进入长期继承。",
+                }
+            )
+
+        gaps.sort(key=lambda item: (self._priority_rank(item.get("severity")), item.get("type", "")))
+        return gaps
+
+    def _build_delivery_contract(self, portfolio_diagnostics, refinement_queue, priority_actions, coverage_gaps):
+        required_outputs = [
+            "knowledge_units",
+            "review_schedule",
+            "inheritance_queue",
+            "quarantine_queue",
+            "portfolio_diagnostics",
+            "priority_actions",
+        ]
+        present_outputs = [
+            name
+            for name in required_outputs
+            if (
+                (name == "knowledge_units" and bool(self.units))
+                or (name == "review_schedule" and hasattr(self, "review_schedule"))
+                or (name == "inheritance_queue" and self.inheritance_queue is not None)
+                or (name == "quarantine_queue" and self.quarantine_queue is not None)
+                or (name == "portfolio_diagnostics" and bool(portfolio_diagnostics))
+                or (name == "priority_actions" and priority_actions is not None)
+            )
+        ]
+
+        blockers = []
+        if self.contamination_risk.get("level") == "high":
+            blockers.append("存在高污染风险单元，暂不适合直接写入长期记忆。")
+        if any(unit.get("digestion_level") == "低" for unit in self.units):
+            blockers.append("仍有低消化率单元，需要二次炼化。")
+
+        ready_to_deliver = len(present_outputs) == len(required_outputs)
+        ready_to_commit = ready_to_deliver and not blockers and len(self.inheritance_queue) > 0
+        follow_up_mode = (
+            "commit-to-memory"
+            if ready_to_commit
+            else "review-and-refine"
+            if blockers or refinement_queue
+            else "deliver-only"
+        )
+
+        return {
+            "ready_to_deliver": ready_to_deliver,
+            "ready_to_commit_to_memory": ready_to_commit,
+            "required_outputs": required_outputs,
+            "present_outputs": present_outputs,
+            "blockers": blockers,
+            "follow_up_mode": follow_up_mode,
+            "quarantine_count": len(self.quarantine_queue),
+            "inheritance_count": len(self.inheritance_queue),
+            "gap_count": len(coverage_gaps),
+            "next_action_id": priority_actions[0]["id"] if priority_actions else None,
+        }
+
     # ── 公共接口 ──────────────────────────────────────────────
 
     @record_metrics("liuku-xianzei")
@@ -597,6 +716,12 @@ class KnowledgeDigest:
             text, credibility, effective_digestion, core_matches, ev_matches, app_matches, is_short, semantic_profile
         )
 
+        # V5.5: 世界观映射——消化等级与污染等级的六库仙贼隐喻
+        lore_digestion_map = {"高": "炁化完成", "中": "炼化中", "低": "未入炁"}
+        lore_contamination_map = {"高": "尸魔侵蚀", "中": "炁机浑浊", "低": "炁机清朗"}
+        lore_digestion = lore_digestion_map.get(level, "未入炁")
+        lore_contamination = lore_contamination_map.get(contamination_level, "炁机清朗")
+
         # 知识单元
         return {
             "concept": text[:30] + "..." if len(text) > 30 else text,
@@ -604,6 +729,7 @@ class KnowledgeDigest:
             "credibility": credibility,
             "digestion_rate": effective_digestion,
             "digestion_level": level,
+            "digestion_lore": lore_digestion,          # V5.5: 六库仙贼隐喻
             "category": category,
             "freshness_days": freshness.days,
             "expires": expire.strftime("%Y-%m-%d"),
@@ -624,9 +750,11 @@ class KnowledgeDigest:
             },
             "contamination_risk": contamination_risk,
             "contamination_level": contamination_level,
+            "contamination_lore": lore_contamination,  # V5.5: 尸魔侵蚀隐喻
             "contamination_reasons": contamination_reasons,
             "inheritance_ready": False,
             "retention_action": "quarantine",
+            "retention_lore": "尸魔封印",               # V5.5: 隔离队列→尸魔封印
         }
 
     def _build_report(self):
@@ -708,10 +836,60 @@ class KnowledgeDigest:
         portfolio_diagnostics = self._build_portfolio_diagnostics()
         refinement_queue = self._build_refinement_queue()
         priority_actions = self._build_priority_actions(portfolio_diagnostics, refinement_queue)
+        coverage_gaps = self._build_coverage_gaps()
+        delivery_contract = self._build_delivery_contract(
+            portfolio_diagnostics, refinement_queue, priority_actions, coverage_gaps
+        )
+        resilience_score = max(0.0, 100.0 - self.contamination_risk["score"] * 35.0)
+        triage_readiness = min(
+            100.0,
+            portfolio_diagnostics["inheritance_readiness"]["ready_rate"]
+            + portfolio_diagnostics["inheritance_readiness"]["quarantine_rate"],
+        )
+        evidence_coverage = portfolio_diagnostics["evidence_coverage"]["coverage_rate"]
+        operational_readiness = min(
+            100.0,
+            52.0
+            + (16.0 if delivery_contract["ready_to_deliver"] else 0.0)
+            + (10.0 if hasattr(self, "review_schedule") else 0.0)
+            + (8.0 if priority_actions else 0.0)
+            + (8.0 if portfolio_diagnostics else 0.0)
+            + (6.0 if coverage_gaps else 0.0),
+        )
+        quality_score = min(
+            100.0,
+            avg_rate * 0.35
+            + resilience_score * 0.20
+            + evidence_coverage * 0.15
+            + triage_readiness * 0.15
+            + operational_readiness * 0.15,
+        )
+        completeness_score = min(
+            100.0,
+            70.0
+            + len(self.units) * 2.5
+            + len(review_schedule) * 2.0
+            + (6.0 if portfolio_diagnostics else 0.0)
+            + (6.0 if refinement_queue is not None else 0.0)
+            + (6.0 if priority_actions is not None else 0.0)
+            + (6.0 if delivery_contract["ready_to_deliver"] else 0.0)
+            + (4.0 if coverage_gaps is not None else 0.0),
+        )
+        consistency_score = min(
+            100.0,
+            max(60.0, resilience_score * 0.70 + triage_readiness * 0.30),
+        )
 
         return {
             "digester": "liuku-xianzei",
-            "version": "v0.1.0",
+            "version": "v5.5",
+            "lore_mapping": {                              # V5.5: 六库仙贼世界观映射
+                "digestion_lore": {"高": "炁化完成", "中": "炼化中", "低": "未入炁"},
+                "contamination_lore": {"高": "尸魔侵蚀", "中": "炁机浑浊", "低": "炁机清朗"},
+                "inheritance_queue_lore": "炁化归元",
+                "quarantine_queue_lore": "尸魔封印",
+                "review_schedule_lore": "炁机循环",
+            },
             "input_count": len(self.items),
             "avg_digestion_rate": round(avg_rate, 1),
             "distribution": {"高": high_count, "中": medium_count, "低": low_count},
@@ -723,27 +901,20 @@ class KnowledgeDigest:
             "portfolio_diagnostics": portfolio_diagnostics,
             "refinement_queue": refinement_queue,
             "priority_actions": priority_actions,
+            "coverage_gaps": coverage_gaps,
+            "delivery_contract": delivery_contract,
             "recommendation": (
-                "优先净化高污染单元后再继承"
+                "尸魔侵蚀严重，优先净化高污染单元"
                 if self.contamination_risk["level"] == "high"
-                else "对低消化单元进行二次炼化"
+                else "炁机浑浊，对低消化单元进行二次炼化"
                 if low_count > 0
-                else "全部消化良好"
+                else "炁化完成，全部消化良好"
             ),
             "quality_tags": quality_tags,
-            "quality_score": round(
-                max(
-                    0.0,
-                    min(
-                        100.0,
-                        avg_rate - self.contamination_risk["score"] * 18.0 + len(self.inheritance_queue) * 2.5,
-                    ),
-                ),
-                1,
-            ),
+            "quality_score": round(quality_score, 1),
             "human_intervention": 1 if self.contamination_risk["level"] == "high" else 0,
-            "output_completeness": round(min(100.0, 70.0 + len(review_schedule) * 3.0 + len(self.units) * 2.0), 1),
-            "consistency_score": round(max(0.0, 100.0 - self.contamination_risk["score"] * 50.0), 1),
+            "output_completeness": round(completeness_score, 1),
+            "consistency_score": round(consistency_score, 1),
         }
 
 
@@ -783,27 +954,29 @@ def main():
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     print("=" * 50)
-    print("🍃 六库仙贼 · 知识消化报告  V5.4")
+    print("🍃 六库仙贼 · 知识消化报告  V5.5")
     print("=" * 50)
     print(f"  输入条数: {result['input_count']}")
     print(f"  平均消化率: {result['avg_digestion_rate']}%")
-    print(f"  分布: 高{result['distribution']['高']} 中{result['distribution']['中']} 低{result['distribution']['低']}")
+    print(f"  分布: 炁化完成{result['distribution']['高']} 炼化中{result['distribution']['中']} 未入炁{result['distribution']['低']}")
     print(f"  污染风险: {result['contamination_risk']['level']} ({result['contamination_risk']['score']})")
     if result.get("quality_tags"):
         print(f"  质量标签: {' | '.join(result['quality_tags'])}")
     print("-" * 50)
+    lore_map = {"高": "炁化完成", "中": "炼化中", "低": "未入炁"}
     for u in result["knowledge_units"][:5]:
         emoji = "🟢" if u["digestion_level"] == "高" else "🟡" if u["digestion_level"] == "中" else "🔴"
         short_flag = " [短]" if u.get("is_short_text") else ""
-        print(f"  {emoji} [{u['digestion_level']}] {u['concept']:<20}{short_flag} | 来源:{u['source']} | 保鲜:{u['freshness_days']}天")
+        lore_label = lore_map.get(u["digestion_level"], "未入炁")
+        print(f"  {emoji} [{lore_label}] {u['concept']:<20}{short_flag} | 来源:{u['source']} | 保鲜:{u['freshness_days']}天")
     print("-" * 50)
     print(f"💡 {result['recommendation']}")
     if result.get("inheritance_queue"):
-        print(f"📥 可继承单元: {len(result['inheritance_queue'])}")
+        print(f"🧬 炁化归元（可继承）: {len(result['inheritance_queue'])}")
     if result.get("quarantine_queue"):
-        print(f"🛑 待复核单元: {len(result['quarantine_queue'])}")
+        print(f"🧊 尸魔封印（待复核）: {len(result['quarantine_queue'])}")
     if result["review_schedule"]:
-        print("📅 反刍调度:")
+        print("🔄 炁机循环（反刍调度）:")
         for r in result["review_schedule"][:5]:
             print(f"    • {r['concept'][:20]}... -> {r['review_in']} ({r['reason']})")
     print("=" * 50)

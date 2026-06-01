@@ -5,6 +5,9 @@
 流程: 读取真实metrics → 分析瓶颈 → 执行真实代码修复 → 验证修复效果
 """
 
+ENGINE_STATUS = "auxiliary-tool"
+SUPPORTED_WITH = "core_engine.py"
+
 import json
 import re
 import shutil
@@ -16,16 +19,11 @@ from datetime import datetime
 # 运行时指标收集
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(SKILLS_ROOT))
-try:
-    from metrics_collector import record_metrics
-except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+from metrics_compat import record_metrics, resolve_runtime_data_dir
 
 
 def load_metrics(skill_name: str) -> list:
-    file_path = Path("runtime_data") / f"{skill_name}_metrics.jsonl"
+    file_path = resolve_runtime_data_dir() / f"{skill_name}_metrics.jsonl"
     if not file_path.exists():
         return []
     with open(file_path, "r", encoding="utf-8") as f:
@@ -250,7 +248,7 @@ def main():
     script_path = Path(SKILLS_DIR) / SKILL_NAME / "scripts" / "analyzer.py"
     
     # 清空旧metrics
-    metrics_file = Path("runtime_data") / "test-analyzer_metrics.jsonl"
+    metrics_file = resolve_runtime_data_dir() / "test-analyzer_metrics.jsonl"
     if metrics_file.exists():
         metrics_file.unlink()
     

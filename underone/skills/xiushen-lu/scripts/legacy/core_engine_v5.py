@@ -13,6 +13,10 @@
 - Rollback (回退): 版本管理与安全回滚
 """
 
+ENGINE_STATUS = "deprecated-experiment"
+REPLACED_BY = "core_engine.py"
+DEPRECATION_NOTE = "保留为历史版本对照，不作为 under-one 的生产入口。"
+
 import json
 import sys
 import os
@@ -21,6 +25,24 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+
+LEGACY_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = LEGACY_DIR.parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+try:
+    from engine_guard import (
+        ALLOW_EXPERIMENTAL_ENTRY_ENV,
+        ALLOW_EXPERIMENTAL_ENTRY_FLAG,
+        enforce_deprecated_entry_guard,
+    )
+except ImportError:
+    ALLOW_EXPERIMENTAL_ENTRY_ENV = "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS"
+    ALLOW_EXPERIMENTAL_ENTRY_FLAG = "--allow-experimental-entry"
+
+    def enforce_deprecated_entry_guard(engine_name, replaced_by, note, argv=None, environ=None):
+        return list(argv if argv is not None else sys.argv[1:])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -509,7 +531,13 @@ class XiuShenLuCore:
 # CLI入口
 # ═══════════════════════════════════════════════════════════
 def main():
-    if len(sys.argv) < 2:
+    args = enforce_deprecated_entry_guard(
+        "legacy/core_engine_v5.py",
+        REPLACED_BY,
+        DEPRECATION_NOTE,
+    )
+
+    if len(args) < 1:
         print("用法:")
         print("  python core_engine.py <skills_dir> [skill_name]")
         print("  示例:")
@@ -517,8 +545,8 @@ def main():
         print("    python core_engine.py /path/to/skills qiti-yuanliu  # 进化指定skill")
         sys.exit(1)
 
-    skills_dir = sys.argv[1]
-    skill_name = sys.argv[2] if len(sys.argv) > 2 else None
+    skills_dir = args[0]
+    skill_name = args[1] if len(args) > 1 else None
 
     core = XiuShenLuCore(skills_dir)
     result = core.run_evolution_cycle(skill_name)

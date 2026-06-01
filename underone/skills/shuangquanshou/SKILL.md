@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "shuangquanshou"
-  version: "v0.1.0"
+  version: "v5.2"
   author: "under-one"
   description: "双全手 - 记忆与人格手术台 - 记忆/人格/情绪/感知改写与污染控制"
   language: "zh"
@@ -13,6 +13,20 @@ metadata:
 # ✋ 双全手 (ShuangQuanShou)
 
 > **记忆与人格手术台 - 记忆/人格/情绪/感知改写与污染控制**
+
+> **世界观**：双全手代表极强的精细控制能力——双手分工，精确操作边界，绝不踩越禁区。
+> - **灵魂烙印**（`dna_core`）：刻入骨髓的核心原则，违则"走火入魔"
+> - **走火入魔**（`critical` 违背）：触犯禁忌原则，强制拒绝执行，保护本源不被腐蚀
+> - **走火入魔预警**（`split_detection`）：3轮内风格切换≥3次，意志飘移过烈，灵魂烙印即将失稳
+> - **手术四域**：记忆（memory）/ 人格（persona）/ 情绪（emotion）/ 感知（perception）
+> - **阴阳双手**：一手守护（校验/拦截）/ 一手修复（手术方案/patch预案）
+>
+> **异人语录**（吕良）：
+> - 护卫通过：「双全在手，万法不侵」——人格DNA校验通过
+> - 人格偏离：「有人动了你的记忆」——检测到人格偏离
+> - 天条阻止：「此路不通，天条在上」——改写请求被护栏阻止
+> - 记忆污染：「记忆被污染了」——人格污染风险
+> - 执行改写：「让我帮你……改一下」——执行人格改写
 
 ## 目录
 
@@ -45,6 +59,11 @@ metadata:
 - DNA违背检测
 - 风格一致性
 - 核心原则校验
+- 灵魂烙印校验
+- 走火入魔防护
+- 人格分裂预警
+- 手术四域诊断
+- 天条违背检测
 
 ## 功能概述
 
@@ -57,6 +76,7 @@ metadata:
 | 人格分裂防护 | 检测3轮内风格切换是否超过3次 |
 | 手术方案生成 | 为记忆/人格/情绪/感知生成可执行 patch 预案 |
 | 污染控制 | 计算污染指数与身份完整度 |
+| 趋势分析 | 移动平均偏离度趋势检测（rising/stable/improving），持续恶化 Δ>0.15 自动触发预警 |
 
 ### 校验维度
 
@@ -108,10 +128,11 @@ shuangquanshou/
 1. **偏离度计算**：对比 current_style 与 dna_expectation 的4个维度差异
 2. **DNA违背检测**：检查 requested_change 是否触发 dna_core 中的禁止规则
 3. **人格分裂防护**：检查 history 中最近3轮是否有≥3种不同风格
-4. **手术域识别**：判断这是记忆、人格、情绪还是感知改写
-5. **方案生成**：输出 before / after / status / risk
-6. **污染评估**：计算 contamination_index 与 identity_integrity
-7. **报告生成**：输出偏离度、手术模式、是否允许切换、修复建议
+4. **趋势分析**：对 history 中的偏离度数据计算移动平均，识别 rising/stable/improving 趋势；持续上升 Δ>0.15 自动追加 warning 违背
+5. **手术域识别**：判断这是记忆、人格、情绪还是感知改写
+6. **方案生成**：输出 before / after / status / risk
+7. **污染评估**：计算 contamination_index 与 identity_integrity
+8. **报告生成**：输出偏离度、漂移趋势（`drift_trend`）、手术模式、是否允许切换、修复建议
 
 ## 输入输出
 
@@ -157,7 +178,7 @@ shuangquanshou/
 ```json
 {
   "validator": "shuangquanshou",
-  "version": "v0.1.0",
+  "version": "v5.2",
   "deviation_score": 0.15,
   "drift_level": "green",
   "dna_violations": [
@@ -181,6 +202,7 @@ shuangquanshou/
 |------|------|-----------|
 | deviation_score | 偏离度 | 0-1，基于4维度平均差异 |
 | drift_level | 漂移等级 | green(<0.2) / yellow(<0.4) / red |
+| drift_trend | 偏离趋势 | {trend: rising/stable/improving, early_avg, recent_avg, delta} |
 | can_switch | 允许切换 | true/false，需无违背且偏离<0.5 |
 | dna_violations | DNA违背列表 | 含严重等级和修复动作 |
 | severity | 违背严重程度 | critical / warning |
@@ -193,7 +215,8 @@ shuangquanshou/
 | 校验 | `.validate() -> dict` | 执行完整DNA校验 |
 | 偏离度 | `._calc_deviation()` | 计算风格偏离度 |
 | DNA违背 | `._check_dna_violations()` | 检查核心原则违背 |
-| 漂移检测 | `._detect_drift()` | 检测人格分裂倾向 |
+| 漂移检测 | `._detect_drift()` | 检测人格分裂倾向，并触发移动平均趋势分析 |
+| 趋势计算 | `._calc_drift_trend(history) -> dict` | 计算偏离度移动平均趋势，Δ>0.15 时追加 warning |
 | 禁止检查 | `._is_forbidden(text, rule) -> bool` | 关键词禁止匹配 |
 
 ## 使用示例
@@ -291,8 +314,8 @@ python scripts/dna_validator.py <(echo '{"current_style":{"tone":3},"dna_expecta
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
-| 5.2 | 当前 | 配置化重构：禁止词/否定前缀/风格维度/漂移阈值/人格分裂检测参数从 under-one.yaml 加载 |
-| 5.1 | - | V5.1升级：语义级禁止检测，支持否定语义识别和同义词扩展 |
+| 5.2 | 当前 | **趋势分析增强**：`_detect_drift` 新增移动平均趋势检测（`drift_trend`），持续上升 Δ>0.15 自动追加 warning 违背；输出字段新增 `drift_trend`。配置化重构：禁止词/否定前缀/风格维度/漂移阈值/人格分裂检测参数从 under-one.yaml 加载 |
+| 5.1 | - | 语义级禁止检测，支持否定语义识别和同义词扩展 |
 | 5.0 | - | V5发布，四维偏离度+DNA违背检测 |
 
 ---

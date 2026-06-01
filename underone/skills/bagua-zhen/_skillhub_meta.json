@@ -1,7 +1,7 @@
 {
   "id": "bagua-zhen",
   "name": "八卦阵",
-  "version": "v0.1.0",
+  "version": "v10.2",
   "type": "script",
   "entry": "scripts/coordinator.py",
   "language": "python",
@@ -14,6 +14,26 @@
   "outputs": ["ecosystem_report_v10.json", "hachigiki_v7_dashboard.html"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 96.0,
+    "avg_completeness": 96.0,
+    "avg_consistency": 95.0,
+    "avg_human": 0.0,
+    "success_rate": 0.99,
+    "avg_duration": 420.0,
+    "recommended_min_records": 8,
+    "degradation_window": 3
+  },
+  "control_plane_contract": {
+    "role": "coordinator",
+    "scope": "ecosystem-readonly",
+    "reads": ["runtime_data", "shared_relationships"],
+    "writes": ["ecosystem_report", "dashboard_artifacts"],
+    "handoff_targets": ["juling-qianjiang", "xiushen-lu"],
+    "mutation_gate": "report-only",
+    "will_not": ["write_skills", "persist_thresholds", "rewrite_goal_anchor"],
+    "summary": "负责聚合、仲裁与监控，不直接修改单个 skill 的内部实现。"
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "生态协调与全景监控",

@@ -1,7 +1,7 @@
 {
   "id": "dalu-dongguan",
   "name": "大罗洞观",
-  "version": "v0.1.0",
+  "version": "v5.3",
   "type": "script",
   "entry": "scripts/link_detector.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["link_report.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 88.0,
+    "avg_completeness": 91.0,
+    "avg_consistency": 89.0,
+    "avg_human": 0.05,
+    "success_rate": 0.94,
+    "avg_duration": 700.0,
+    "recommended_min_records": 10,
+    "degradation_window": 4
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "隐含关系识别与知识图谱构建",

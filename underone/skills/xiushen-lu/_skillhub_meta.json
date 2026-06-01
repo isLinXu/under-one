@@ -1,7 +1,7 @@
 {
   "id": "xiushen-lu",
   "name": "修身炉",
-  "version": "v0.1.0",
+  "version": "v7.1",
   "type": "script",
   "entry": "scripts/core_engine.py",
   "language": "python",
@@ -14,6 +14,48 @@
   "outputs": ["evolution_report_v7.json", "adaptive_thresholds.json"],
   "dependencies": ["shared_knowledge"],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 90.0,
+    "avg_completeness": 94.0,
+    "avg_consistency": 88.0,
+    "avg_human": 0.02,
+    "success_rate": 0.96,
+    "avg_duration": 820.0,
+    "recommended_min_records": 12,
+    "degradation_window": 4
+  },
+  "control_plane_contract": {
+    "role": "evolver",
+    "scope": "cross-skill-evolution",
+    "reads": ["runtime_data", "skills", "shared_knowledge"],
+    "writes": ["evolution_report", "adaptive_thresholds", "skills_when_apply"],
+    "handoff_targets": [],
+    "mutation_gate": "explicit-apply-only",
+    "will_not": ["rewrite_live_context", "bypass_manual_gate", "mutate_without_backup"],
+    "summary": "负责分析与提出跨 skill 演化建议，仅在显式 apply 模式下改写技能内容。"
+  },
+  "engine_manifest": {
+    "active_entry": "scripts/core_engine.py",
+    "auxiliary_tools": [
+      "scripts/xiushenlu_verifier.py",
+      "scripts/seed_runtime_data.py",
+      "scripts/bootstrap_profiles.py",
+      "scripts/underone_stdlib.py"
+    ],
+    "compatibility_shims": [
+      "scripts/shared_knowledge.py"
+    ],
+    "deprecated_experiments": [
+      "scripts/v8_engine.py",
+      "scripts/universal_engine.py",
+      "scripts/legacy/core_engine_v5.py"
+    ],
+    "experimental_opt_in": {
+      "env": "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS",
+      "flag": "--allow-experimental-entry",
+      "redirect_entry": "scripts/core_engine.py"
+    }
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "自进化与阈值自适应",

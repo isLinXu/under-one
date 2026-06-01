@@ -1,98 +1,108 @@
 #!/usr/bin/env python3
-"""
-器名: 数据播种器
-用途: 将36场景测试结果注入为修身炉的运行时数据
-输出格式: 与 metrics_collector.py 保持一致（9个标准字段）
-"""
-import json, random
+"""Deterministic runtime seeder for xiushen-lu bootstrap validation."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from typing import Iterable, List
 
-# 自动定位 skills 目录（脚本位于 underone/skills/xiushen-lu/scripts/）
-SKILL_DIR = str(Path(__file__).resolve().parent.parent.parent)  # → underone/skills
-OUTPUT_DIR = Path("runtime_data")
-OUTPUT_DIR.mkdir(exist_ok=True)
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-# 基于36场景测试结果模拟120条运行时记录 per skill
-skill_configs = {
-    "qiti-yuanliu": {
-        "success_rate": 0.99, "avg_duration": 600, "avg_errors": 0.02,
-        "avg_human": 0.01, "avg_quality": 94, "complexity": "medium"
-    },
-    "tongtian-lu": {
-        "success_rate": 0.95, "avg_duration": 800, "avg_errors": 0.05,
-        "avg_human": 0.02, "avg_quality": 92, "complexity": "high"
-    },
-    "dalu-dongguan": {
-        "success_rate": 0.92, "avg_duration": 700, "avg_errors": 0.08,
-        "avg_human": 0.05, "avg_quality": 88, "complexity": "medium"
-    },
-    "shenji-bailian": {
-        "success_rate": 0.97, "avg_duration": 1500, "avg_errors": 0.03,
-        "avg_human": 0.01, "avg_quality": 95, "complexity": "high"
-    },
-    "fenghou-qimen": {
-        "success_rate": 0.98, "avg_duration": 550, "avg_errors": 0.03,
-        "avg_human": 0.01, "avg_quality": 96, "complexity": "medium"
-    },
-    "liuku-xianzei": {
-        "success_rate": 0.90, "avg_duration": 1000, "avg_errors": 0.12,
-        "avg_human": 0.08, "avg_quality": 82, "complexity": "high"
-    },
-    "shuangquanshou": {
-        "success_rate": 0.93, "avg_duration": 500, "avg_errors": 0.07,
-        "avg_human": 0.04, "avg_quality": 90, "complexity": "low"
-    },
-    "juling-qianjiang": {
-        "success_rate": 0.96, "avg_duration": 1200, "avg_errors": 0.04,
-        "avg_human": 0.02, "avg_quality": 93, "complexity": "high"
-    },
-    "bagua-zhen": {
-        "success_rate": 0.99, "avg_duration": 400, "avg_errors": 0.01,
-        "avg_human": 0.00, "avg_quality": 97, "complexity": "medium"
-    },
-    "xiushen-lu": {
-        "success_rate": 0.97, "avg_duration": 800, "avg_errors": 0.03,
-        "avg_human": 0.01, "avg_quality": 92, "complexity": "medium"
-    },
-}
+try:
+    from metrics_collector import resolve_runtime_data_dir
+except ImportError:
+    def resolve_runtime_data_dir(data_dir=None) -> Path:
+        return Path(data_dir or "runtime_data").expanduser()
 
-def generate_records(skill_name, config, n=120):
-    records = []
-    base_time = datetime(2026, 5, 6, 8, 0, 0)
-    for i in range(n):
-        # 加入一些退化趋势（最后20条记录质量略降，触发进化）
-        if i > n - 20:
-            quality = max(50, config["avg_quality"] - random.randint(5, 15))
-            errors = config["avg_errors"] + random.uniform(0.05, 0.2)
-            human = min(1.0, config["avg_human"] + random.uniform(0.05, 0.15))
-            success = random.random() < config["success_rate"] * 0.85
-        else:
-            quality = config["avg_quality"] + random.randint(-5, 5)
-            errors = max(0, config["avg_errors"] + random.uniform(-0.02, 0.03))
-            human = max(0, config["avg_human"] + random.uniform(-0.01, 0.02))
-            success = random.random() < config["success_rate"]
+from bootstrap_profiles import generate_profile_records, list_bootstrap_profiles
 
-        # 格式与 metrics_collector.record_metrics 输出一致
-        records.append({
-            "skill_name": skill_name,
-            "timestamp": (base_time + timedelta(minutes=i * 30)).isoformat(),
-            "duration_ms": max(100, round(config["avg_duration"] + random.randint(-100, 200), 2)),
-            "success": success,
-            "quality_score": round(max(0, min(100, quality)), 1),
-            "error_count": max(0, round(errors, 2)),
-            "human_intervention": 1 if human > 0.5 else (0 if human < 0.1 else round(human, 2)),
-            "output_completeness": round(max(60, min(100, 95 + random.randint(-10, 5))), 1),
-            "consistency_score": round(max(50, min(100, quality + random.randint(-5, 5))), 1),
-        })
-    return records
 
-for skill, config in skill_configs.items():
-    records = generate_records(skill, config)
-    file_path = OUTPUT_DIR / f"{skill}_metrics.jsonl"
-    with open(file_path, "w", encoding="utf-8") as f:
-        for r in records:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    print(f"  Seeded {len(records)} records for {skill} → {file_path}")
+def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Generate deterministic runtime traces for one or more under-one skills.",
+    )
+    parser.add_argument(
+        "--skills",
+        default="all",
+        help="Comma-separated skill ids to seed. Use 'all' to seed every known profile.",
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=24,
+        help="Number of records per skill. Default: 24",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=20260514,
+        help="Deterministic seed used to derive per-skill traces.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Optional output directory. Defaults to the resolved runtime_data directory.",
+    )
+    parser.add_argument(
+        "--skills-dir",
+        default=None,
+        help="Optional skills root used to discover custom bootstrap profiles from _skillhub_meta.json.",
+    )
+    return parser.parse_args(list(argv) if argv is not None else None)
 
-print(f"\n✅ 数据播种完成: {len(skill_configs)} skills × 120 records = {len(skill_configs)*120} total")
+
+def resolve_skill_selection(raw: str, skills_dir: str | None = None) -> List[str]:
+    if raw.strip().lower() == "all":
+        return list_bootstrap_profiles(skills_root=skills_dir)
+    selected = [item.strip() for item in raw.split(",") if item.strip()]
+    known = set(list_bootstrap_profiles(skills_root=skills_dir))
+    unknown = [skill for skill in selected if skill not in known]
+    if unknown:
+        raise SystemExit(f"Unknown bootstrap profile(s): {', '.join(unknown)}")
+    return selected
+
+
+def write_seed_file(output_dir: Path, skill_name: str, records: List[dict]) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_path = output_dir / f"{skill_name}_metrics.jsonl"
+    with open(file_path, "w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return file_path
+
+
+def main(argv: Iterable[str] | None = None) -> int:
+    args = parse_args(argv)
+    skills = resolve_skill_selection(args.skills, skills_dir=args.skills_dir)
+    output_dir = resolve_runtime_data_dir(args.output_dir)
+    total = 0
+
+    for skill_name in skills:
+        skill_dir = None
+        if args.skills_dir:
+            skill_dir = Path(args.skills_dir).expanduser().resolve() / skill_name
+        records = generate_profile_records(
+            skill_name,
+            n=args.count,
+            seed=args.seed,
+            skill_dir=skill_dir,
+            skills_root=args.skills_dir,
+        )
+        target = write_seed_file(output_dir, skill_name, records)
+        total += len(records)
+        print(f"  Seeded {len(records)} records for {skill_name} -> {target}")
+
+    print(
+        f"\nOK: seeded {len(skills)} skill(s), {total} total records, seed={args.seed}, output_dir={output_dir}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

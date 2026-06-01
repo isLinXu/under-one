@@ -16,26 +16,73 @@ from collections import Counter
 # ── 路径设置 ───────────────────────────────────────────────
 SKILL_ROOT = Path(__file__).resolve().parent.parent  # qiti-yuanliu/
 SKILLS_ROOT = SKILL_ROOT.parent                       # skills/
-sys.path.insert(0, str(SKILLS_ROOT))
 
 # ── 依赖导入（带降级） ─────────────────────────────────────
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
+    from under_one.validation import validate_json_list
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
+
+    try:
+        from _skill_config import validate_json_list, get_skill_config
+    except ImportError:
+        def validate_json_list(data, item_schema, skill_name="skill"):
+            if not isinstance(data, list):
+                return False, ["<root> must be a list"]
+            return True, []
+
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 try:
-    from _skill_config import validate_json_list, get_skill_config
+    from under_one.adapters import get_client as get_llm_client
+    from under_one.adapters import LLMError
 except ImportError:
-    def validate_json_list(data, item_schema, skill_name="skill"):
-        if not isinstance(data, list):
-            return False, ["<root> must be a list"]
-        return True, []
+    get_llm_client = None
+    LLMError = Exception
 
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+try:
+    from skills.control_plane_protocol import build_control_plane_status, get_control_plane_contract
+except ImportError:
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    try:
+        from control_plane_protocol import build_control_plane_status, get_control_plane_contract
+    except ImportError:
+        def get_control_plane_contract(_skill_name, skill_dir=None):
+            return {}
+
+        def build_control_plane_status(
+            skill_name,
+            *,
+            phase,
+            manual_gate_required,
+            skill_dir=None,
+            writes_applied=False,
+            next_owner=None,
+            handoff_targets=None,
+            note=None,
+        ):
+            return {
+                "role": None,
+                "scope": None,
+                "mutation_gate": None,
+                "reads": [],
+                "writes": [],
+                "will_not": [],
+                "phase": phase,
+                "manual_gate_required": manual_gate_required,
+                "writes_applied": writes_applied,
+                "next_owner": next_owner or skill_name,
+                "handoff_targets": handoff_targets or [],
+                "blocked_writes": [],
+                "summary": None,
+                "note": note,
+            }
 
 
 class QiTiScanner:
@@ -63,6 +110,8 @@ class QiTiScanner:
         self.context = context_data
         self.alerts = []
         self.metrics = {}
+        self._semantic_llm_cache = None
+        self._semantic_llm_client = None
         self._load_config()
 
     def _load_config(self):
@@ -149,6 +198,14 @@ class QiTiScanner:
         self.repair_handoff_reason = str(rh.get("reason", "repeated_contradictions"))
         self.repair_handoff_evidence_limit = max(1, int(rh.get("evidence_limit", 3)))
 
+        # 可选 LLM 语义一致性检查；默认关闭，保持离线零调用。
+        llm = cfg.get("semantic_contradiction", {})
+        self.semantic_llm_enabled = bool(llm.get("enabled", False))
+        self.semantic_llm_provider = llm.get("provider")
+        self.semantic_llm_model = llm.get("model")
+        self.semantic_llm_threshold = float(llm.get("threshold", 0.72))
+        self.semantic_llm_max_chars = int(llm.get("max_context_chars", 3000))
+
     # ── 语义级工具方法 ──────────────────────────────────────
 
     def _extract_keywords(self, text: str) -> list:
@@ -201,6 +258,83 @@ class QiTiScanner:
                 containment = 0.1
         return min(1.0, jaccard + containment)
 
+    def _get_semantic_llm_client(self):
+        if not self.semantic_llm_enabled or get_llm_client is None:
+            return None
+        if self._semantic_llm_client is not None:
+            return self._semantic_llm_client
+
+        kwargs = {}
+        if self.semantic_llm_model:
+            kwargs["model"] = self.semantic_llm_model
+        try:
+            self._semantic_llm_client = get_llm_client(self.semantic_llm_provider, **kwargs)
+        except Exception as exc:
+            self._semantic_llm_cache = {
+                "enabled": True,
+                "available": False,
+                "score": 0.0,
+                "error": str(exc),
+            }
+            return None
+        return self._semantic_llm_client
+
+    @staticmethod
+    def _parse_llm_score(content: str) -> float:
+        if not content:
+            return 0.0
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                for key in ("score", "contradiction_score", "risk"):
+                    if key in parsed:
+                        return max(0.0, min(1.0, float(parsed[key])))
+            if isinstance(parsed, (int, float)):
+                return max(0.0, min(1.0, float(parsed)))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+        match = re.search(r'(?<!\d)(0(?:\.\d+)?|1(?:\.0+)?)(?!\d)', content)
+        if not match:
+            return 0.0
+        return max(0.0, min(1.0, float(match.group(1))))
+
+    def _semantic_contradiction_check(self):
+        """使用可选 LLM 判断跨轮语义矛盾；失败时降级为规则路径。"""
+        if self._semantic_llm_cache is not None:
+            return self._semantic_llm_cache
+        client = self._get_semantic_llm_client()
+        if client is None:
+            self._semantic_llm_cache = {"enabled": self.semantic_llm_enabled, "available": False, "score": 0.0}
+            return self._semantic_llm_cache
+
+        context_text = "\n".join(
+            f"{msg.get('round', 0)} {msg.get('role', '')}: {msg.get('content', '')}"
+            for msg in self.context
+        )
+        context_text = context_text[-self.semantic_llm_max_chars:]
+        prompt = (
+            "判断以下对话是否存在跨轮语义矛盾。只返回 JSON，格式为 "
+            "{\"score\": 0到1之间的小数, \"reason\": \"不超过20字\"}。\n\n"
+            f"{context_text}"
+        )
+        try:
+            response = client.complete(prompt, max_tokens=48, temperature=0.0)
+            score = self._parse_llm_score(str(response.content).strip())
+            self._semantic_llm_cache = {
+                "enabled": True,
+                "available": True,
+                "score": round(score, 3),
+                "provider": getattr(response, "provider", getattr(client, "provider", "unknown")),
+                "model": getattr(response, "model", getattr(client, "model", "unknown")),
+                "raw": str(response.content).strip()[:120],
+            }
+        except LLMError as exc:
+            self._semantic_llm_cache = {"enabled": True, "available": False, "score": 0.0, "error": str(exc)}
+        except Exception as exc:
+            self._semantic_llm_cache = {"enabled": True, "available": False, "score": 0.0, "error": str(exc)}
+        return self._semantic_llm_cache
+
     def _classify_correction_mode(self, content: str, role: str = ""):
         """识别用户纠偏是正常澄清还是高风险推翻。"""
         if not content:
@@ -237,6 +371,36 @@ class QiTiScanner:
                 }
             )
         return events
+
+    def _assistant_acknowledged_correction(self, round_num: int) -> bool:
+        """检测后续 assistant 是否已显式承接该轮纠偏，避免把已吸收的纠偏仍视作满额风险。"""
+        current = next((msg for msg in self.context if msg.get("round", 0) == round_num), None)
+        if not current:
+            return False
+
+        current_content = current.get("content", "")
+        current_keywords = set(self._extract_keywords(current_content))
+        if not current_keywords:
+            return False
+
+        acknowledgement_markers = ("已", "改成", "切换", "采用", "调整", "收到", "改为")
+        for msg in self.context:
+            if msg.get("round", 0) <= round_num or msg.get("role") != "assistant":
+                continue
+            content = msg.get("content", "")
+            if not content:
+                continue
+            reply_keywords = set(self._extract_keywords(content))
+            keyword_overlap = current_keywords & reply_keywords
+            similarity = self._semantic_similarity(
+                current_content[:self.first_goal_length],
+                content[:self.first_goal_length],
+            )
+            if keyword_overlap and (
+                similarity >= 0.2 or any(marker in content for marker in acknowledgement_markers)
+            ):
+                return True
+        return False
 
     def _calc_topic_drift(self):
         """主题漂移检测：基于语义相似度的渐进偏移"""
@@ -361,6 +525,7 @@ class QiTiScanner:
             "topic_drift": round(topic_drift, 2),
             "intent_shift": round(intent_shift, 2),
             "clarification_events": len([event for event in self._collect_correction_events() if event["mode"] == "clarification"]),
+            "semantic_llm": self._semantic_contradiction_check(),
         }
 
     def _count_semantic_contradictions(self):
@@ -376,6 +541,44 @@ class QiTiScanner:
                 unique.append(c)
         return unique
 
+    def _calc_contradiction_impact(self):
+        """将同一轮中的多重矛盾信号折算为更接近真实风险的冲击度。"""
+        contradictions = self._count_semantic_contradictions()
+        if not contradictions:
+            return 0.0
+
+        by_round = {}
+        context_by_round = {msg.get("round", 0): msg for msg in self.context}
+        for item in contradictions:
+            by_round.setdefault(item.get("round", 0), []).append(item)
+
+        impact = 0.0
+        for round_num, items in by_round.items():
+            msg = context_by_round.get(round_num, {})
+            correction_mode = self._classify_correction_mode(
+                msg.get("content", ""), msg.get("role", "")
+            )
+            unique_types = {item.get("type") for item in items if item.get("type")}
+            extra_signals = max(0, len(unique_types) - 1)
+
+            if correction_mode == "clarification":
+                round_impact = 0.6 + extra_signals * 0.15
+            elif correction_mode == "correction":
+                round_impact = min(2.0, 1.0 + extra_signals * 0.35)
+            elif correction_mode == "hard_reset":
+                round_impact = min(2.6, 1.4 + extra_signals * 0.40)
+            else:
+                round_impact = float(len(items))
+
+            if correction_mode in {"correction", "hard_reset"} and self._assistant_acknowledged_correction(round_num):
+                resolved_discount = 0.5 if correction_mode == "correction" else 0.35
+                resolved_floor = 0.9 if correction_mode == "correction" else 1.1
+                round_impact = max(resolved_floor, round_impact - resolved_discount)
+
+            impact += round_impact
+
+        return round(impact, 2)
+
     def _detect_all_contradictions(self):
         """详细语义矛盾检测（单一真源实现）。"""
         contradictions = []
@@ -383,6 +586,10 @@ class QiTiScanner:
             content = msg.get("content", "")
             round_num = msg.get("round", 0)
             correction_mode = self._classify_correction_mode(content, msg.get("role", ""))
+            explicit_user_correction = (
+                correction_mode == "clarification"
+                and any(marker in content for marker in ("不对", "错了"))
+            )
 
             # 1. 直接关键词匹配
             for kw in self.contradiction_keywords:
@@ -400,7 +607,7 @@ class QiTiScanner:
             for pos, _ in self.reversal_patterns:
                 for prefix in self.negation_prefixes:
                     pattern = prefix + pos
-                    if correction_mode == "clarification" and pattern in content:
+                    if (correction_mode == "clarification" or explicit_user_correction) and pattern in content:
                         continue
                     if pattern in content:
                         contradictions.append({
@@ -414,13 +621,23 @@ class QiTiScanner:
             negation_count = sum(1 for prefix in self.negation_prefixes if prefix in content)
             content_len = max(1, len(content))
             negation_density = (negation_count / content_len) * 100
-            if correction_mode != "clarification" and negation_density > self.negation_density_threshold:
+            if correction_mode not in {"clarification"} and not explicit_user_correction and negation_density > self.negation_density_threshold:
                 contradictions.append({
                     "round": round_num,
                     "type": "high_negation_density",
                     "density": round(negation_density, 2),
                     "preview": content[:50] + "..." if len(content) > 50 else content,
                 })
+
+        semantic = self._semantic_contradiction_check()
+        if semantic.get("available") and semantic.get("score", 0.0) >= self.semantic_llm_threshold:
+            last_round = self.context[-1].get("round", 0) if self.context else 0
+            contradictions.append({
+                "round": last_round,
+                "type": "semantic_llm",
+                "score": semantic.get("score", 0.0),
+                "preview": semantic.get("raw", "semantic contradiction"),
+            })
 
         return contradictions
 
@@ -448,9 +665,10 @@ class QiTiScanner:
 
     def _check_consistency(self):
         """检查上下文一致性 (基于语义矛盾数)"""
-        contradictions = len(self._count_semantic_contradictions())
-        consistency = max(0, 100 - contradictions * 15)
+        contradiction_impact = self._calc_contradiction_impact()
+        consistency = max(0, 100 - contradiction_impact * 15)
         self.metrics["consistency"] = consistency
+        self.metrics["contradiction_impact"] = contradiction_impact
 
     def _check_density(self):
         """V5.3 语义信息密度"""
@@ -499,7 +717,18 @@ class QiTiScanner:
             1 for msg in self.context
             for m in self.logic_markers if m in msg.get("content", "")
         )
-        completeness = min(self.completeness_max, self.completeness_base + marker_count * self.completeness_per_marker)
+        role_set = {msg.get("role") for msg in self.context if msg.get("role")}
+        turn_bonus = min(15, max(0, len(self.context) - 1) * 5)
+        role_bonus = 10 if {"user", "assistant"}.issubset(role_set) else 0
+        correction_bonus = 10 if self._collect_correction_events() else 0
+        completeness = min(
+            self.completeness_max,
+            self.completeness_base
+            + marker_count * self.completeness_per_marker
+            + turn_bonus
+            + role_bonus
+            + correction_bonus,
+        )
         self.metrics["completeness"] = completeness
 
     def _detect_contradictions(self):
@@ -512,6 +741,8 @@ class QiTiScanner:
                 msg += f" 模式 '{c['pattern']}'"
             if c.get("density"):
                 msg += f" (密度 {c['density']})"
+            if c.get("score") is not None:
+                msg += f" (score {c['score']})"
             self.alerts.append({
                 "level": "warning",
                 "type": c["type"],
@@ -586,10 +817,22 @@ class QiTiScanner:
             priority_actions,
             risk_hotspots,
         )
+        control_plane_status = build_control_plane_status(
+            "qiti-yuanliu",
+            phase="diagnose-and-handoff" if repair_handoff else "guarded-observe",
+            manual_gate_required=bool(escalation_contract.get("manual_review_required")),
+            skill_dir=SKILL_ROOT,
+            writes_applied=False,
+            next_owner=repair_handoff.get("target_skill") if repair_handoff else "qiti-yuanliu",
+            handoff_targets=[repair_handoff.get("target_skill")] if repair_handoff and repair_handoff.get("target_skill") else [],
+            note="repair_handoff" if repair_handoff else "stable_observation",
+        )
         return {
             "scanner": "qiti-yuanliu",
-            "version": "v0.1.0",
+            "version": "v6.1",
             "context_length": len(self.context),
+            "control_plane_contract": get_control_plane_contract("qiti-yuanliu", skill_dir=SKILL_ROOT),
+            "control_plane_status": control_plane_status,
             "metrics": self.metrics,
             "alerts": self.alerts,
             "recommendations": self._generate_recommendations(

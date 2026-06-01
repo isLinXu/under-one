@@ -3,8 +3,16 @@ Skill 配置加载辅助模块
 提供统一接口让 skill 脚本读取 under-one.yaml 中的配置，不依赖外部依赖。
 """
 
+import copy
 import json
+import os
 from pathlib import Path
+from typing import Optional
+
+try:
+    from _yaml_fallback import minimal_yaml_parse
+except ImportError:
+    from ._yaml_fallback import minimal_yaml_parse
 
 
 # 缓存配置内容，避免重复读取
@@ -15,9 +23,67 @@ _CONFIG_PATH_CANDIDATES = [
     "../../under-one.yaml",
     "~/.under-one/under-one.yaml",
 ]
+ENV_OVERRIDE_PREFIX = "UNDER_ONE__"
+SUPPORTED_CONFIG_VERSIONS = {1}
 
 
-def _find_config() -> Path | None:
+def _parse_env_value(raw: str):
+    lowered = raw.strip().lower()
+    if lowered in {"true", "false"}:
+        return lowered == "true"
+    if lowered in {"null", "none"}:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
+
+
+def _set_nested_value(target: dict, path: list, value):
+    current = target
+    for key in path[:-1]:
+        if not isinstance(current.get(key), dict):
+            current[key] = {}
+        current = current[key]
+    current[path[-1]] = value
+
+
+def _apply_env_overrides(payload: dict) -> dict:
+    merged = copy.deepcopy(payload)
+    for key, raw_value in os.environ.items():
+        if not key.startswith(ENV_OVERRIDE_PREFIX):
+            continue
+        path = [part.lower() for part in key[len(ENV_OVERRIDE_PREFIX):].split("__") if part]
+        if not path:
+            continue
+        _set_nested_value(merged, path, _parse_env_value(raw_value))
+    return merged
+
+
+def _validate_config(payload: dict, config_path: Optional[Path] = None):
+    if not isinstance(payload, dict):
+        raise ValueError(f"配置文件必须是 YAML mapping: {config_path or '<memory>'}")
+    raw_version = payload.get("config_version")
+    if raw_version is None:
+        return
+    try:
+        version = int(raw_version)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"config_version 必须是整数: {raw_version!r}") from exc
+    if version not in SUPPORTED_CONFIG_VERSIONS:
+        supported = ", ".join(str(item) for item in sorted(SUPPORTED_CONFIG_VERSIONS))
+        raise ValueError(f"不支持的 config_version={version}，当前支持: {supported}")
+
+
+def _find_config() -> Optional[Path]:
     """按优先级搜索配置文件"""
     for p in _CONFIG_PATH_CANDIDATES:
         path = Path(p).expanduser().resolve()
@@ -40,7 +106,7 @@ def load_skill_config() -> dict:
 
     config_path = _find_config()
     if config_path is None:
-        _CONFIG_CACHE = {}
+        _CONFIG_CACHE = _apply_env_overrides({})
         return _CONFIG_CACHE
 
     try:
@@ -49,6 +115,8 @@ def load_skill_config() -> dict:
             import yaml
             with open(config_path, "r", encoding="utf-8") as f:
                 _CONFIG_CACHE = yaml.safe_load(f) or {}
+                _validate_config(_CONFIG_CACHE, config_path)
+                _CONFIG_CACHE = _apply_env_overrides(_CONFIG_CACHE)
                 return _CONFIG_CACHE
         except ImportError:
             pass
@@ -56,94 +124,13 @@ def load_skill_config() -> dict:
         # 极简 YAML 子集解析（仅处理本项目用到的简单格式）
         with open(config_path, "r", encoding="utf-8") as f:
             raw = f.read()
-        _CONFIG_CACHE = _minimal_yaml_parse(raw)
+        _CONFIG_CACHE = minimal_yaml_parse(raw)
+        _validate_config(_CONFIG_CACHE, config_path)
+        _CONFIG_CACHE = _apply_env_overrides(_CONFIG_CACHE)
         return _CONFIG_CACHE
     except Exception:
         _CONFIG_CACHE = {}
         return _CONFIG_CACHE
-
-
-def _minimal_yaml_parse(text: str) -> dict:
-    """极简 YAML 解析器，仅支持本项目用到的格式：
-    - 顶级键
-    - 缩进子键
-    - 列表（- 开头）
-    - 基本数值、字符串
-    """
-    result = {}
-    current_section = None
-    current_sub = None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        # 顶级键: value
-        if not line.startswith(" ") and not line.startswith("\t"):
-            if ":" in stripped:
-                key, _, val = stripped.partition(":")
-                key = key.strip()
-                val = val.strip()
-                if val == "":
-                    result[key] = {}
-                    current_section = key
-                    current_sub = None
-                else:
-                    result[key] = _parse_yaml_value(val)
-                    current_section = None
-        # 子键
-        elif current_section is not None and stripped.startswith("-"):
-            # 列表项
-            val = stripped[1:].strip()
-            if isinstance(result.get(current_section), dict) and current_sub is not None:
-                if current_sub not in result[current_section]:
-                    result[current_section][current_sub] = []
-                result[current_section][current_sub].append(_parse_yaml_value(val))
-            else:
-                if current_section not in result:
-                    result[current_section] = []
-                result[current_section].append(_parse_yaml_value(val))
-        elif current_section is not None and ":" in stripped:
-            key, _, val = stripped.partition(":")
-            key = key.strip()
-            val = val.strip()
-            if val == "":
-                if current_section not in result:
-                    result[current_section] = {}
-                result[current_section][key] = {}
-                current_sub = key
-            else:
-                if current_section not in result:
-                    result[current_section] = {}
-                result[current_section][key] = _parse_yaml_value(val)
-    return result
-
-
-def _parse_yaml_value(val: str):
-    """解析 YAML 标量值"""
-    val = val.strip()
-    if val.startswith('"') and val.endswith('"'):
-        return val[1:-1]
-    if val.startswith("'") and val.endswith("'"):
-        return val[1:-1]
-    if val == "true":
-        return True
-    if val == "false":
-        return False
-    if val == "null" or val == "~":
-        return None
-    try:
-        if "." in val:
-            return float(val)
-        return int(val)
-    except ValueError:
-        pass
-    # 列表解析 [a, b]
-    if val.startswith("[") and val.endswith("]"):
-        inner = val[1:-1]
-        if not inner.strip():
-            return []
-        return [_parse_yaml_value(v.strip()) for v in inner.split(",")]
-    return val
 
 
 def get_config(section: str, key: str = None, default=None):

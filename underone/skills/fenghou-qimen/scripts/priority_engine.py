@@ -12,25 +12,25 @@ import random
 from pathlib import Path
 
 # 运行时指标收集
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
+    from under_one.validation import validate_json_list
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
 
-# 输入验证与配置加载
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-try:
-    from _skill_config import validate_json_list, get_skill_config
-except ImportError:
-    def validate_json_list(data, item_schema, skill_name="skill"):
-        if not isinstance(data, list):
-            return False, ["<root> must be a list"]
-        return True, []
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+    try:
+        from _skill_config import validate_json_list, get_skill_config
+    except ImportError:
+        def validate_json_list(data, item_schema, skill_name="skill"):
+            if not isinstance(data, list):
+                return False, ["<root> must be a list"]
+            return True, []
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 class PriorityEngine:
@@ -50,33 +50,53 @@ class PriorityEngine:
         "team_match": 0.05,
     }
 
+    # 完整七门体系（原著奇门遁甲八门：开/生/休/景/惊/杜/死，伤门合并入杜门）
     DEFAULT_GATES = {
-        (4.5, float("inf")): "开门",
-        (4.0, 4.5): "生门",
-        (3.2, 4.0): "景门",
-        (2.5, 3.2): "杜门",
-        (0.0, 2.5): "死门",
+        (4.5, float("inf")): "开门",  # 大吉，可出行征战
+        (4.2, 4.5): "生门",           # 吉，利谋生求财
+        (3.6, 4.2): "休门",           # 半吉，宜休整蓄势
+        (3.2, 3.6): "景门",           # 中平，文书利
+        (2.8, 3.2): "惊门",           # 半凶，变化动荡
+        (2.5, 2.8): "杜门",           # 凶，阻塞封堵
+        (0.0, 2.5): "死门",           # 大凶，终结收场
     }
 
     DEFAULT_ACTIONS = {
         "开门": "立即启动",
         "生门": "重点推进",
+        "休门": "稳步推进，择机而动",
         "景门": "审视后执行",
+        "惊门": "谨慎评估，防范变局",
         "杜门": "绕过障碍/延后",
         "死门": "终止释放资源",
     }
 
-    def __init__(self, tasks, template=None):
+    TASK_TYPE_KEYWORDS = {
+        "urgency_priority": ["紧急", "故障", "事故", "宕机", "hotfix", "incident", "blocker", "bug"],
+        "quality_priority": ["质量", "测试", "安全", "合规", "审计", "重构", "验证", "quality", "security", "test"],
+        "resource_limited": ["资源", "成本", "预算", "人手", "排期", "resource", "budget", "cost"],
+        "team_driven": ["团队", "协作", "评审", "沟通", "干系人", "stakeholder", "team", "review"],
+    }
+
+    def __init__(self, tasks, template=None, task_history=None):
         """初始化引擎。
         
         Args:
             tasks: 任务列表
             template: 权重模板名称（如 'urgency_priority', 'quality_priority'）
                      为 None 时使用默认权重
+            task_history: 可选历史任务样本，用于自适应权重微调
         """
         self.tasks = tasks
+        self.task_history = task_history or []
         self.ranked = []
         self.monte_carlo = {}
+        self.adaptive_weighting = {
+            "enabled": False,
+            "selected_template": None,
+            "reason": "disabled",
+            "adjustments": {},
+        }
         
         # 加载配置
         self._load_config(template)
@@ -86,15 +106,18 @@ class PriorityEngine:
         # 加载权重
         weights_cfg = get_skill_config("fenghouqimen", "weights", self.DEFAULT_WEIGHTS)
         templates_cfg = get_skill_config("fenghouqimen", "weight_templates", {})
+        adaptive_cfg = get_skill_config("fenghouqimen", "adaptive_weights", {})
         
         # 调试输出（验证配置加载）
         # print(f"[DEBUG] template={template}, templates_keys={list(templates_cfg.keys()) if isinstance(templates_cfg, dict) else 'N/A'}")
         
-        if template and template in templates_cfg:
-            self.weights = templates_cfg[template]
+        if template == "adaptive" or (not template and adaptive_cfg.get("enabled", False)):
+            self.weights, self.active_template = self._adaptive_weights(weights_cfg, templates_cfg, adaptive_cfg)
+        elif template and template in templates_cfg:
+            self.weights = dict(templates_cfg[template])
             self.active_template = template
         else:
-            self.weights = weights_cfg
+            self.weights = dict(weights_cfg)
             self.active_template = "default"
         
         # 加载八门阈值
@@ -120,6 +143,75 @@ class PriorityEngine:
         self.buffer_threshold = get_skill_config("fenghouqimen", "buffer_threshold", 80)
         self.buffer_low = get_skill_config("fenghouqimen", "buffer_recommendation_low", "增加20%应急资源")
         self.buffer_high = get_skill_config("fenghouqimen", "buffer_recommendation_high", "无需额外缓冲")
+
+    def _infer_task_type(self):
+        if not self.tasks:
+            return "balanced", "empty_task_list"
+
+        joined = " ".join(
+            str(task.get("name", "")) + " "
+            + str(task.get("description", "")) + " "
+            + " ".join(str(tag) for tag in task.get("tags", []))
+            for task in self.tasks
+        ).lower()
+        for template, keywords in self.TASK_TYPE_KEYWORDS.items():
+            if any(keyword.lower() in joined for keyword in keywords):
+                return template, f"keyword:{template}"
+
+        avg_urgency = sum(float(task.get("urgency", 3) or 3) for task in self.tasks) / len(self.tasks)
+        avg_resource = sum(float(task.get("resource_match", 3) or 3) for task in self.tasks) / len(self.tasks)
+        avg_team = sum(float(task.get("stakeholder_support", 3) or 3) for task in self.tasks) / len(self.tasks)
+        if avg_urgency >= 4.0:
+            return "urgency_priority", "high_avg_urgency"
+        if avg_resource <= 2.2:
+            return "resource_limited", "low_resource_match"
+        if avg_team >= 4.0:
+            return "team_driven", "high_stakeholder_support"
+        return "balanced", "fallback"
+
+    @staticmethod
+    def _normalized_weights(weights, target_total):
+        total = sum(float(value) for value in weights.values())
+        if total <= 0:
+            return weights
+        return {key: round(float(value) / total * target_total, 4) for key, value in weights.items()}
+
+    def _adaptive_weights(self, base_weights, templates_cfg, adaptive_cfg):
+        selected_template, reason = self._infer_task_type()
+        candidate = dict(templates_cfg.get(selected_template, base_weights))
+        target_total = sum(float(value) for value in base_weights.values())
+        adjustments = {}
+
+        all_samples = self.task_history + self.tasks
+        history_values = [
+            float(item.get("history_success"))
+            for item in all_samples
+            if isinstance(item.get("history_success"), (int, float))
+        ]
+        if history_values:
+            avg_history = sum(history_values) / len(history_values)
+            low_success_threshold = float(adaptive_cfg.get("low_success_threshold", 2.6))
+            high_success_threshold = float(adaptive_cfg.get("high_success_threshold", 4.2))
+            boost = float(adaptive_cfg.get("history_boost", 0.05))
+            if avg_history < low_success_threshold:
+                candidate["dependency"] = candidate.get("dependency", 0.15) + boost
+                candidate["environment_readiness"] = candidate.get("environment_readiness", 0.05) + boost / 2
+                candidate["urgency"] = max(0.05, candidate.get("urgency", 0.25) - boost)
+                adjustments["history_success"] = "boost_readiness_for_low_success"
+            elif avg_history > high_success_threshold:
+                candidate["importance"] = candidate.get("importance", 0.35) + boost / 2
+                candidate["resource_match"] = candidate.get("resource_match", 0.10) + boost / 2
+                candidate["dependency"] = max(0.05, candidate.get("dependency", 0.15) - boost / 2)
+                adjustments["history_success"] = "lean_into_successful_pattern"
+
+        normalized = self._normalized_weights(candidate, target_total)
+        self.adaptive_weighting = {
+            "enabled": True,
+            "selected_template": selected_template,
+            "reason": reason,
+            "adjustments": adjustments,
+        }
+        return normalized, f"adaptive:{selected_template}"
 
     @record_metrics("fenghou-qimen")
     def run(self):
@@ -225,10 +317,11 @@ class PriorityEngine:
 
         return {
             "engine": "fenghou-qimen",
-            "version": "v0.1.0",
+            "version": "v5.1",
             "task_count": len(self.tasks),
             "active_template": self.active_template,
             "weights_used": self.weights,
+            "adaptive_weighting": self.adaptive_weighting,
             "ranked_tasks": self.ranked,
             "execution_plan": plan,
             "execution_phases": execution_phases,
@@ -259,12 +352,16 @@ class PriorityEngine:
     def _phase_bucket(self, task):
         gate = task.get("gate")
         dependency = task.get("dependency", 3)
+        # 开门/生门 + 依赖简单 → 先手突破（气运顺，立即出手）
         if gate in {"开门", "生门"} and dependency <= 3:
             return ("phase-1", "先手突破")
-        if gate in {"开门", "生门", "景门"}:
+        # 开门/生门/休门/景门 → 稳态推进（整体局势可为）
+        if gate in {"开门", "生门", "休门", "景门"}:
             return ("phase-2", "稳态推进")
-        if gate == "杜门":
+        # 惊门/杜门 → 障碍清理（局势有阻，需化解）
+        if gate in {"惊门", "杜门"}:
             return ("phase-3", "障碍清理")
+        # 死门 → 冻结观察（大凶，暂不动）
         return ("phase-4", "冻结观察")
 
     def _build_execution_phases(self, plan):
@@ -394,7 +491,7 @@ def main():
     print(f"  {result['buffer_recommendation']}")
     print("-" * 60)
     for item in result["execution_plan"]:
-        emoji = {"开门":"🟢","生门":"🟢","景门":"🟡","杜门":"🟠","死门":"🔴"}.get(item["gate"], "⚪")
+        emoji = {"开门":"🟢","生门":"🟢","休门":"🟢","景门":"🟡","惊门":"🟠","杜门":"🟠","死门":"🔴"}.get(item["gate"], "⚪")
         print(f"  {emoji} [{item['gate']}] {item['task']:<12} 得分:{item['score']:<5} -> {item['action']}")
     print("=" * 60)
 

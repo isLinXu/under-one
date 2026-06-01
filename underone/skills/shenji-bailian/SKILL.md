@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "shenji-bailian"
-  version: "v0.1.0"
+  version: "v6.5"
   author: "under-one"
   description: "神机百炼 - 自然语言技能工坊 - 根据自然语言或结构化规格生成 skill、tool、专精骨架与配套资产"
   language: "zh"
@@ -14,6 +14,19 @@ metadata:
 
 > 自然语言技能工坊 - 将一句需求锻造成 skill、tool、测试与契约。
 
+> **世界观**：神机百炼以自然语言为炁、以需求为原料，经百炼锤打将其锻造成具有自主意志的法器（skill/tool）。
+> - **百炼**：从粗坯到成器的多阶段精炼过程（scaffold → contract → battle-ready）
+> - **器灵**（`runtime_contract`）：法器获得的自主契约意志，约束其行为边界
+> - **铸胚**（`scaffold-only`）：粗坯成型，尚未淬火，可快速交付骨架
+> - **刻文**（`contract-first`）：在法器上铭刻限制契约，使器灵守规
+> - **百炼成钢**（`battle-ready`）：完整锻造，器灵觉醒，可上阵作战
+>
+> **异人语录**（马仙洪）：
+> - 开炉锻造：「来，让我给你造个更好的」——开始锻造
+> - 锻造完成：「神机百炼，无所不能」——锻造完成
+> - 契约先行：「先立契约，再动锤」——契约先行模式
+> - 战备级锻造：「这把武器，可以直接上战场」——战备级锻造
+
 ## 触发词
 
 - 生成工具
@@ -23,6 +36,12 @@ metadata:
 - 脚本工具
 - 代码脚手架
 - 自然语言生成工具
+- 百炼锻造
+- 器灵契约
+- 铸胚起手
+- 法器制造
+- 淬火成器
+- 需求炼化
 
 ## 功能概述
 
@@ -136,7 +155,7 @@ V6.2 返回结果示例：
 ```json
 {
   "factory": "shenji-bailian",
-  "version": "v0.1.0",
+  "version": "v6.5",
   "tool_name": "retrieval_skill",
   "artifact_type": "skill",
   "forge_mode": "battle-ready",

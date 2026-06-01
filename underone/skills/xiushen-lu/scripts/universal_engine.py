@@ -15,6 +15,10 @@
   - HybridStrategy: 混合进化 (SKILL.md + scripts同时进化)
 """
 
+ENGINE_STATUS = "deprecated-experiment"
+REPLACED_BY = "core_engine.py"
+DEPRECATION_NOTE = "保留为跨载体实验原型，不作为 under-one 技能目录的正式入口。"
+
 import ast
 import json
 import sys
@@ -31,12 +35,20 @@ from collections import defaultdict
 # 运行时指标收集
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(SKILLS_ROOT))
+from metrics_compat import record_metrics
+
 try:
-    from metrics_collector import record_metrics
+    from engine_guard import (
+        ALLOW_EXPERIMENTAL_ENTRY_ENV,
+        ALLOW_EXPERIMENTAL_ENTRY_FLAG,
+        enforce_deprecated_entry_guard,
+    )
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    ALLOW_EXPERIMENTAL_ENTRY_ENV = "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS"
+    ALLOW_EXPERIMENTAL_ENTRY_FLAG = "--allow-experimental-entry"
+
+    def enforce_deprecated_entry_guard(engine_name, replaced_by, note, argv=None, environ=None):
+        return list(argv if argv is not None else sys.argv[1:])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -679,7 +691,13 @@ class UniversalXiuShenLu:
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = enforce_deprecated_entry_guard(
+        "universal_engine.py",
+        REPLACED_BY,
+        DEPRECATION_NOTE,
+    )
+
+    if len(args) < 1:
         print("Universal XiuShenLu - 通用修身炉")
         print("\n用法:")
         print("  python universal_engine.py <target_path> [name]")
@@ -692,8 +710,8 @@ def main():
         print("  python universal_engine.py /path/to/script.py my-script")
         sys.exit(1)
 
-    target = sys.argv[1]
-    name = sys.argv[2] if len(sys.argv) > 2 else None
+    target = args[0]
+    name = args[1] if len(args) > 1 else None
 
     xsl = UniversalXiuShenLu()
     result = xsl.evolve(target, name)

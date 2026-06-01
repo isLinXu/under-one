@@ -23,19 +23,20 @@ from pathlib import Path
 from collections import defaultdict
 
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(SKILLS_ROOT))
-try:
-    from metrics_collector import record_metrics
-except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
 
 try:
-    from _skill_config import get_skill_config
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
 except ImportError:
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
+
+    try:
+        from _skill_config import get_skill_config
+    except ImportError:
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 class LinkDetector:
@@ -92,6 +93,14 @@ class LinkDetector:
     CAUSE_MARKERS = ["因为", "由于", "鉴于", "基于", "因", "既然", "考虑到", "源于", "归因于"]
     EFFECT_MARKERS = ["所以", "因此", "导致", "致使", "引起", "造成", "使得", "从而", "结果", "故", "于是", "就此", "据此"]
     CLAIM_MARKERS = ["必须", "一定", "显然", "证明", "毫无疑问", "完全稳定", "不会失败", "唯一"]
+    SEMANTIC_GROUPS = {
+        "cost": ["成本", "预算", "费用", "价格", "支出", "开销", "cost", "budget", "price"],
+        "performance": ["性能", "延迟", "速度", "吞吐", "响应", "加载", "卡顿", "performance", "latency", "speed"],
+        "risk": ["风险", "隐患", "异常", "失败", "缺陷", "漏洞", "risk", "failure", "defect"],
+        "quality": ["质量", "可靠", "稳定", "测试", "验证", "准确", "quality", "reliable", "test"],
+        "resource": ["资源", "人手", "算力", "内存", "容量", "配额", "resource", "quota", "capacity"],
+        "schedule": ["排期", "周期", "截止", "延期", "时间", "里程碑", "schedule", "deadline", "timeline"],
+    }
 
     def __init__(self, segments):
         self.segments = segments
@@ -142,6 +151,10 @@ class LinkDetector:
         causal_cfg = cfg.get("causal_markers", {})
         self.CAUSE_MARKERS = causal_cfg.get("cause", self.CAUSE_MARKERS)
         self.EFFECT_MARKERS = causal_cfg.get("effect", self.EFFECT_MARKERS)
+        self.SEMANTIC_GROUPS = cfg.get("semantic_groups", self.SEMANTIC_GROUPS)
+        se = cfg.get("semantic_expansion", {})
+        self.SEMANTIC_GROUP_WEIGHT = float(se.get("group_weight", 0.35))
+        self.SEMANTIC_GROUP_PAIR_BONUS = float(se.get("group_pair_bonus", 0.12))
 
     @record_metrics("dalu-dongguan")
     def detect(self):
@@ -389,7 +402,27 @@ class LinkDetector:
         words_b = _tokenize(b)
         if not words_a or not words_b:
             return 0.0
-        return len(words_a & words_b) / len(words_a | words_b)
+        lexical = len(words_a & words_b) / len(words_a | words_b)
+        return max(lexical, self._semantic_group_similarity(a, b))
+
+    def _semantic_groups_for_text(self, text):
+        text_l = text.lower()
+        groups = set()
+        for group, markers in self.SEMANTIC_GROUPS.items():
+            if any(str(marker).lower() in text_l for marker in markers):
+                groups.add(group)
+        return groups
+
+    def _semantic_group_similarity(self, a, b):
+        groups_a = self._semantic_groups_for_text(a)
+        groups_b = self._semantic_groups_for_text(b)
+        if not groups_a or not groups_b:
+            return 0.0
+        overlap = groups_a & groups_b
+        if not overlap:
+            return 0.0
+        union_size = max(1, len(groups_a | groups_b))
+        return min(0.95, self.SEMANTIC_GROUP_WEIGHT + len(overlap) / union_size * self.SEMANTIC_GROUP_PAIR_BONUS)
 
     def _generate_mermaid(self):
         lines = ["graph TD"]
@@ -765,7 +798,7 @@ class LinkDetector:
     def _build_output(self):
         mermaid = self._generate_mermaid()
         return {
-            "detector": "dalu-dongguan", "version": "v0.1.0",
+            "detector": "dalu-dongguan", "version": "v5.3",
             "segment_count": len(self.segments), "entity_count": len(self.entities),
             "link_count": len(self.links), "links": self.links,
             "entity_map": dict(self.entities),

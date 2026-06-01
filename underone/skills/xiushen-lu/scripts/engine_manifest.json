@@ -1,0 +1,22 @@
+{
+  "active_entry": "scripts/core_engine.py",
+  "auxiliary_tools": [
+    "scripts/xiushenlu_verifier.py",
+    "scripts/seed_runtime_data.py",
+    "scripts/bootstrap_profiles.py",
+    "scripts/underone_stdlib.py"
+  ],
+  "compatibility_shims": [
+    "scripts/shared_knowledge.py"
+  ],
+  "deprecated_experiments": [
+    "scripts/v8_engine.py",
+    "scripts/universal_engine.py",
+    "scripts/legacy/core_engine_v5.py"
+  ],
+  "experimental_opt_in": {
+    "env": "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS",
+    "flag": "--allow-experimental-entry",
+    "redirect_entry": "scripts/core_engine.py"
+  }
+}

@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "xiushen-lu"
-  version: "v0.1.0"
+  version: "v7.1"
   author: "under-one"
   description: "修身炉 - 自进化中枢 - 默认只读分析、自适应阈值护栏与跨skill学习"
   language: "zh"
@@ -13,6 +13,23 @@ metadata:
 # 🔥 修身炉 (XiuShen-Lu)
 
 > **自进化中枢 - 默认只读分析、自适应阈值护栏与跨skill学习**
+
+> **世界观**：修身炉取自道家"修身炼丹"——丹炉是炼化一切、去芜存菁的容器，持续淬炼使其在实战中不断进化。
+> - **炉主**（`XiuShenLuCoreV7`）：主持整个炼化过程的核心引擎
+> - **采炁**（`QiSourceV7`）：汇聚各技运行中散逸的炁场数据
+> - **炼师**（`RefinerV7`）：分析炉中原料，识别杂质（瓶颈）所在
+> - **化形**（`TransformerV7`）：将识别的问题转化为进化方案，可借鉴其他技的炼化经验
+> - **封印**（`RollbackV7`）：进化失败时启动封印，还原上一稳定态
+> - **渡劫六步**：采炁 → 炼师判断 → 炉主决策 → 入炉炼化 → 试炼验成 → 出炉成器
+> - **渡劫失败**（`failed_rolled_back`）：进化验证不过，回炉封印，修为归零
+>
+> **异人语录**（马仙洪·造物主）：
+> - 百炼成钢：「炉火纯青，百炼成钢」——技能已完成一次自进化
+> - 炉温已到：「炉温已到，待开炉门」——进化计划已就绪
+> - 炉火失控：「炉火失控，紧急回炉」——检测到异常，自动回滚
+> - 微调火候：「微调火候，精益求精」——参数微调进化
+> - 添柴加火：「添柴加火，扩展炉膛」——功能扩展进化
+> - 推倒重炼：「推倒重炼，脱胎换骨」——结构重构进化
 
 ## 目录
 
@@ -42,12 +59,27 @@ metadata:
 - 瓶颈分析
 - 健康评分
 - 进化周期
+- 渡劫进化
+- 入炉炼化
+- 回炉封印
+- 修身炼丹
+- 炁场采集
+- 炼师诊断
+- 炉火重燃
 
 ## 功能概述
 
 Agent自进化中枢V7.1：自适应阈值引擎（根据历史数据动态调整）、深度进化（优化脚本内部参数）、跨skill学习（借鉴其他skill优化经验）、知识迁移（验证有效的阈值自动共享）。
 
 **V7.1 护栏新增**：默认只读分析，`apply_changes=False` 时不会持久化 `adaptive_thresholds.json`；阈值更新同时受上下界保护，避免越调越偏。
+
+**职责边界协议**：修身炉是十技中的 `evolver`。它负责分析、生成演化建议、在显式 `--apply` 模式下持久化阈值或改写 skill；它**不负责**直接改写 live context，也不会绕过人工变更门。
+
+**入口裁定**：`scripts/core_engine.py` 是唯一生产入口。`xiushenlu_verifier.py / seed_runtime_data.py / bootstrap_profiles.py` 属于辅助工具；`v8_engine.py / universal_engine.py` 保留为实验原型，不作为当前技能入口。
+
+**进化反馈回流**：每轮 `run_evolution_cycle` 结束后，自动将各 skill 的健康分、瓶颈类型、进化建议写入 `runtime_data/evolution_feedback.jsonl`（最近500条）。其他 skill 或监控工具可被动读取此文件获取跨 skill 进化视图，无需主动调用修身炉。
+
+**实验入口护栏**：若 agent 或用户直接运行 `v8_engine.py / universal_engine.py`，脚本会默认拒绝作为生产入口执行，并提示回到 `core_engine.py`。只有显式传入 `--allow-experimental-entry` 或设置 `UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS=1` 时，才允许进入实验模式。
 
 ### V7核心组件
 
@@ -95,8 +127,16 @@ graph LR
 ```
 xiushen-lu/
 ├── SKILL.md              # 本文件
+├── _skillhub_meta.json   # 元数据 + control_plane_contract + engine_manifest
 └── scripts/
-    └── core_engine.py    # V7核心引擎
+    ├── core_engine.py         # 唯一生产入口
+    ├── xiushenlu_verifier.py  # 辅助验证器
+    ├── seed_runtime_data.py   # 冷启动播种器
+    ├── bootstrap_profiles.py  # 冷启动画像基线
+    ├── shared_knowledge.py    # 兼容 shim，转发到全局共享知识库
+    ├── engine_guard.py        # 实验入口护栏与重定向提示
+    ├── v8_engine.py           # 实验原型（已弃用）
+    └── universal_engine.py    # 实验原型（已弃用）
 ```
 
 ### 进化周期六步法
@@ -135,7 +175,7 @@ python scripts/core_engine.py <skills_dir> [skill_name]
 ```json
 {
   "engine": "xiushen-lu",
-  "version": "v0.1.0",
+  "version": "v7.1",
   "timestamp": "2026-05-06T01:40:00",
   "results": [
     {
@@ -291,14 +331,14 @@ print(f"\n总计: {summary['total']} 成功: {summary['evolved']} 回滚: {summa
 
 ## 错误处理
 
-| 场景 | 处理方式 |
-|------|----------|
-| 无参数 | CLI显示用法说明并exit 1 |
-| 数据不足(<10条) | 跳过进化，status="skipped" |
-| 进化类型=none | 跳过进化，status="no_action" |
-| 验证失败 | 自动回滚，status="failed_rolled_back" |
-| 语法错误 | 回滚到最近备份 |
-| 配置加载失败 | 自动回退到硬编码默认值 |
+| 场景 | 处理方式 | 渡劫隐喻 |
+|------|----------|---------|
+| 无参数 | CLI显示用法说明并exit 1 | — |
+| 数据不足(<10条) | 跳过进化，status="skipped" | **炁源不足**：炁场数据稀薄，本轮不入炉 |
+| 进化类型=none | 跳过进化，status="no_action" | **炁体稳固**：无需入炉，继续守势 |
+| 验证失败 | 自动回滚，status="failed_rolled_back" | **渡劫失败**：试炼不过，回炉封印，还原封存态 |
+| 语法错误 | 回滚到最近备份 | **走火**：炉火过猛，法体受损，紧急封印 |
+| 配置加载失败 | 自动回退到硬编码默认值 | **以本源应急**：外部炁源断链，以先天炁维持运转 |
 
 ## 测试方法
 

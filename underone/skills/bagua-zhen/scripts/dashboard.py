@@ -6,7 +6,7 @@
 输出: HTML监控面板
 """
 
-import json, sys
+import json, os, sys
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -25,8 +25,12 @@ SKILL_META = {
 }
 
 
+def _runtime_dir() -> Path:
+    return Path(os.getenv("UNDER_ONE_RUNTIME_DIR", "runtime_data")).expanduser()
+
+
 def load_metrics(skill_name):
-    file_path = Path("runtime_data") / f"{skill_name}_metrics.jsonl"
+    file_path = _runtime_dir() / f"{skill_name}_metrics.jsonl"
     if not file_path.exists():
         return []
     with open(file_path, "r", encoding="utf-8") as f:
@@ -39,12 +43,20 @@ def calc_stats(records):
         return {"success_rate": 0, "quality": 0, "errors": 0, "human": 0, "consistency": 0, "n": 0}
     n = len(records)
     successes = sum(1 for r in records if r.get("success", False))
+    def _avg(key):
+        values = [
+            r.get(key)
+            for r in records
+            if isinstance(r.get(key), (int, float)) and r.get(key) >= 0
+        ]
+        return round(sum(values) / len(values), 1) if values else 0
+
     return {
         "success_rate": round(successes / n * 100, 1),
-        "quality": round(sum(r.get("quality_score", 0) for r in records) / n, 1),
+        "quality": _avg("quality_score"),
         "errors": round(sum(r.get("error_count", 0) for r in records) / n, 2),
         "human": round(sum(r.get("human_intervention", 0) for r in records) / n, 2),
-        "consistency": round(sum(r.get("consistency_score", 0) for r in records) / n, 1),
+        "consistency": _avg("consistency_score"),
         "n": n,
     }
 
@@ -85,7 +97,7 @@ def generate_dashboard():
 
     # 修身炉状态
     evo_report = {}
-    evo_path = Path("runtime_data") / ".." / "evolution_report_v7.json"
+    evo_path = _runtime_dir().parent / "evolution_report_v7.json"
     if not evo_path.exists():
         evo_path = Path("evolution_report_v7.json")
     if evo_path.exists():

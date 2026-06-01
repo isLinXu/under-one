@@ -1,115 +1,159 @@
 #!/usr/bin/env python3
-"""
-器名: 跨技能知识共享库 (Cross-Skill Knowledge Hub)
-用途: 让skill之间共享进化经验、关键词库、优化策略
-输入: skill_name, knowledge_type, data
-输出: 共享知识文件
+"""Compatibility shim for xiushen-lu shared knowledge imports.
 
-V7特性: 一个skill发现的新关键词/阈值/策略，可被其他skill借鉴
+This module keeps the historical import path
+`xiushen-lu/scripts/shared_knowledge.py` alive.
+
+Behavior:
+- In the source repository, it forwards to the canonical shared hub at
+  `underone/skills/shared_knowledge.py`.
+- In standalone bundle installs, it falls back to a local implementation so
+  `skillctl self-test` remains self-contained.
 """
 
+from __future__ import annotations
+
+import importlib.util
 import json
-from pathlib import Path
+import sys
 from datetime import datetime
-from typing import Dict, List, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-SHARED_DIR = Path("shared_knowledge")
-SHARED_DIR.mkdir(exist_ok=True)
-
-
-class KnowledgeHub:
-    """跨技能知识共享中心"""
-
-    SHARED_KEYWORDS = {
-        "contradiction": ["不对", "错了", "矛盾", "之前说", "改回", "重新", "改主意", "变卦"],
-        "creation": ["写", "生成", "创建", "改写", "润色", "翻译", "生成", "撰写", "起草"],
-        "high_risk": ["删除", "覆盖", "资金", "医疗", "法律", "生产环境", "销毁", "清空"],
-        "evidence": ["数据", "统计", "研究表明", "实验", "测试", "结果", "证据", "证明"],
-        "logic_markers": ["因为", "所以", "首先", "然后", "最后", "结论", "因此", "综上"],
-    }
-
-    SHARED_THRESHOLDS = {
-        "default": {
-            "success_rate_warning": 0.80,
-            "success_rate_critical": 0.65,
-            "human_intervention_warning": 0.10,
-            "degradation_consecutive": 4,
-        },
-        "qiti-yuanliu": {
-            "entropy_warning": 3.0,
-            "entropy_critical": 7.0,
-            "consistency_threshold": 90,
-        },
-        "tongtian-lu": {
-            "curse_high": ["删除", "覆盖", "资金", "医疗", "法律", "生产环境", "销毁"],
-            "curse_medium": ["发布", "发送", "配置", "权限", "变更"],
-        },
-        "fenghou-qimen": {
-            "gate_open": 4.5,
-            "gate_life": 4.0,
-            "gate_view": 3.2,
-            "gate_block": 2.5,
-        },
-        "liuku-xianzei": {
-            "core_claim_weight": 40,
-            "evidence_weight": 30,
-            "application_weight": 30,
-        },
-    }
-
-    @classmethod
-    def contribute(cls, skill_name: str, knowledge_type: str, data: Any) -> None:
-        """skill贡献新知识"""
-        file_path = SHARED_DIR / f"{knowledge_type}.jsonl"
-        entry = {
-            "skill": skill_name,
-            "timestamp": datetime.now().isoformat(),
-            "data": data,
-        }
-        with open(file_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    @classmethod
-    def query(cls, knowledge_type: str, skill_filter: str = None, n: int = 10) -> List[Dict]:
-        """查询共享知识"""
-        file_path = SHARED_DIR / f"{knowledge_type}.jsonl"
-        if not file_path.exists():
-            return []
-        with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        records = [json.loads(l) for l in lines if l.strip()]
-        if skill_filter:
-            records = [r for r in records if r["skill"] == skill_filter]
-        return records[-n:]
-
-    @classmethod
-    def get_keywords(cls, category: str) -> List[str]:
-        """获取共享关键词"""
-        return cls.SHARED_KEYWORDS.get(category, [])
-
-    @classmethod
-    def get_threshold(cls, skill_name: str, key: str) -> Any:
-        """获取共享阈值配置"""
-        defaults = cls.SHARED_THRESHOLDS.get("default", {})
-        skill_specific = cls.SHARED_THRESHOLDS.get(skill_name, {})
-        return skill_specific.get(key, defaults.get(key))
-
-    @classmethod
-    def migrate_threshold(cls, from_skill: str, to_skill: str, threshold_key: str) -> Any:
-        """跨skill阈值迁移：将A技能验证有效的阈值迁移到B技能"""
-        value = cls.SHARED_THRESHOLDS.get(from_skill, {}).get(threshold_key)
-        if value is not None:
-            cls.SHARED_THRESHOLDS.setdefault(to_skill, {})[threshold_key] = value
-            cls.contribute("xiushen-lu", "threshold_migration", {
-                "from": from_skill,
-                "to": to_skill,
-                "key": threshold_key,
-                "value": value,
-            })
-        return value
+ENGINE_STATUS = "compatibility-shim"
+DEPRECATED = True
+REPLACED_BY = "../../shared_knowledge.py"
 
 
-if __name__ == "__main__":
-    KnowledgeHub.contribute("qiti-yuanliu", "new_pattern", {"keyword": "改主意", "type": "contradiction"})
-    print("Knowledge shared:", KnowledgeHub.query("new_pattern"))
-    print("Keywords:", KnowledgeHub.get_keywords("contradiction"))
+def _candidate_canonical_paths() -> List[Path]:
+    current = Path(__file__).resolve()
+    return [
+        current.parents[2] / "shared_knowledge.py",
+        current.parents[1] / "shared_knowledge.py",
+        current.parent / "_shared_knowledge.py",
+    ]
+
+
+def _load_canonical_module():
+    current = Path(__file__).resolve()
+    for candidate in _candidate_canonical_paths():
+        if candidate == current or not candidate.exists() or candidate.is_dir():
+            continue
+        spec = importlib.util.spec_from_file_location("_underone_shared_knowledge", candidate)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    return None
+
+
+_MODULE = _load_canonical_module()
+
+if _MODULE is not None:
+    KnowledgeHub = _MODULE.KnowledgeHub
+    get_hub = _MODULE.get_hub
+else:
+    try:
+        from metrics_collector import resolve_runtime_data_dir
+    except ImportError:
+        def resolve_runtime_data_dir(data_dir=None) -> Path:
+            return Path(data_dir or "runtime_data").expanduser()
+
+    _knowledge_hub_instance = None
+    _knowledge_hub_dir: Optional[Path] = None
+
+    class KnowledgeHub:
+        """Local fallback for standalone bundle installs."""
+
+        def __init__(self, data_dir: Optional[str] = None):
+            self.data_dir = resolve_runtime_data_dir(data_dir)
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            self.knowledge_file = self.data_dir / "shared_knowledge.json"
+            self._knowledge: Dict[str, List[Dict[str, Any]]] = self._load()
+
+        def _load(self) -> Dict[str, List[Dict[str, Any]]]:
+            if not self.knowledge_file.exists():
+                return {}
+            try:
+                return json.loads(self.knowledge_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return {}
+
+        def _save(self) -> None:
+            self.knowledge_file.write_text(
+                json.dumps(self._knowledge, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+        def contribute(self, skill_name: str, knowledge_type: str, data: Dict[str, Any]) -> None:
+            key = f"{skill_name}:{knowledge_type}"
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "skill_name": skill_name,
+                "type": knowledge_type,
+                "data": data,
+            }
+            self._knowledge.setdefault(key, []).append(entry)
+            self._knowledge[key] = self._knowledge[key][-50:]
+            self._save()
+
+        def query(self, knowledge_type: str, skill_name: Optional[str] = None, n: int = 5) -> List[Dict[str, Any]]:
+            results: List[Dict[str, Any]] = []
+            for key, entries in self._knowledge.items():
+                entry_skill, _, entry_type = key.partition(":")
+                if entry_type != knowledge_type:
+                    continue
+                if skill_name is not None and entry_skill != skill_name:
+                    continue
+                results.extend(entries)
+            results.sort(key=lambda item: item.get("timestamp", ""), reverse=True)
+            return results[:n]
+
+        def get_threshold(self, skill_name: str, key: str) -> Optional[float]:
+            entries = self.query("threshold_evolution", skill_name=skill_name, n=1)
+            if not entries:
+                return None
+            change = str(entries[0].get("data", {}).get("change", ""))
+            import re
+            match = re.search(r"([\d.]+)", change)
+            if match:
+                return float(match.group(1))
+            return None
+
+        def get_similar_skills(self, skill_name: str) -> List[str]:
+            similarity_map = {
+                "qiti-yuanliu": ["shuangquanshou"],
+                "tongtian-lu": ["shenji-bailian"],
+                "fenghou-qimen": ["juling-qianjiang"],
+                "liuku-xianzei": ["dalu-dongguan"],
+            }
+            return similarity_map.get(skill_name, [])
+
+        def stats(self) -> Dict[str, Any]:
+            total_entries = sum(len(items) for items in self._knowledge.values())
+            return {
+                "total_entries": total_entries,
+                "categories": list(self._knowledge.keys()),
+                "file": str(self.knowledge_file),
+            }
+
+    def get_hub(data_dir: Optional[str] = None) -> KnowledgeHub:
+        global _knowledge_hub_instance, _knowledge_hub_dir
+        resolved_dir = resolve_runtime_data_dir(data_dir)
+        if _knowledge_hub_instance is None or _knowledge_hub_dir != resolved_dir:
+            _knowledge_hub_instance = KnowledgeHub(str(resolved_dir))
+            _knowledge_hub_dir = resolved_dir
+        return _knowledge_hub_instance
+
+
+sys.modules.setdefault("shared_knowledge", sys.modules[__name__])
+
+__all__ = [
+    "KnowledgeHub",
+    "get_hub",
+    "ENGINE_STATUS",
+    "DEPRECATED",
+    "REPLACED_BY",
+]

@@ -12,6 +12,10 @@ V8四大突破:
 4. 联邦进化协议: 多Agent实例间共享进化
 """
 
+ENGINE_STATUS = "deprecated-experiment"
+REPLACED_BY = "core_engine.py"
+DEPRECATION_NOTE = "保留为实验性原型，不作为 under-one 的生产入口。"
+
 import json, os, sys, math, statistics, hashlib, time, re
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -21,12 +25,20 @@ from collections import defaultdict, deque
 # 运行时指标收集
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(SKILLS_ROOT))
+from metrics_compat import record_metrics
+
 try:
-    from metrics_collector import record_metrics
+    from engine_guard import (
+        ALLOW_EXPERIMENTAL_ENTRY_ENV,
+        ALLOW_EXPERIMENTAL_ENTRY_FLAG,
+        enforce_deprecated_entry_guard,
+    )
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    ALLOW_EXPERIMENTAL_ENTRY_ENV = "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS"
+    ALLOW_EXPERIMENTAL_ENTRY_FLAG = "--allow-experimental-entry"
+
+    def enforce_deprecated_entry_guard(engine_name, replaced_by, note, argv=None, environ=None):
+        return list(argv if argv is not None else sys.argv[1:])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -611,12 +623,18 @@ class HachigikiV8Engine:
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = enforce_deprecated_entry_guard(
+        "v8_engine.py",
+        REPLACED_BY,
+        DEPRECATION_NOTE,
+    )
+
+    if len(args) < 1:
         print("用法: python v8_engine.py <skills_dir> [skill_name]")
         sys.exit(1)
 
-    engine = HachigikiV8Engine(sys.argv[1])
-    result = engine.run_v8_cycle(sys.argv[2] if len(sys.argv) > 2 else None)
+    engine = HachigikiV8Engine(args[0])
+    result = engine.run_v8_cycle(args[1] if len(args) > 1 else None)
 
     print("\n" + "=" * 60)
     print("🧠 under-one.skills V8 · 预测智能周期完成")

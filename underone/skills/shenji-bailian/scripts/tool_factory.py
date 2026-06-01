@@ -20,21 +20,21 @@ from pathlib import Path
 # ── 路径设置 ───────────────────────────────────────────────
 SKILL_ROOT = Path(__file__).resolve().parent.parent  # shenji-bailian/
 SKILLS_ROOT = SKILL_ROOT.parent                       # skills/
-sys.path.insert(0, str(SKILLS_ROOT))
 
 # ── 依赖导入（带降级） ─────────────────────────────────────
 try:
-    from metrics_collector import record_metrics
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics
 except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics
 
-try:
-    from _skill_config import get_skill_config
-except ImportError:
-    def get_skill_config(skill_name, key=None, default=None):
-        return default
+    try:
+        from _skill_config import get_skill_config
+    except ImportError:
+        def get_skill_config(skill_name, key=None, default=None):
+            return default
 
 
 # ═══════════════════════════════════════════════════════════
@@ -820,6 +820,9 @@ SKILL_META_TEMPLATE = '''{{
   "dependencies": [],
   "standalone_validation": {{"kind": "python-script", "path": "tests/standalone_smoke.py"}},
   "runtime_contract": {runtime_contract_json},
+  "bootstrap_profile": {bootstrap_profile_json},
+  "control_plane_contract": {control_plane_contract_json},
+  "alignment": {alignment_json},
   "min_python": "3.8"
 }}
 '''
@@ -1209,6 +1212,35 @@ class ToolFactory:
             "contracts_present": [key for key, value in sections.items() if value],
         }
 
+    def _build_delivery_contract(self, files, artifact_type, module_name, test_code, contract):
+        if artifact_type == "skill":
+            required_artifacts = [
+                f"{module_name}/SKILL.md",
+                f"{module_name}/README.md",
+                f"{module_name}/_skillhub_meta.json",
+                f"{module_name}/scripts/{module_name}.py",
+                f"{module_name}/tests/standalone_smoke.py",
+            ]
+        else:
+            required_artifacts = [f"{module_name}.py"]
+            if test_code:
+                required_artifacts.append(f"test_{module_name}.py")
+            if contract:
+                required_artifacts.append(f"{module_name}.contract.md")
+
+        present_artifacts = [path for path in required_artifacts if path in files]
+        blockers = []
+        if len(present_artifacts) != len(required_artifacts):
+            blockers.append("仍有必需产物缺失，暂不适合直接交付。")
+        return {
+            "ready_to_deliver": len(present_artifacts) == len(required_artifacts),
+            "artifact_type": artifact_type,
+            "required_artifacts": required_artifacts,
+            "present_artifacts": present_artifacts,
+            "blockers": blockers,
+            "next_step": "run-standalone-smoke" if artifact_type == "skill" else "run-generated-tests",
+        }
+
     def _render_skill_doc(self, skill_name, description, inputs, outputs, module_name):
         display_name = skill_name.replace("_", "-")
         tool_contract = self.spec.get("sections", {}).get("tool_contract", {})
@@ -1237,6 +1269,9 @@ class ToolFactory:
         triggers = tool_contract.get("triggers", [display_name, "自动化", "处理", "生成"])
         specialization = tool_contract.get("specialization", "general-skill")
         runtime_contract = self._build_runtime_contract(specialization, module_name)
+        bootstrap_profile = self._build_bootstrap_profile(specialization)
+        control_plane_contract = self._build_generated_control_plane_contract(specialization)
+        alignment = self._build_generated_alignment(description, specialization)
         return SKILL_META_TEMPLATE.format(
             skill_name=display_name,
             display_name=display_name,
@@ -1247,6 +1282,9 @@ class ToolFactory:
             inputs_json=json.dumps(inputs, ensure_ascii=False),
             outputs_json=json.dumps(outputs, ensure_ascii=False),
             runtime_contract_json=json.dumps(runtime_contract, ensure_ascii=False),
+            bootstrap_profile_json=json.dumps(bootstrap_profile, ensure_ascii=False),
+            control_plane_contract_json=json.dumps(control_plane_contract, ensure_ascii=False),
+            alignment_json=json.dumps(alignment, ensure_ascii=False),
         )
 
     def _render_skill_readme(self, skill_name, module_name):
@@ -1324,6 +1362,67 @@ class ToolFactory:
             "required_files": required_files,
             "required_exports": ["transform", "process"],
             "required_output_keys": required_output_keys,
+        }
+
+    def _build_bootstrap_profile(self, specialization):
+        defaults = {
+            "avg_quality": 84.0,
+            "avg_completeness": 88.0,
+            "avg_consistency": 86.0,
+            "avg_human": 0.05,
+            "success_rate": 0.92,
+            "avg_duration": 650.0,
+            "recommended_min_records": 10,
+            "degradation_window": 4,
+        }
+        overlays = {
+            "retrieval-skill": {"avg_quality": 86.0, "avg_completeness": 90.0, "avg_consistency": 85.0, "avg_duration": 820.0},
+            "browser-skill": {"avg_quality": 83.0, "avg_completeness": 89.0, "avg_consistency": 84.0, "avg_human": 0.07, "avg_duration": 900.0, "recommended_min_records": 12},
+            "analysis-skill": {"avg_quality": 88.0, "avg_completeness": 91.0, "avg_consistency": 88.0, "avg_duration": 720.0},
+            "workflow-skill": {"avg_quality": 85.0, "avg_completeness": 90.0, "avg_consistency": 87.0, "avg_human": 0.06, "avg_duration": 760.0},
+        }
+        profile = dict(defaults)
+        profile.update(overlays.get(specialization, {}))
+        return profile
+
+    def _build_generated_alignment(self, description, specialization):
+        core_map = {
+            "retrieval-skill": "多源检索与命中摘要",
+            "browser-skill": "网页读取与结构化抽取",
+            "analysis-skill": "数据分析与报告生成",
+            "workflow-skill": "步骤编排与状态流转",
+        }
+        boundary_map = {
+            "retrieval-skill": "负责检索与总结，不直接假设外部检索端点始终可用",
+            "browser-skill": "负责抓取与整理，不绕过域名/权限边界",
+            "analysis-skill": "负责统计与洞察，不替代业务规则最终裁决",
+            "workflow-skill": "负责编排与状态推进，不隐式执行未声明步骤",
+        }
+        core = core_map.get(specialization, "结构化输入输出处理")
+        boundary = boundary_map.get(specialization, "负责稳定执行与输出，不越权扩张能力边界")
+        return {
+            "core": core,
+            "agent_meaning": f"围绕“{description}”提供可独立安装、可独立验证的 {specialization or 'general-skill'} 骨架",
+            "cost": "若缺少真实样本与失败路径验证，容易出现结果空泛、边界松动或质量漂移",
+            "boundary": boundary,
+        }
+
+    def _build_generated_control_plane_contract(self, specialization):
+        scope_map = {
+            "retrieval-skill": "retrieval-execution",
+            "browser-skill": "browser-execution",
+            "analysis-skill": "analysis-execution",
+            "workflow-skill": "workflow-execution",
+        }
+        return {
+            "role": "executor",
+            "scope": scope_map.get(specialization, "task-execution"),
+            "reads": ["declared_inputs"],
+            "writes": ["declared_outputs", "runtime_data"],
+            "handoff_targets": [],
+            "mutation_gate": "none",
+            "will_not": ["write_other_skills", "persist_thresholds", "mutate_without_user_request"],
+            "summary": "负责执行本 skill 的局部任务，不跨权修改其他 skill 或控制层策略。",
         }
 
     def _build_specialized_bundle(self, specialization, module_name):
@@ -2359,10 +2458,18 @@ def normalize_workflow_state(raw_state):
                 files[f"{module_name}.contract.md"] = contract
 
         forge_summary = self._build_forge_summary(template_key, mode_cfg)
+        delivery_contract = self._build_delivery_contract(
+            files, artifact_type, module_name, test_code, contract
+        )
+        artifact_coverage = (
+            len(delivery_contract["present_artifacts"]) / len(delivery_contract["required_artifacts"])
+            if delivery_contract["required_artifacts"]
+            else 1.0
+        )
 
         return {
             "factory": "shenji-bailian",
-            "version": "v0.1.0",
+            "version": "v6.5",
             "tool_name": name,
             "artifact_type": artifact_type,
             "specialization": self.spec.get("sections", {}).get("tool_contract", {}).get("specialization", "general"),
@@ -2370,6 +2477,7 @@ def normalize_workflow_state(raw_state):
             "forge_mode": mode_cfg["name"],
             "forge_intent": forge_summary["forge_intent"],
             "forge_summary": forge_summary,
+            "delivery_contract": delivery_contract,
             "inferred_spec": self.spec,
             "files": files,
             # 向后兼容：保留 V5.0 的顶级字段
@@ -2386,12 +2494,22 @@ def normalize_workflow_state(raw_state):
                         + (6.0 if test_code else 0.0)
                         + (4.0 if contract else 0.0)
                         + (4.0 if artifact_type == "skill" else 0.0)
+                        + (6.0 if delivery_contract["ready_to_deliver"] else 0.0)
                     ),
                 ),
                 1,
             ),
             "human_intervention": 0,
-            "output_completeness": round(min(100.0, 65.0 + len(files) * 6.0), 1),
+            "output_completeness": round(
+                min(
+                    100.0,
+                    68.0
+                    + artifact_coverage * 22.0
+                    + (6.0 if test_code else 0.0)
+                    + (4.0 if contract else 0.0),
+                ),
+                1,
+            ),
             "consistency_score": 100.0 if files else 0.0,
             "error_count": 0,
         }

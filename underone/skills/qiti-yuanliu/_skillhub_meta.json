@@ -1,7 +1,7 @@
 {
   "id": "qiti-yuanliu",
   "name": "炁体源流",
-  "version": "v0.1.0",
+  "version": "v6.1",
   "type": "script",
   "entry": "scripts/entropy_scanner.py",
   "language": "python",
@@ -14,6 +14,26 @@
   "outputs": ["*.health_report.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 92.0,
+    "avg_completeness": 95.0,
+    "avg_consistency": 94.0,
+    "avg_human": 0.02,
+    "success_rate": 0.98,
+    "avg_duration": 520.0,
+    "recommended_min_records": 12,
+    "degradation_window": 4
+  },
+  "control_plane_contract": {
+    "role": "observer",
+    "scope": "context-diagnosis",
+    "reads": ["context", "runtime_data"],
+    "writes": ["runtime_data", "health_report"],
+    "handoff_targets": ["dalu-dongguan", "xiushen-lu"],
+    "mutation_gate": "diagnose-and-handoff-only",
+    "will_not": ["write_skills", "persist_thresholds", "override_ecosystem_policy"],
+    "summary": "负责诊断、稳态契约与 handoff，不直接改写 skill 代码或全局阈值。"
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "自我反思与规则生长",

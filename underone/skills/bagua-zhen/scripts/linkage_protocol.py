@@ -9,11 +9,18 @@ V7特性: 十技联动、修身炉监控、八卦阵仲裁
 """
 
 import json
+import os
 import sys
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def _runtime_dir() -> Path:
+    runtime_dir = Path(os.getenv("UNDER_ONE_RUNTIME_DIR", "runtime_data")).expanduser()
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    return runtime_dir
 
 
 class LinkageProtocol:
@@ -136,8 +143,7 @@ class LinkageProtocol:
     def _report_to_xiushenlu(self, skill_name: str, result: Dict) -> None:
         """V7: 向修身炉报告运行时指标"""
         try:
-            metrics_dir = Path("runtime_data")
-            metrics_dir.mkdir(exist_ok=True)
+            metrics_dir = _runtime_dir()
             metrics_file = metrics_dir / f"{skill_name}_metrics.jsonl"
             metric = {
                 "skill_name": skill_name,

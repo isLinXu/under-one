@@ -1,7 +1,7 @@
 {
   "id": "fenghou-qimen",
   "name": "风后奇门",
-  "version": "v0.1.0",
+  "version": "v5.1",
   "type": "script",
   "entry": "scripts/priority_engine.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["priority_plan.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 95.0,
+    "avg_completeness": 95.0,
+    "avg_consistency": 94.0,
+    "avg_human": 0.01,
+    "success_rate": 0.98,
+    "avg_duration": 540.0,
+    "recommended_min_records": 8,
+    "degradation_window": 3
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "多维任务评分与执行排序",

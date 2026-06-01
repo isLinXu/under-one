@@ -13,17 +13,24 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
+try:
+    from metrics_collector import resolve_runtime_data_dir
+except ImportError:
+    def resolve_runtime_data_dir(data_dir=None) -> Path:
+        return Path(data_dir or "runtime_data").expanduser()
+
 
 # 单例模式：全局知识库实例
 _knowledge_hub_instance = None
+_knowledge_hub_dir: Optional[Path] = None
 
 
 class KnowledgeHub:
     """跨 Skill 知识共享中心"""
 
-    def __init__(self, data_dir: str = "runtime_data"):
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
+    def __init__(self, data_dir: Optional[str] = None):
+        self.data_dir = resolve_runtime_data_dir(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.knowledge_file = self.data_dir / "shared_knowledge.json"
         self._knowledge: Dict[str, List[Dict]] = self._load()
 
@@ -127,11 +134,13 @@ class KnowledgeHub:
         }
 
 
-def get_hub(data_dir: str = "runtime_data") -> KnowledgeHub:
+def get_hub(data_dir: Optional[str] = None) -> KnowledgeHub:
     """获取全局 KnowledgeHub 单例"""
-    global _knowledge_hub_instance
-    if _knowledge_hub_instance is None:
-        _knowledge_hub_instance = KnowledgeHub(data_dir)
+    global _knowledge_hub_instance, _knowledge_hub_dir
+    resolved_dir = resolve_runtime_data_dir(data_dir)
+    if _knowledge_hub_instance is None or _knowledge_hub_dir != resolved_dir:
+        _knowledge_hub_instance = KnowledgeHub(str(resolved_dir))
+        _knowledge_hub_dir = resolved_dir
     return _knowledge_hub_instance
 
 

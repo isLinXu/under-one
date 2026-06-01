@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-器名: 修身炉V7核心引擎 (XiuShenLu Core Engine V7)
-用途: Agent自进化中枢V7 - 自适应阈值、深度进化、跨skill学习
+器名: 修身炉V7.1核心引擎 (XiuShenLu Core Engine V7.1)
+用途: Agent自进化中枢V7.1 - 自适应阈值、深度进化、跨skill学习
 输入: 运行时指标JSON 或 技能目录路径
 输出: 进化报告 {evolution_type, changes, validation_result, new_version, adaptive_thresholds}
 
-V7升级:
+V7.1升级:
 - 自适应阈值引擎: 根据历史数据动态调整进化触发阈值
 - 深度进化: 不再只改SKILL.md，而是优化脚本内部参数
 - 跨skill学习: 借鉴其他skill的优化经验
@@ -23,20 +23,69 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 
 # 运行时指标收集
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(SKILLS_ROOT))
-try:
-    from metrics_collector import record_metrics
-except ImportError:
-    def record_metrics(*args, **kwargs):
-        def decorator(f): return f
-        return decorator
 
 try:
-    from _skill_config import get_skill_config
+    from under_one.config import get_skill_config
+    from under_one.metrics import record_metrics, resolve_runtime_data_dir
 except ImportError:
-    def get_skill_config(_section, _key=None, default=None):
-        return default
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    from metrics_compat import record_metrics, resolve_runtime_data_dir
+
+    try:
+        from _skill_config import get_skill_config
+    except ImportError:
+        def get_skill_config(_section, _key=None, default=None):
+            return default
+
+try:
+    from skills.control_plane_protocol import build_control_plane_status, get_control_plane_contract
+except ImportError:
+    if str(SKILLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(SKILLS_ROOT))
+    try:
+        from control_plane_protocol import build_control_plane_status, get_control_plane_contract
+    except ImportError:
+        def get_control_plane_contract(_skill_name, skill_dir=None):
+            return {}
+
+        def build_control_plane_status(
+            skill_name,
+            *,
+            phase,
+            manual_gate_required,
+            skill_dir=None,
+            writes_applied=False,
+            next_owner=None,
+            handoff_targets=None,
+            note=None,
+        ):
+            return {
+                "role": None,
+                "scope": None,
+                "mutation_gate": None,
+                "reads": [],
+                "writes": [],
+                "will_not": [],
+                "phase": phase,
+                "manual_gate_required": manual_gate_required,
+                "writes_applied": writes_applied,
+                "next_owner": next_owner or skill_name,
+                "handoff_targets": handoff_targets or [],
+                "blocked_writes": [],
+                "summary": None,
+                "note": note,
+            }
+
+try:
+    from bootstrap_profiles import get_bootstrap_profile
+except ImportError:
+    def get_bootstrap_profile(_skill_name: str):
+        return None
 
 # V7: 导入跨技能知识共享库
 try:
@@ -47,6 +96,29 @@ except ImportError:
 
 
 VERSION = "v0.1.0"
+ENGINE_STATUS = "active"
+ENGINE_MANIFEST = {
+    "active_entry": "scripts/core_engine.py",
+    "auxiliary_tools": [
+        "scripts/xiushenlu_verifier.py",
+        "scripts/seed_runtime_data.py",
+        "scripts/bootstrap_profiles.py",
+        "scripts/underone_stdlib.py",
+    ],
+    "compatibility_shims": [
+        "scripts/shared_knowledge.py",
+    ],
+    "deprecated_experiments": [
+        "scripts/v8_engine.py",
+        "scripts/universal_engine.py",
+        "scripts/legacy/core_engine_v5.py",
+    ],
+    "experimental_opt_in": {
+        "env": "UNDERONE_ALLOW_XIUSHEN_EXPERIMENTS",
+        "flag": "--allow-experimental-entry",
+        "redirect_entry": "scripts/core_engine.py",
+    },
+}
 _cfg_persist_on_apply_only = get_skill_config("xiushenlu", "persist_adaptive_thresholds_on_apply_only", True)
 _cfg_adaptive_bounds = get_skill_config("xiushenlu", "adaptive_threshold_bounds", {})
 
@@ -79,9 +151,9 @@ def _evolution_quality(report: dict) -> float:
 class QiSourceV7:
     """V7炁源: 增强版数据收集，支持实时流和批量导入"""
 
-    def __init__(self, data_dir: str = "runtime_data"):
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
+    def __init__(self, data_dir: Optional[str] = None):
+        self.data_dir = resolve_runtime_data_dir(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.buffer: List[Dict] = []
 
     def collect(self, metric: Dict) -> None:
@@ -142,7 +214,8 @@ class RefinerV7:
             "quality_drop_threshold": 5.0,
         }
         # V7: 自适应阈值存储
-        self.adaptive_file = Path("adaptive_thresholds.json")
+        adaptive_file_override = os.environ.get("UNDER_ONE_ADAPTIVE_THRESHOLDS_FILE")
+        self.adaptive_file = Path(adaptive_file_override).expanduser() if adaptive_file_override else Path("adaptive_thresholds.json")
         self.persist_adaptive = (not _cfg_persist_on_apply_only) if persist_adaptive is None else persist_adaptive
         self.adaptive_bounds = self._resolve_bounds(adaptive_bounds or _cfg_adaptive_bounds)
         self.adaptive = self._load_adaptive()
@@ -248,7 +321,11 @@ class RefinerV7:
         successes = sum(1 for r in records if r.get("success", False))
         total_errors = sum(r.get("error_count", 0) for r in records)
         total_human = sum(r.get("human_intervention", 0) for r in records)
-        qualities = [r.get("quality_score", 100) for r in records]
+        qualities = [
+            float(r["quality_score"])
+            for r in records
+            if isinstance(r.get("quality_score"), (int, float)) and r.get("quality_score") >= 0
+        ]
         completenesses = [self._average_signal([r], "output_completeness", fallback_key="quality_score", default=100.0) for r in records]
         consistencies = [self._average_signal([r], "consistency_score", fallback_key="quality_score", default=100.0) for r in records]
         avg_duration = sum(r.get("duration_ms", 0) for r in records) / n
@@ -256,7 +333,7 @@ class RefinerV7:
         success_rate = successes / n
         avg_errors = total_errors / n
         avg_human = total_human / n
-        avg_quality = sum(qualities) / n
+        avg_quality = sum(qualities) / len(qualities) if qualities else 100.0
         avg_completeness = sum(completenesses) / n
         avg_consistency = sum(consistencies) / n
         std_quality = statistics.stdev(qualities) if len(qualities) > 1 else 0
@@ -394,7 +471,9 @@ class RefinerV7:
         max_streak = 0
         prev_quality = None
         for r in records:
-            q = r.get("quality_score", 100)
+            q = r.get("quality_score")
+            if not isinstance(q, (int, float)) or q < 0:
+                continue
             if prev_quality is not None and q < prev_quality:
                 streak += 1
                 max_streak = max(max_streak, streak)
@@ -757,7 +836,7 @@ class XiuShenLuCoreV7:
     def __init__(
         self,
         skills_dir: str,
-        data_dir: str = "runtime_data",
+        data_dir: Optional[str] = None,
         apply_changes: bool = False,
         persist_adaptive: Optional[bool] = None,
     ):
@@ -875,6 +954,7 @@ class XiuShenLuCoreV7:
             round(sum(1 for item in actionable_results if item.get("status") == "planned") / len(actionable_results), 2)
             if actionable_results else 0.0
         )
+        error_count = sum(1 for item in results if item.get("status") == "error")
         summary = {
             "total": len(eligible_targets),
             "evolved": sum(1 for r in results if r["status"] == "evolved"),
@@ -885,20 +965,48 @@ class XiuShenLuCoreV7:
         evolution_backlog = self._build_evolution_backlog(results)
         pattern_summary = self._build_pattern_summary(analyzed_results, evolution_backlog)
         execution_policy = self._build_execution_policy(summary, evolution_backlog, manual_gate_ratio)
+        policy_consistency = 80.0 if not self.apply_changes else 78.0
+        if error_count:
+            policy_consistency = max(55.0, policy_consistency - error_count * 8.0)
+        consistency_score = round(
+            avg_target_consistency if analyzed_results else policy_consistency,
+            1,
+        )
+        human_intervention = (
+            1.0 if (not self.apply_changes and actionable_results) else manual_gate_ratio
+        )
+        control_plane_status = build_control_plane_status(
+            "xiushen-lu",
+            phase="apply-changes" if self.apply_changes else "plan-only",
+            manual_gate_required=execution_policy["manual_gate_required"],
+            skill_dir=Path(__file__).resolve().parent.parent,
+            writes_applied=self.apply_changes,
+            next_owner=(execution_policy["next_targets"][0] if execution_policy["next_targets"] else "xiushen-lu"),
+            handoff_targets=execution_policy.get("approval_scope", []) or execution_policy.get("next_targets", []),
+            note="apply_mode" if self.apply_changes else "plan_only",
+        )
+        # V7.1+: 反馈回流 — 将进化分析摘要写入 evolution_feedback.jsonl
+        # 让其他 skill 的 metrics_compat 或 shared_knowledge 可以被动读取进化建议
+        self._write_evolution_feedback(results)
+
         report = {
             "engine": "xiushen-lu",
             "version": VERSION,
+            "engine_status": ENGINE_STATUS,
+            "engine_manifest": ENGINE_MANIFEST,
+            "control_plane_contract": get_control_plane_contract("xiushen-lu", skill_dir=Path(__file__).resolve().parent.parent),
+            "control_plane_status": control_plane_status,
             "timestamp": datetime.now().isoformat(),
             "overall_quality": _evolution_quality({
                 "results": results,
                 "summary": summary,
                 "output_completeness": decision_coverage,
-                "consistency_score": avg_target_consistency,
-                "human_intervention": manual_gate_ratio,
+                "consistency_score": consistency_score,
+                "human_intervention": human_intervention,
             }),
             "output_completeness": decision_coverage,
-            "consistency_score": avg_target_consistency,
-            "human_intervention": manual_gate_ratio,
+            "consistency_score": consistency_score,
+            "human_intervention": human_intervention,
             "aggregated_runtime_signals": {
                 "avg_target_output_completeness": avg_target_completeness,
                 "avg_target_consistency_score": avg_target_consistency,
@@ -913,6 +1021,57 @@ class XiuShenLuCoreV7:
             "execution_policy": execution_policy,
         }
         return report
+
+    def _write_evolution_feedback(self, results: List[Dict]) -> None:
+        """V7.1+: 反馈回流——将本轮进化分析摘要以 JSONL 追加写入 runtime_data/evolution_feedback.jsonl。
+        
+        格式（每行一条）：
+        {
+            "timestamp": "...",
+            "engine_version": "v7.1",
+            "skill": "qiti-yuanliu",
+            "health_score": 72.5,
+            "bottleneck_type": "error_prone",
+            "evolution_type": "tuning",
+            "priority": "high",
+            "recommendations": ["..."],
+            "applied": false
+        }
+        其他 skill 或监控工具可读取此文件获取修身炉的跨 skill 分析视图。
+        """
+        try:
+            feedback_path = resolve_runtime_data_dir() / "evolution_feedback.jsonl"
+            feedback_path.parent.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().isoformat()
+            lines = []
+            for item in results:
+                if not isinstance(item.get("analysis"), dict):
+                    continue
+                analysis = item["analysis"]
+                lines.append(json.dumps({
+                    "timestamp": ts,
+                    "engine_version": VERSION,
+                    "skill": item.get("skill", "unknown"),
+                    "status": item.get("status", "unknown"),
+                    "health_score": analysis.get("health_score"),
+                    "bottleneck_type": analysis.get("bottleneck_type"),
+                    "evolution_type": analysis.get("evolution_type"),
+                    "priority": analysis.get("priority"),
+                    "recommendations": analysis.get("recommendations", [])[:3],
+                    "applied": item.get("status") == "evolved",
+                }, ensure_ascii=False))
+            if lines:
+                with open(feedback_path, "a", encoding="utf-8") as f:
+                    f.write("\n".join(lines) + "\n")
+                # 保留最近 500 行，避免无限增长
+                try:
+                    existing = feedback_path.read_text(encoding="utf-8").splitlines()
+                    if len(existing) > 500:
+                        feedback_path.write_text("\n".join(existing[-500:]) + "\n", encoding="utf-8")
+                except Exception:
+                    pass
+        except Exception:
+            pass  # 反馈写入失败不影响主流程
 
     def _discover_skills(self) -> List[str]:
         skills = []
@@ -1019,36 +1178,82 @@ class XiuShenLuCoreV7:
             ][:5],
         }
 
+    @staticmethod
+    def _bootstrap_observed_weight(sample_size: int) -> float:
+        if sample_size <= 0:
+            return 0.0
+        if sample_size >= 5:
+            return 1.0
+        return round(min(0.6, sample_size / 5), 2)
+
+    @classmethod
+    def _bootstrap_signal(cls, baseline: float, actual: float, sample_size: int) -> float:
+        if sample_size <= 0:
+            return baseline
+        weight = cls._bootstrap_observed_weight(sample_size)
+        return baseline * (1.0 - weight) + actual * weight
+
     def _build_bootstrap_analysis(self, skill_name: str, records: List[Dict]) -> Dict:
         """为冷启动 skill 生成基线分析与采样建议。"""
         skill_path = self.skills_dir / skill_name
         script_dir = skill_path / "scripts"
         script_files = list(script_dir.glob("*.py")) if script_dir.exists() else []
-        test_files = [p for p in script_files if p.name.startswith("test_")]
+        embedded_test_files = [p for p in script_files if p.name.startswith("test_")]
+        skill_tests_dir = skill_path / "tests"
+        standalone_test_files = (
+            [p for p in skill_tests_dir.glob("*.py") if p.name != "__init__.py"]
+            if skill_tests_dir.exists()
+            else []
+        )
+        test_files = list({p.resolve() for p in [*embedded_test_files, *standalone_test_files]})
         has_skill_md = (skill_path / "SKILL.md").exists()
         has_meta = (skill_path / "_skillhub_meta.json").exists()
 
         script_count = len(script_files)
         sample_size = len(records)
+        profile = get_bootstrap_profile(skill_name, skill_dir=skill_path, skills_root=self.skills_dir)
+        recommended_min_records = int((profile or {}).get("recommended_min_records", 10))
         actual_quality = self._safe_mean([r.get("quality_score", 0) for r in records])
         actual_completeness = self._safe_mean([r.get("output_completeness", r.get("quality_score", 0)) for r in records])
         actual_consistency = self._safe_mean([r.get("consistency_score", r.get("quality_score", 0)) for r in records])
         actual_human = self._safe_mean([r.get("human_intervention", 0) for r in records])
 
         structure_bonus = (8 if has_skill_md else 0) + (6 if has_meta else 0) + min(8, script_count * 2) + min(6, len(test_files) * 2)
-        runtime_confidence = "low" if sample_size < 5 else "medium"
-        baseline_quality = min(75.0, 45.0 + structure_bonus + sample_size * 1.5)
-        baseline_completeness = min(85.0, 35.0 + structure_bonus + sample_size * 2.0)
-        baseline_consistency = min(90.0, 50.0 + structure_bonus + sample_size * 1.2)
-        if sample_size:
-            baseline_quality = max(baseline_quality, actual_quality)
-            baseline_completeness = max(baseline_completeness, actual_completeness)
-            baseline_consistency = max(baseline_consistency, actual_consistency)
+        if sample_size == 0:
+            runtime_confidence = "low"
+        elif sample_size < max(3, recommended_min_records // 2):
+            runtime_confidence = "low"
+        elif sample_size < recommended_min_records:
+            runtime_confidence = "medium"
+        else:
+            runtime_confidence = "high"
+        structural_quality = min(75.0, 45.0 + structure_bonus + sample_size * 1.5)
+        structural_completeness = min(85.0, 35.0 + structure_bonus + sample_size * 2.0)
+        structural_consistency = min(90.0, 50.0 + structure_bonus + sample_size * 1.2)
+        if profile:
+            profile_weight = 0.65
+            baseline_quality = structural_quality * (1.0 - profile_weight) + float(profile.get("avg_quality", structural_quality)) * profile_weight
+            baseline_completeness = structural_completeness * (1.0 - profile_weight) + float(profile.get("avg_completeness", structural_completeness)) * profile_weight
+            baseline_consistency = structural_consistency * (1.0 - profile_weight) + float(profile.get("avg_consistency", structural_consistency)) * profile_weight
+            baseline_source = "profiled"
+        else:
+            baseline_quality = structural_quality
+            baseline_completeness = structural_completeness
+            baseline_consistency = structural_consistency
+            baseline_source = "structural"
+        displayed_quality = self._bootstrap_signal(baseline_quality, actual_quality, sample_size)
+        displayed_completeness = self._bootstrap_signal(baseline_completeness, actual_completeness, sample_size)
+        displayed_consistency = self._bootstrap_signal(baseline_consistency, actual_consistency, sample_size)
+        observed_weight = self._bootstrap_observed_weight(sample_size)
 
         recommendations = [
             "先补齐足量 runtime 轨迹，再决定是否进入正式进化。",
-            "建议至少补 10 条真实执行记录，覆盖成功、失败和边界样例。",
+            f"建议至少补 {recommended_min_records} 条真实执行记录，覆盖成功、失败和边界样例。",
         ]
+        if profile:
+            recommendations.append(
+                f"当前采用 {skill_name} 的冷启动画像基线，待样本充足后再切换为完全数据驱动。"
+            )
         if script_count == 0:
             recommendations.append("该 skill 暂无脚本入口，优先补齐可执行主流程。")
         if not has_meta:
@@ -1061,13 +1266,21 @@ class XiuShenLuCoreV7:
             "status": "analyzed",
             "bootstrap_mode": True,
             "sample_size": sample_size,
-            "health_score": round(min(80.0, baseline_quality * 0.75 + baseline_consistency * 0.15 + baseline_completeness * 0.10), 1),
+            "health_score": round(
+                min(
+                    82.0,
+                    displayed_quality * 0.72
+                    + displayed_consistency * 0.16
+                    + displayed_completeness * 0.12,
+                ),
+                1,
+            ),
             "evolution_type": "bootstrap",
             "priority": priority,
             "bottleneck_type": "cold_start",
-            "avg_quality": round(actual_quality if sample_size else baseline_quality, 1),
-            "avg_output_completeness": round(actual_completeness if sample_size else baseline_completeness, 1),
-            "avg_consistency_score": round(actual_consistency if sample_size else baseline_consistency, 1),
+            "avg_quality": round(displayed_quality, 1),
+            "avg_output_completeness": round(displayed_completeness, 1),
+            "avg_consistency_score": round(displayed_consistency, 1),
             "avg_human_intervention": round(actual_human, 2),
             "quality_variance": 0.0,
             "consecutive_degradation": 0,
@@ -1078,6 +1291,10 @@ class XiuShenLuCoreV7:
                 "script_count": script_count,
                 "test_count": len(test_files),
                 "runtime_confidence": runtime_confidence,
+                "observed_weight": observed_weight,
+                "baseline_source": baseline_source,
+                "profile_applied": bool(profile),
+                "recommended_min_records": recommended_min_records,
             },
             "bootstrap_signals": {
                 "record_count": sample_size,
@@ -1086,6 +1303,10 @@ class XiuShenLuCoreV7:
                 "has_skill_md": has_skill_md,
                 "has_meta": has_meta,
                 "runtime_confidence": runtime_confidence,
+                "observed_weight": observed_weight,
+                "baseline_source": baseline_source,
+                "profile_applied": bool(profile),
+                "recommended_min_records": recommended_min_records,
             },
         }
 

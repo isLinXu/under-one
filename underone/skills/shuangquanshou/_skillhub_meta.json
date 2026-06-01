@@ -1,7 +1,7 @@
 {
   "id": "shuangquanshou",
   "name": "双全手",
-  "version": "v0.1.0",
+  "version": "v5.2",
   "type": "script",
   "entry": "scripts/dna_validator.py",
   "language": "python",
@@ -14,6 +14,16 @@
   "outputs": ["dna_report.json"],
   "dependencies": [],
   "standalone_validation": {"kind": "python-script", "path": "tests/standalone_smoke.py"},
+  "bootstrap_profile": {
+    "avg_quality": 90.0,
+    "avg_completeness": 92.0,
+    "avg_consistency": 94.0,
+    "avg_human": 0.04,
+    "success_rate": 0.93,
+    "avg_duration": 500.0,
+    "recommended_min_records": 10,
+    "degradation_window": 4
+  },
   "min_python": "3.8",
   "alignment": {
     "core": "记忆与人格的安全改写",

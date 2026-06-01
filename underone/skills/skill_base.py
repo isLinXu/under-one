@@ -26,6 +26,11 @@ import sys
 from pathlib import Path
 from functools import wraps
 
+try:
+    from _yaml_fallback import minimal_yaml_parse
+except ImportError:
+    from ._yaml_fallback import minimal_yaml_parse
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 路径设置
 # ═══════════════════════════════════════════════════════════════════════════
@@ -57,7 +62,7 @@ def _load_global_config():
         # 降级：手动解析 YAML
         config_path = _SKILLS_ROOT.parent / "under-one.yaml"
         if config_path.exists():
-            _config_cache = _minimal_yaml_parse(config_path.read_text(encoding="utf-8"))
+            _config_cache = minimal_yaml_parse(config_path.read_text(encoding="utf-8"))
         else:
             _config_cache = {}
     return _config_cache
@@ -76,86 +81,6 @@ def get_skill_config(skill_name: str, key: str = None, default=None):
     if key is None:
         return section if section else default
     return section.get(key, default)
-
-
-def _minimal_yaml_parse(text: str) -> dict:
-    """极简 YAML 解析器"""
-    result = {}
-    current_section = None
-    current_sub = None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if not line.startswith(" ") and not line.startswith("\t"):
-            if ":" in stripped:
-                key, _, val = stripped.partition(":")
-                key = key.strip()
-                val = val.strip()
-                if val == "":
-                    result[key] = {}
-                    current_section = key
-                    current_sub = None
-                else:
-                    result[key] = _parse_yaml_value(val)
-                    current_section = None
-        elif current_section is not None and stripped.startswith("-"):
-            val = stripped[1:].strip()
-            # 修复：确保列表存在
-            if current_sub and current_sub in result.get(current_section, {}):
-                if isinstance(result[current_section][current_sub], list):
-                    result[current_section][current_sub].append(_parse_yaml_value(val))
-                else:
-                    # 已经是dict，转为列表
-                    result[current_section][current_sub] = [result[current_section][current_sub], _parse_yaml_value(val)]
-            elif current_section in result and isinstance(result[current_section], list):
-                result[current_section].append(_parse_yaml_value(val))
-            else:
-                # 新的顶级列表项
-                if current_section not in result:
-                    result[current_section] = []
-                result[current_section].append(_parse_yaml_value(val))
-        elif current_section is not None and ":" in stripped:
-            key, _, val = stripped.partition(":")
-            key = key.strip()
-            val = val.strip()
-            if val == "":
-                if current_section not in result:
-                    result[current_section] = {}
-                result[current_section][key] = {}
-                current_sub = key
-            else:
-                if current_section not in result:
-                    result[current_section] = {}
-                result[current_section][key] = _parse_yaml_value(val)
-    return result
-
-
-def _parse_yaml_value(val: str):
-    """解析 YAML 标量值"""
-    val = val.strip()
-    if val.startswith('"') and val.endswith('"'):
-        return val[1:-1]
-    if val.startswith("'") and val.endswith("'"):
-        return val[1:-1]
-    if val == "true":
-        return True
-    if val == "false":
-        return False
-    if val == "null" or val == "~":
-        return None
-    try:
-        if "." in val:
-            return float(val)
-        return int(val)
-    except ValueError:
-        pass
-    if val.startswith("[") and val.endswith("]"):
-        inner = val[1:-1]
-        if not inner.strip():
-            return []
-        return [_parse_yaml_value(v.strip()) for v in inner.split(",")]
-    return val
 
 
 # ═══════════════════════════════════════════════════════════════════════════
