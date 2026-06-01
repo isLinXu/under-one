@@ -21,6 +21,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any, Dict
 
 from .config import get_config, get_script_timeout
 from .metrics import create_prometheus_server, format_prometheus_metrics, get_all_skills_metrics, resolve_runtime_data_dir
@@ -380,7 +381,7 @@ def cmd_validate_skill(args):
             recommendations = [] if validation_passed else [
                 "Inspect audit errors before using this standalone skill."
             ]
-        report = {
+        report: Dict[str, Any] = {
             "skill": skill_dir.name,
             "validation_passed": validation_passed,
             "audit": audit,

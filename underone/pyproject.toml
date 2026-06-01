@@ -56,9 +56,27 @@ target-version = "py39"
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.9"
+# Analysis target for mypy itself (the package still supports the 3.9+ runtime
+# declared in [project].requires-python; modern mypy only accepts >=3.10 here).
+python_version = "3.10"
 warn_return_any = true
+# Skill scripts are standalone, dependency-free and dynamically loaded, so the
+# global default stays lenient. The public SDK package is held to a stricter
+# bar via the per-module override below.
 disallow_untyped_defs = false
+ignore_missing_imports = true
+
+# Public SDK surface: keep it clean and well-typed.
+[[tool.mypy.overrides]]
+module = "under_one.*"
+warn_return_any = true
+check_untyped_defs = true
+
+# Skill layer is intentionally dynamic and self-contained; do not fail the SDK
+# type gate on it.
+[[tool.mypy.overrides]]
+module = "skills.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

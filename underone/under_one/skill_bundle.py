@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Optional
 
 
 BUNDLE_HEADER = "===== UNDER-ONE SKILL BUNDLE v1 ====="
@@ -504,7 +504,7 @@ def parse_bundle_text(text: str) -> ParsedSkillBundle:
 
     files: Dict[str, str] = {}
     current_path: Optional[str] = None
-    current_lines = []
+    current_lines: List[str] = []
 
     while idx < len(lines):
         line = lines[idx]

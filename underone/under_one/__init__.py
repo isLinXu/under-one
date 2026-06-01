@@ -210,7 +210,7 @@ def _invoke_skill(
 
 # 十技异人语录：每个Skill对应漫画中的经典意象与台词
 # 在特定条件下触发，为运行时注入漫画原作的趣味灵魂
-_SKILL_QUOTES = {
+_SKILL_QUOTES: Dict[str, Dict[str, Any]] = {
     "qiti-yuanliu": {
         "name_cn": "炁体源流",
         "master": "张怀义",
@@ -367,14 +367,14 @@ def _get_realm(skill_name: str, score: float) -> str:
     realm_map = skill_info.get("realm_names", {})
     for threshold in sorted(realm_map.keys(), reverse=True):
         if score >= threshold:
-            return realm_map[threshold]
+            return str(realm_map[threshold])
     return "未入境界"
 
 
 def _get_quote(skill_name: str, quote_key: str) -> str:
     """获取异人语录。"""
     skill_info = _SKILL_QUOTES.get(skill_name, {})
-    return (skill_info.get("quotes") or {}).get(quote_key, "")
+    return str((skill_info.get("quotes") or {}).get(quote_key, ""))
 
 
 def _check_resonance(active_skills: list) -> list:
@@ -478,7 +478,7 @@ class ContextGuard(BaseSkill):
         self.logger.info(f"扫描{len(context)}轮对话并提炼炁体规则")
         mod = _load_skill_module("qiti-yuanliu", "entropy_scanner.py")
         normalized_context = self._normalize_context(context)
-        result = mod.QiTiScanner(normalized_context).scan()
+        result: Dict[str, Any] = mod.QiTiScanner(normalized_context).scan()
         result["success"] = True
         self_evolution = result.get("self_evolution", {})
         result.setdefault("origin_anchor", self_evolution.get("origin_core", {}).get("goal_anchor"))
@@ -790,7 +790,7 @@ class InsightRadar(BaseSkill):
         self.logger.info(f"分析{len(segments)}段文本的关联")
         mod = _load_skill_module("dalu-dongguan", "link_detector.py")
         normalized_segments = self._normalize_segments(segments)
-        result = mod.LinkDetector(normalized_segments).detect()
+        result: Dict[str, Any] = mod.LinkDetector(normalized_segments).detect()
         result["success"] = True
 
         # 注入异人风味
@@ -1218,7 +1218,7 @@ class PersonaGuard(BaseSkill):
         base_profile = copy.deepcopy(profile)
         preview_profile = copy.deepcopy(profile)
         applied_patch_items = []
-        simulation = {
+        simulation: Dict[str, Any] = {
             "mode": rewrite_patch.get("mode"),
             "apply_ready": bool(rewrite_patch.get("apply_ready")),
             "applied": False,
@@ -1344,7 +1344,7 @@ class PersonaGuard(BaseSkill):
             report_path = Path(tmpdir) / "dna_report.json"
             if report_path.exists():
                 try:
-                    parsed = json.loads(report_path.read_text(encoding="utf-8"))
+                    parsed: Dict[str, Any] = json.loads(report_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     parsed = {"raw_output": result.stdout.strip()}
             else:
@@ -1369,7 +1369,7 @@ class ToolOrchestrator(BaseSkill):
         jg = self.config.get("julingqianjiang", {})
         self.strategy = jg.get("strategy", "protect")
 
-    def run(self, tasks: list, spirits: list) -> Dict[str, Any]:
+    def run(self, tasks: list, spirits: list) -> Dict[str, Any]:  # type: ignore[override]
         """
         调度多个工具执行任务——以拘灵遣将之法，遣灵出阵。
         Args:
@@ -1429,7 +1429,7 @@ class EcosystemHub(BaseSkill):
     """
     skill_name = "bagua-zhen"
 
-    def run(self) -> Dict[str, Any]:
+    def run(self) -> Dict[str, Any]:  # type: ignore[override]
         """
         扫描十技生态全景——以八卦阵之法，观全局气脉。
         Returns:
