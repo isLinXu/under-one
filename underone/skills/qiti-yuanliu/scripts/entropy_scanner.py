@@ -106,9 +106,24 @@ _QI_POS_MARKERS = ["必须", "应当", "应该", "始终", "总是", "要", "要
 _QI_NEG_MARKERS = ["禁止", "不得", "不要", "从不", "别", "不能", "避免", "never", "avoid", "don't", "do not", "prohibit"]
 
 
+_QI_LEAD_TRIM = ("你", "您", "我们", "我", "它", "他", "她", "就", "也", "还", "并", "且", "请")
+
+
 def _qi_split_directives(text):
     parts = re.split(r"[\n。；;！!]+", text or "")
     return [p.strip(" \t\r-*·•—") for p in parts if p.strip(" \t\r-*·•—")]
+
+
+def _qi_trim_leading(core):
+    """剥离修辞后，去掉残留的开头主语/连接词（如"你""就""并"），避免还炁结果出现悬空片段。"""
+    prev = None
+    while core and core != prev:
+        prev = core
+        for lead in _QI_LEAD_TRIM:
+            if core.startswith(lead):
+                core = core[len(lead):].strip(" ，,。.、:：")
+                break
+    return core
 
 
 def _qi_topic_signature(rule):
@@ -133,6 +148,8 @@ def distill_intent(text):
         removed = [m for m in _QI_RHETORIC_MARKERS if m in low]
         for m in removed:
             core = re.sub(re.escape(m), "", core, flags=re.IGNORECASE).strip(" ，,。.、")
+        if removed:
+            core = _qi_trim_leading(core)
         if not core:
             continue
         norm = re.sub(r"\s+", "", core.lower())
@@ -216,6 +233,28 @@ def preflight_guard(skill_rules, global_rules=None):
         "global_rule_count": len(global_rules),
         "lore": "炁体源流为众术之先：先过一遍，术有相冲则拦，无冲则放——克制他术之源",
     }
+
+
+def gatekeep(skill_name=None, skill_rules=None, global_rules=None, prompt=None):
+    """炁体源流·众术之先：统一的前置校验入口。
+
+    任何 skill 执行前先过一遍——把意图还原为炁（可选 prompt）、检测规则冲突、给出
+    放行/拦截裁决。这是炁体源流"众术之源、终极克制"的落地：他术先经此门。
+    """
+    report = {
+        "gate": "炁体源流·众术之先",
+        "skill": skill_name,
+    }
+    if prompt:
+        report["qi_essence"] = distill_intent(prompt)
+    pf = preflight_guard(skill_rules or [], global_rules or [])
+    report["preflight"] = pf
+    report["rule_conflicts"] = detect_rule_conflicts(list(global_rules or []) + list(skill_rules or []))
+    report["passed"] = pf["passed"]
+    report["verdict"] = pf["verdict"]
+    report["resolutions"] = [c["resolution"] for c in pf["conflicts"]]
+    report["lore"] = "众术之源、终极克制——他术执行前先经炁体源流之门"
+    return report
 
 
 class QiTiScanner:

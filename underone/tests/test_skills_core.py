@@ -64,6 +64,7 @@ QiTiScanner = entropy_scanner.QiTiScanner
 distill_intent = entropy_scanner.distill_intent
 detect_rule_conflicts = entropy_scanner.detect_rule_conflicts
 preflight_guard = entropy_scanner.preflight_guard
+gatekeep = entropy_scanner.gatekeep
 
 priority_engine = _import_skill("fenghou_qimen.scripts.priority_engine")
 PriorityEngine = priority_engine.PriorityEngine
@@ -149,6 +150,26 @@ class TestContextGuard:
         assert blocked["passed"] is False
         passed = preflight_guard(["输出尽量简洁"], global_rules=["必须使用中文回答"])
         assert passed["passed"] is True
+
+    def test_distill_intent_trims_dangling_subject(self):
+        """还炁打磨：剥离修辞后不应残留悬空主语（如"你"）。"""
+        out = distill_intent("请你务必始终使用中文回答")
+        assert out["qi_essence"]
+        assert not any(e.startswith(("你", "您", "请")) for e in out["qi_essence"])
+
+    def test_gatekeep_unified_verdict(self):
+        """众术之先·统一门：还炁 + 冲突消解 + 前置校验合一裁决。"""
+        blocked = gatekeep(
+            skill_name="demo",
+            skill_rules=["禁止使用中文回答"],
+            global_rules=["必须使用中文回答"],
+            prompt="请务必使用中文回答",
+        )
+        assert blocked["passed"] is False
+        assert blocked["resolutions"]
+        assert "qi_essence" in blocked
+        ok = gatekeep(skill_name="demo", skill_rules=["输出尽量简洁"], global_rules=["必须使用中文回答"])
+        assert ok["passed"] is True
 
     def test_empty_context_health_score(self):
         """空上下文应返回健康分"""

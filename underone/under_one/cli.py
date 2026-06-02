@@ -8,6 +8,7 @@ Usage:
     under-one scan <skill> <input>             # 运行指定skill
     under-one audit [skill]                    # 审计skill结构与元数据
     under-one status                           # 查看十技生态状态
+    under-one preflight rules.json --skill X   # 炁体源流前置校验（他术执行前先过一遍）
     under-one evolve [skill]                   # 启动修身炉进化
     under-one bundles [--check] [skill]        # 构建 .skill 单文件分发包
     under-one install-host --host qclaw        # 安装到指定宿主
@@ -182,6 +183,54 @@ def cmd_audit(args):
         if args.output:
             print(f"report={out_path}")
     sys.exit(0 if payload["error_count"] == 0 else 1)
+
+
+def _load_entropy_scanner():
+    """动态加载炁体源流脚本，复用其前置校验函数（众术之先）。"""
+    import importlib.util
+
+    path = find_skill_dir() / "qiti-yuanliu" / "scripts" / "entropy_scanner.py"
+    if not path.exists():
+        print(f"ERROR: 炁体源流脚本不存在: {path}")
+        sys.exit(1)
+    spec = importlib.util.spec_from_file_location("qiti_entropy_scanner", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def cmd_preflight(args):
+    """炁体源流·众术之先：他术执行前先过一遍规则，检测冲突并裁决放行/拦截。"""
+    mod = _load_entropy_scanner()
+    skill_rules = json.load(open(args.rules, encoding="utf-8")) if args.rules else []
+    global_rules = json.load(open(args.global_rules, encoding="utf-8")) if args.global_rules else []
+    prompt = Path(args.prompt).read_text(encoding="utf-8") if args.prompt else None
+    if not isinstance(skill_rules, list) or not isinstance(global_rules, list):
+        print("ERROR: 规则文件必须是 JSON 字符串数组")
+        sys.exit(2)
+
+    report = mod.gatekeep(
+        skill_name=args.skill,
+        skill_rules=skill_rules,
+        global_rules=global_rules,
+        prompt=prompt,
+    )
+
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print("\n炁体源流 · 众术之先 · 前置校验")
+        print("-" * 40)
+        if args.skill:
+            print(f"  目标 skill: {args.skill}")
+        print(f"  裁决: {report['verdict']}")
+        print(f"  放行: {'是' if report['passed'] else '否'}")
+        for c in report["preflight"]["conflicts"]:
+            print(f"  术之冲突: {c['rule_a']}  ⟂  {c['rule_b']}")
+            print(f"            消解: {c['resolution']}")
+        if prompt and report.get("qi_essence"):
+            print(f"  意图本质: {report['qi_essence']['qi_essence']}")
+    sys.exit(0 if report["passed"] else 1)
 
 
 def cmd_evolve(args):
@@ -500,6 +549,7 @@ def main():
   under-one scan priority-engine tasks.json # 运行优先级排序
   under-one audit                          # 审计skill结构与元数据
   under-one status                         # 查看生态状态
+  under-one preflight skill_rules.json --global global.json --skill tool-orchestrator
   under-one evolve                         # 启动自进化
   under-one bundles --check                # 校验 .skill 打包
   under-one install-bundle foo.skill       # 安装单个 skill bundle
@@ -538,6 +588,15 @@ def main():
     # status
     p_status = subparsers.add_parser("status", help="查看十技生态状态")
     p_status.set_defaults(func=cmd_status)
+
+    # preflight（炁体源流·众术之先：他术执行前的前置校验层）
+    p_preflight = subparsers.add_parser("preflight", help="炁体源流前置校验：他术执行前先过一遍规则")
+    p_preflight.add_argument("rules", nargs="?", help="待执行 skill 的规则 JSON（字符串数组）")
+    p_preflight.add_argument("--skill", help="目标 skill 名（仅用于报告标注）")
+    p_preflight.add_argument("--global", dest="global_rules", help="全局规则 JSON（字符串数组）")
+    p_preflight.add_argument("--prompt", help="可选 prompt 文本文件，附带还炁意图还原")
+    p_preflight.add_argument("--json", action="store_true", help="输出 JSON 结果")
+    p_preflight.set_defaults(func=cmd_preflight)
 
     # evolve
     p_evolve = subparsers.add_parser("evolve", help="启动修身炉自进化")

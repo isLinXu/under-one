@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v10.4.0] - 2026-06-02
+
+### Added - 炁体源流落地为真正的跨技能前置校验层
+
+承接 v10.3，把炁体源流"众术之源、终极克制"从函数级提升为可跨技能调用的前置校验层。
+
+- **炁体源流 (v6.3) — 众术之先·统一门**
+  - `gatekeep(skill_name, skill_rules, global_rules, prompt)`：将"还炁 + 规则冲突消解 + 前置校验"合为单一裁决入口，输出 `passed`/`verdict`/`resolutions`，可附带 `qi_essence` 意图还原
+  - 还炁打磨：剥离修辞后清理悬空主语（"你/您/请"等），`distill_intent` 的"意图本质"输出更干净
+- **框架命令 `under-one preflight`**（`under_one/cli.py`）
+  - `under-one preflight <rules.json> [--global g.json] [--prompt p.txt] [--skill name]`：他术执行前先经炁体源流之门，术有相冲则拦——冲突时退出码非零，可直接接入任意 skill 的执行前置环节
+  - 动态加载炁体源流脚本复用 `gatekeep`，不引入新依赖
+
+### Verified
+
+- pytest 全量回归 **273 passed**（+2 新用例：`gatekeep` 统一裁决、还炁去悬空主语；bundle 版本快照 v6.2→v6.3）
+- `under-one audit` 10/10 skill **0 warning / 0 error**
+- CLI 冒烟：`under-one preflight` 冲突拦截（exit≠0）/ 放行（exit 0）均 PASS
+
+### Docs
+
+- `docs/LORE.md`：新增「本轮增强对齐（v10.4）」众术之先统一门说明
+- `qiti-yuanliu/SKILL.md`：补充 `gatekeep` 与 `under-one preflight` 世界观条目并同步 `_skillhub_meta.json`
+
 ## [v10.3.0] - 2026-06-02
 
 ### Added - 其余五技贴合原著 + 编外身份标注（按差距从大到小）
