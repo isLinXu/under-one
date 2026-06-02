@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "shenji-bailian"
-  version: "v6.6"
+  version: "v6.7"
   author: "under-one"
   description: "神机百炼 - 自然语言技能工坊 - 根据自然语言或结构化规格生成 skill、tool、专精骨架与配套资产"
   language: "zh"
@@ -21,6 +21,8 @@ metadata:
 > - **刻文**（`contract-first`）：在法器上铭刻限制契约，使器灵守规
 > - **百炼成钢**（`battle-ready`）：完整锻造，器灵觉醒，可上阵作战
 > - **异术移植**（`graft_manifest`，V6.6）：呼应漫画"将异术手段移植到机关人偶"——新器并非凭空生造，而是嫁接已验证的成熟模式（基底模板/专精招式，或 `spec.graft` 点名索取的招式），新器即承其能
+> - **法器无主**（`reusability`，V6.7）：呼应"做出来别人也能用"——锻出之器声明 `ownerless` 且 `callable_by=any-agent`，附接口契约（entry/inputs/outputs），不绑定单一调用者
+> - **瞬间出器**（`forge_speed`，V6.7）：呼应"如臂使指"的速度感——`ritual_steps=0` 零仪式即时成器，而非"我帮你写个脚本你等一下"
 >
 > **悟得者**：马仙洪 ｜ **语录人物**：马仙洪（亦为修身炉之源，二技同源）
 >

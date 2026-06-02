@@ -2509,9 +2509,30 @@ def normalize_workflow_state(raw_state):
             else 1.0
         )
 
+        entry_path = (
+            f"{module_name}/scripts/{module_name}.py" if artifact_type == "skill" else f"{module_name}.py"
+        )
+        reusability = {
+            "ownerless": True,
+            "callable_by": "any-agent",
+            "interface": {
+                "entry": entry_path,
+                "inputs": self.spec.get("inputs", []),
+                "outputs": self.spec.get("outputs", []),
+            },
+            "portable": artifact_type == "skill",
+            "lore": "法器无主：炼出之器不只自用，任何 agent 皆可直接调用",
+        }
+        forge_speed = {
+            "instant": True,
+            "ritual_steps": 0,
+            "latency_class": "instant" if mode_cfg.get("name") in ("quick-forge", "rapid") else "fast",
+            "note": "如臂使指：看到规格即时出器，无需多步仪式",
+            "lore": "瞬间出器：神机百炼炼器如臂使指，非'等一下'，而是即刻成器",
+        }
         return {
             "factory": "shenji-bailian",
-            "version": "v6.5",
+            "version": "v6.7",
             "tool_name": name,
             "artifact_type": artifact_type,
             "specialization": self.spec.get("sections", {}).get("tool_contract", {}).get("specialization", "general"),
@@ -2520,6 +2541,8 @@ def normalize_workflow_state(raw_state):
             "forge_intent": forge_summary["forge_intent"],
             "forge_summary": forge_summary,
             "graft_manifest": graft_manifest,
+            "reusability": reusability,
+            "forge_speed": forge_speed,
             "delivery_contract": delivery_contract,
             "inferred_spec": self.spec,
             "files": files,
