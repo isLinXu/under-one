@@ -1,7 +1,7 @@
 {
   "id": "dalu-dongguan",
   "name": "大罗洞观",
-  "version": "v5.3",
+  "version": "v5.5",
   "type": "script",
   "entry": "scripts/link_detector.py",
   "language": "python",

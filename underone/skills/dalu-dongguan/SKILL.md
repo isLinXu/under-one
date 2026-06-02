@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "dalu-dongguan"
-  version: "v5.3"
+  version: "v5.5"
   author: "under-one"
   description: "大罗洞观 - 关联检测器 - 全局洞察与知识图谱构建"
   language: "zh"
@@ -25,6 +25,9 @@ metadata:
 > - **幻象识别**（`hallucination_risk`）：识别信息中可能的虚假成分，防止幻觉入侵
 > - **超越时间的认知**（`temporal_evolution`，V5.4）：跨整个时间轴追踪同一实体的复现轨迹，揭示主题随时间的纵向演变（区别于仅相邻段触发的 `temporal_chain`）
 > - **命运干涉**（`fate_interventions`，V5.4）：对 A 级高置信度关联不止于报告，更主动给出"干预策略"——锁定命脉、改写下游结局，呼应"踏在别人命运上"
+> - **因果洞察·认知盲区**（`blind_spots`，V5.5）：呼应"洞观——穿透表象看见隐含因果"。不止"A、B 都提到 X"，而是发现同一实体在**非相邻**片段以不同措辞反复浮现，暴露用户未明说的认知盲点/反复纠结的症结
+> - **走向预测**（`trajectory_prediction`，V5.5）：呼应"大罗洞观不是搜索引擎，是预言家"——据实体持续度、异常信号与因果链，预测接下来若干轮内大概率的冲突/主题走向
+> - **并行隐性依赖洞察**（`detect_parallel_dependencies`，V5.5）：多个 agent 并行执行时，洞察其隐性依赖与可能踩踏的共享资源（写写踩踏 / 产物消费依赖），CLI `--parallel`
 >
 > **悟得者**：谷畸亭 ｜ **语录人物**：谷畸亭
 >

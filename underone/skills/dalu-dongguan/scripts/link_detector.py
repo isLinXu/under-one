@@ -865,10 +865,79 @@ class LinkDetector:
             "recommended_action": "先核验高风险节点，再做归纳总结" if level != "low" else "可继续扩充证据后再做综合判断",
         }
 
+    def _build_blind_spots(self):
+        """因果洞察·认知盲区（呼应"洞观"——穿透表象看隐含因果）。
+
+        不是简单"A、B 都提到 X"，而是发现：同一实体在**非相邻**片段以不同措辞
+        反复浮现，往往暴露用户未明说的认知盲点或反复纠结的症结。
+        """
+        order = {seg.get("source", f"seg{i}"): i for i, seg in enumerate(self.segments)}
+        blind_spots = []
+        for ent, sources in self.entities.items():
+            uniq = sorted(set(sources))
+            if len(uniq) < 2:
+                continue
+            idxs = sorted(order.get(s, 0) for s in uniq)
+            gaps = [b - a for a, b in zip(idxs, idxs[1:])]
+            if gaps and max(gaps) >= 2:
+                conf = min(0.92, 0.4 + len(uniq) * 0.12 + (0.1 if max(gaps) >= 3 else 0.0))
+                blind_spots.append({
+                    "focus": ent,
+                    "recurrence": len(uniq),
+                    "max_gap": max(gaps),
+                    "confidence": round(conf, 2),
+                    "insight": f"「{ent}」在非相邻的 {len(uniq)} 个片段反复浮现，疑似未明说的认知盲区/反复纠结的症结",
+                    "sources": uniq[:5],
+                })
+        blind_spots.sort(key=lambda b: (b["confidence"], b["recurrence"]), reverse=True)
+        return blind_spots[:4]
+
+    def _build_trajectory_prediction(self, horizon=3):
+        """走向预测（呼应"大罗洞观不是搜索引擎，是预言家"）。
+
+        据实体持续度、异常信号与因果链，预测接下来 horizon 轮内大概率的冲突/主题走向。
+        """
+        predictions = []
+        persistent = sorted(
+            ((e, len(set(s))) for e, s in self.entities.items() if len(set(s)) >= 2),
+            key=lambda x: x[1], reverse=True,
+        )
+        if persistent:
+            e, span = persistent[0]
+            predictions.append({
+                "type": "topic_continuation",
+                "probability": round(min(0.9, 0.5 + span * 0.1), 2),
+                "forecast": f"接下来 {horizon} 轮内大概率继续围绕主线「{e}」深入或收敛",
+            })
+        if self.anomaly_signals:
+            top = self.anomaly_signals[0]
+            predictions.append({
+                "type": "conflict_risk",
+                "probability": round(min(0.85, 0.4 + top.get("score", 0.0) * 0.5), 2),
+                "forecast": f"{horizon} 轮内大概率因「{top.get('source') or top.get('entity')}」出现 {top.get('type', '冲突')} 类冲突，建议提前澄清",
+            })
+        if self.causal_chain:
+            last = self.causal_chain[-1]
+            predictions.append({
+                "type": "causal_followup",
+                "probability": 0.6,
+                "forecast": f"因果链止于「{last.get('effect')}」，{horizon} 轮内大概率追问其后续影响",
+            })
+        return {
+            "horizon": horizon,
+            "predictions": predictions,
+            "prediction_count": len(predictions),
+            "lore": "洞观未来：大罗洞观不是搜索引擎，是预言家——据当下模式推演接下来的走向",
+        }
+
     def _build_output(self):
         mermaid = self._generate_mermaid()
+        blind_spots = self._build_blind_spots()
+        trajectory_prediction = self._build_trajectory_prediction()
         return {
-            "detector": "dalu-dongguan", "version": "v5.4",
+            "detector": "dalu-dongguan", "version": "v5.5",
+            "blind_spots": blind_spots,
+            "trajectory_prediction": trajectory_prediction,
             "segment_count": len(self.segments), "entity_count": len(self.entities),
             "link_count": len(self.links), "links": self.links,
             "entity_map": dict(self.entities),
@@ -903,10 +972,62 @@ class LinkDetector:
         }
 
 
+def detect_parallel_dependencies(agents):
+    """并行 agent 隐性依赖洞察（呼应"看别人看不见的东西"）。
+
+    多个 agent 并行时，洞察其隐性依赖与可能踩踏的共享资源。
+    agents: [{"id":.., "reads":[..], "writes":[..], "needs":[..], "produces":[..]}]
+    """
+    agents = agents or []
+
+    def _w(a):
+        return set(a.get("writes", []) or []) | set(a.get("produces", []) or [])
+
+    def _r(a):
+        return set(a.get("reads", []) or []) | set(a.get("needs", []) or [])
+
+    resource_collisions, implicit_deps = [], []
+    for i in range(len(agents)):
+        for j in range(i + 1, len(agents)):
+            a, b = agents[i], agents[j]
+            ida, idb = a.get("id", f"agent{i}"), b.get("id", f"agent{j}")
+            ww = _w(a) & _w(b)
+            if ww:
+                resource_collisions.append({
+                    "agents": [ida, idb], "resources": sorted(ww),
+                    "type": "write-write", "risk": "high",
+                    "advice": "串行化或分区写入，避免相互覆盖（资源踩踏）",
+                })
+            rw = _r(b) & _w(a)
+            if rw:
+                implicit_deps.append({"from": ida, "to": idb, "via": sorted(rw),
+                                      "type": "produces→consumes",
+                                      "advice": f"{idb} 隐式依赖 {ida} 的产物，需保证先后次序"})
+            wr = _r(a) & _w(b)
+            if wr:
+                implicit_deps.append({"from": idb, "to": ida, "via": sorted(wr),
+                                      "type": "produces→consumes",
+                                      "advice": f"{ida} 隐式依赖 {idb} 的产物，需保证先后次序"})
+    safe = not resource_collisions and not implicit_deps
+    return {
+        "agent_count": len(agents),
+        "resource_collisions": resource_collisions,
+        "implicit_dependencies": implicit_deps,
+        "parallel_safe": not resource_collisions,
+        "verdict": "可安全并行" if safe else "存在隐性依赖/资源踩踏，需编排次序",
+        "lore": "洞观并行：看见 agent 之间看不见的隐性依赖与资源踩踏",
+    }
+
+
 def main():
     if len(sys.argv) < 2:
         print("用法: python link_detector.py <segments.json>")
+        print("  --parallel <agents.json>   并行 agent 隐性依赖/资源踩踏洞察")
         sys.exit(1)
+    if sys.argv[1] == "--parallel":
+        agents = json.load(open(sys.argv[2], encoding="utf-8")) if len(sys.argv) > 2 else []
+        print(json.dumps(detect_parallel_dependencies(agents), ensure_ascii=False, indent=2))
+        return
     with open(sys.argv[1], "r", encoding="utf-8") as f:
         segments = json.load(f)
     if not isinstance(segments, list):
