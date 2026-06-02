@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "qiti-yuanliu"
-  version: "v6.1"
+  version: "v6.2"
   author: "under-one"
   description: "炁体源流 - 本源自省器 - 自我反思、规则生长、稳态修复与目标锚定"
   language: "zh"
@@ -22,6 +22,7 @@ metadata:
 > - **炁归契约**（`repair_handoff`）：炁体无法自愈时，移交大罗洞观执行深度追踪
 > - **炁层次**：`excellent`(先天炁，纯净) → `good`(后天炁，正常) → `warning/danger`(后天炁受损)
 > - **炁婴自主进化**（`meta_reflect`，V6.2）：呼应漫画"无限炁 + 炁婴自主行动"——炁婴拥有自主意志，能反观"诊断本身"，对诊断结果递归再诊断，直到炁场归一（`meta_entropy` 收敛为 0）
+> - **术之尽头·还炁/规则冲突消解/前置校验**（`distill_intent` / `detect_rule_conflicts` / `preflight_guard`，V6.2）：呼应张怀义"术之尽头——将一切术法还原为最原始的炁"。不止做上下文保洁，更能把任意 prompt/instruction/rules **还原为最纯粹的意图本质**（剥离修辞/冗余/客套）、指出多规则间的"术之冲突点"并给出消解方案，并作为**众术之先的前置校验层**——他术执行前先过一遍，术有相冲则拦（克制他术）。CLI：`--reduce` / `--conflicts` / `--preflight`
 >
 > **悟得者**：张怀义（"术之尽头"）｜ **语录人物**：张怀义
 >

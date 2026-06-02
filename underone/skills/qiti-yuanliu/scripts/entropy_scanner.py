@@ -85,6 +85,139 @@ except ImportError:
             }
 
 
+# ════════════════════════════════════════════════════════════════
+# 术之尽头：还炁（意图还原）+ 规则冲突消解 + 前置校验层
+# 呼应漫画——炁体源流是"术之尽头"，将一切术法还原为最原始的炁；
+# 它是众术之源，也是终极克制。下列函数把任意 prompt/instruction/rules
+# 还原为最纯粹的意图本质，并能在他术执行前先过一遍、指出术之冲突点。
+# ════════════════════════════════════════════════════════════════
+
+_QI_RHETORIC_MARKERS = [
+    "请", "麻烦", "务必", "一定要", "尽量", "最好", "我觉得", "我希望", "如你所知",
+    "众所周知", "总之", "另外", "顺便", "其实", "说实话", "当然", "显然", "基本上",
+    "please", "kindly", "really", "very ", "just ", "actually", "basically", "simply",
+]
+_QI_IMPERATIVE_MARKERS = [
+    "必须", "禁止", "不得", "不能", "应当", "应该", "需要", "只能", "始终", "永远",
+    "从不", "总是", "要求", "确保", "避免", "always", "never", "must", "should",
+    "do not", "don't", "ensure", "avoid", "require", "shall",
+]
+_QI_POS_MARKERS = ["必须", "应当", "应该", "始终", "总是", "要", "要求", "确保", "always", "must", "should", "require", "shall", "ensure"]
+_QI_NEG_MARKERS = ["禁止", "不得", "不要", "从不", "别", "不能", "避免", "never", "avoid", "don't", "do not", "prohibit"]
+
+
+def _qi_split_directives(text):
+    parts = re.split(r"[\n。；;！!]+", text or "")
+    return [p.strip(" \t\r-*·•—") for p in parts if p.strip(" \t\r-*·•—")]
+
+
+def _qi_topic_signature(rule):
+    low = rule.lower()
+    for m in _QI_POS_MARKERS + _QI_NEG_MARKERS:
+        low = low.replace(m.lower(), "")
+    return re.sub(r"[^\w\u4e00-\u9fff]+", "", low)
+
+
+def distill_intent(text):
+    """术之尽头·还炁：把一段 prompt/instruction/rules 还原为最纯粹的意图本质。
+
+    剥离修辞/客套/冗余，抽出祈使核心（directives），并标出被剥离的修辞与被合并的重复。
+    回答的不是"你说了什么"，而是"你到底想要什么"。
+    """
+    directives = _qi_split_directives(text)
+    essence, background, stripped, redundancies = [], [], [], []
+    seen = {}
+    for d in directives:
+        core = d
+        low = d.lower()
+        removed = [m for m in _QI_RHETORIC_MARKERS if m in low]
+        for m in removed:
+            core = re.sub(re.escape(m), "", core, flags=re.IGNORECASE).strip(" ，,。.、")
+        if not core:
+            continue
+        norm = re.sub(r"\s+", "", core.lower())
+        if norm in seen:
+            redundancies.append({"text": d, "duplicate_of": seen[norm]})
+            continue
+        seen[norm] = core
+        if removed:
+            stripped.append({"original": d, "removed_markers": removed})
+        if any(m in low for m in _QI_IMPERATIVE_MARKERS):
+            essence.append(core)
+        else:
+            background.append(core)
+    return {
+        "qi_essence": essence,
+        "directive_count": len(essence),
+        "background": background,
+        "stripped_rhetoric": stripped,
+        "redundancies": redundancies,
+        "compression_ratio": round(1 - (len(essence) + len(background)) / max(1, len(directives)), 3)
+        if directives else 0.0,
+        "lore": "术之尽头：将一切术法还原为最原始的炁——剥去修辞与冗余，只剩你到底想要什么",
+    }
+
+
+def detect_rule_conflicts(rules):
+    """规则冲突消解：检测一组规则间的"术之冲突点"并给出消解方案。
+
+    主要检测同主题的正反冲突（既要又不要 / always X vs never X）。
+    """
+    norm_rules = [str(r).strip() for r in (rules or []) if str(r).strip()]
+    conflicts = []
+    for i in range(len(norm_rules)):
+        for j in range(i + 1, len(norm_rules)):
+            a, b = norm_rules[i], norm_rules[j]
+            la, lb = a.lower(), b.lower()
+            a_pos = any(m.lower() in la for m in _QI_POS_MARKERS)
+            a_neg = any(m.lower() in la for m in _QI_NEG_MARKERS)
+            b_pos = any(m.lower() in lb for m in _QI_POS_MARKERS)
+            b_neg = any(m.lower() in lb for m in _QI_NEG_MARKERS)
+            ta, tb = _qi_topic_signature(a), _qi_topic_signature(b)
+            if not ta or not tb:
+                continue
+            shared = ta in tb or tb in ta or len(set(ta) & set(tb)) >= max(2, min(len(ta), len(tb)) // 2)
+            if shared and ((a_pos and b_neg) or (a_neg and b_pos)):
+                conflicts.append({
+                    "rule_a": a,
+                    "rule_b": b,
+                    "type": "正反冲突",
+                    "resolution": "限定作用域或定优先级：明确二者各自适用的上下文，消解'同主题既要又不要'",
+                })
+    return {
+        "rule_count": len(norm_rules),
+        "conflicts": conflicts,
+        "conflict_count": len(conflicts),
+        "verdict": "术有相冲" if conflicts else "术无相冲",
+        "lore": "炁为众术之源，亦为终极克制——指出术之冲突点，给出消解方案",
+    }
+
+
+def preflight_guard(skill_rules, global_rules=None):
+    """前置校验层：任何 skill 执行前，炁体源流先过一遍其规则，检测与全局规则的冲突（克制他术）。"""
+    skill_rules = [str(r).strip() for r in (skill_rules or []) if str(r).strip()]
+    global_rules = [str(r).strip() for r in (global_rules or []) if str(r).strip()]
+    combined = global_rules + skill_rules
+    result = detect_rule_conflicts(combined)
+    # 仅当冲突跨越 global ↔ skill，或 skill 内部自冲，才视为拦截
+    blocking = []
+    for c in result["conflicts"]:
+        a_in_skill = c["rule_a"] in skill_rules
+        b_in_skill = c["rule_b"] in skill_rules
+        if a_in_skill or b_in_skill:
+            blocking.append(c)
+    passed = not blocking
+    return {
+        "gate": "炁体源流·前置校验",
+        "passed": passed,
+        "verdict": "可放行" if passed else "拦截：存在术之冲突，需先消解再执行他术",
+        "conflicts": blocking,
+        "skill_rule_count": len(skill_rules),
+        "global_rule_count": len(global_rules),
+        "lore": "炁体源流为众术之先：先过一遍，术有相冲则拦，无冲则放——克制他术之源",
+    }
+
+
 class QiTiScanner:
     """V6.1 炁体源流 — 本源自省器 — 语义级熵计算 + 稳态修复契约"""
 
@@ -1830,7 +1963,25 @@ def main():
     if len(sys.argv) < 2:
         print("用法: python entropy_scanner.py <context.json>")
         print('  context.json: [{"role":"user","content":"...","round":1}, ...]')
+        print("  --reduce <text_or_rules_file>           还炁：把 prompt/rules 还原为纯粹意图本质")
+        print("  --conflicts <rules.json>                规则冲突消解：检测术之冲突点")
+        print("  --preflight <skill_rules.json> [global_rules.json]  前置校验层：他术执行前先过一遍")
         sys.exit(1)
+
+    # 术之尽头三式（独立于上下文扫描）
+    if sys.argv[1] == "--reduce":
+        text = Path(sys.argv[2]).read_text(encoding="utf-8") if len(sys.argv) > 2 else ""
+        print(json.dumps(distill_intent(text), ensure_ascii=False, indent=2))
+        return
+    if sys.argv[1] == "--conflicts":
+        rules = json.load(open(sys.argv[2], encoding="utf-8")) if len(sys.argv) > 2 else []
+        print(json.dumps(detect_rule_conflicts(rules), ensure_ascii=False, indent=2))
+        return
+    if sys.argv[1] == "--preflight":
+        skill_rules = json.load(open(sys.argv[2], encoding="utf-8")) if len(sys.argv) > 2 else []
+        global_rules = json.load(open(sys.argv[3], encoding="utf-8")) if len(sys.argv) > 3 else []
+        print(json.dumps(preflight_guard(skill_rules, global_rules), ensure_ascii=False, indent=2))
+        return
 
     input_path = Path(sys.argv[1])
     if not input_path.exists():
