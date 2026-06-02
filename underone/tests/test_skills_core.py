@@ -61,6 +61,9 @@ def _materialize_generated_skill(result, tmp_path):
 # ---------------------------------------------------------------------------
 entropy_scanner = _import_skill("qiti_yuanliu.scripts.entropy_scanner")
 QiTiScanner = entropy_scanner.QiTiScanner
+distill_intent = entropy_scanner.distill_intent
+detect_rule_conflicts = entropy_scanner.detect_rule_conflicts
+preflight_guard = entropy_scanner.preflight_guard
 
 priority_engine = _import_skill("fenghou_qimen.scripts.priority_engine")
 PriorityEngine = priority_engine.PriorityEngine
@@ -68,9 +71,11 @@ build_domain_override = priority_engine.build_domain_override
 
 link_detector = _import_skill("dalu_dongguan.scripts.link_detector")
 LinkDetector = link_detector.LinkDetector
+detect_parallel_dependencies = link_detector.detect_parallel_dependencies
 
 knowledge_digest = _import_skill("liuku_xianzei.scripts.knowledge_digest")
 KnowledgeDigest = knowledge_digest.KnowledgeDigest
+devour_any = knowledge_digest.devour_any
 
 dna_validator = _import_skill("shuangquanshou.scripts.dna_validator")
 DNAValidator = dna_validator.DNAValidator
@@ -115,6 +120,35 @@ xiushenlu_verifier = _import_skill("xiushen_lu.scripts.xiushenlu_verifier")
 
 class TestContextGuard:
     """上下文稳态扫描器测试"""
+
+    def test_distill_intent_strips_rhetoric(self):
+        """术之尽头·还炁：剥离修辞，抽出祈使核心。"""
+        text = "请你务必始终使用中文回答。另外，我觉得这个项目很有意思。必须保留原始数据。"
+        out = distill_intent(text)
+        assert out["directive_count"] >= 2
+        assert any("中文" in e for e in out["qi_essence"])
+        assert out["stripped_rhetoric"]
+
+    def test_distill_intent_dedups_redundancy(self):
+        """重复祈使应被合并入 redundancies。"""
+        text = "必须使用中文。\n必须使用中文。"
+        out = distill_intent(text)
+        assert out["redundancies"]
+
+    def test_detect_rule_conflicts_positive_negative(self):
+        """规则冲突消解：同主题正反冲突应被检出并给出消解方案。"""
+        rules = ["必须始终使用中文回答", "禁止使用中文回答", "回答要简洁"]
+        out = detect_rule_conflicts(rules)
+        assert out["conflict_count"] >= 1
+        assert out["verdict"] == "术有相冲"
+        assert out["conflicts"][0]["resolution"]
+
+    def test_preflight_guard_blocks_on_conflict(self):
+        """前置校验层：skill 规则与全局规则冲突时拦截。"""
+        blocked = preflight_guard(["禁止使用中文回答"], global_rules=["必须使用中文回答"])
+        assert blocked["passed"] is False
+        passed = preflight_guard(["输出尽量简洁"], global_rules=["必须使用中文回答"])
+        assert passed["passed"] is True
 
     def test_empty_context_health_score(self):
         """空上下文应返回健康分"""
@@ -621,6 +655,39 @@ class TestPriorityEngine:
 class TestInsightRadar:
     """跨文档关联检测测试"""
 
+    def test_blind_spots_non_adjacent_recurrence(self):
+        """因果盲区：实体在非相邻片段反复浮现应被识别为认知盲区。"""
+        segments = [
+            {"source": "s0", "content": "关于缓存一致性的基础问题"},
+            {"source": "s1", "content": "今天天气不错聊点别的"},
+            {"source": "s2", "content": "为什么数据有时候不一致缓存又出问题"},
+        ]
+        result = LinkDetector(segments).detect()
+        assert "blind_spots" in result
+        assert "trajectory_prediction" in result
+
+    def test_trajectory_prediction_present(self):
+        """走向预测：应输出对接下来若干轮的预测。"""
+        segments = [
+            {"source": "s0", "content": "登录模块 鉴权 token 设计"},
+            {"source": "s1", "content": "登录模块 token 过期 鉴权 失败"},
+        ]
+        result = LinkDetector(segments).detect()
+        pred = result["trajectory_prediction"]
+        assert pred["horizon"] == 3
+        assert pred["prediction_count"] >= 1
+
+    def test_parallel_dependencies_collision_and_dep(self):
+        """并行洞察：写写踩踏与读写隐性依赖应被检出。"""
+        agents = [
+            {"id": "a", "writes": ["db"], "produces": ["index"]},
+            {"id": "b", "writes": ["db"], "reads": ["index"]},
+        ]
+        out = detect_parallel_dependencies(agents)
+        assert out["parallel_safe"] is False
+        assert any(c["type"] == "write-write" for c in out["resource_collisions"])
+        assert any(d["via"] == ["index"] for d in out["implicit_dependencies"])
+
     def test_semantic_link_detection(self):
         """语义相似度应产生关联（需共用大量词汇以通过Jaccard阈值0.3）"""
         segments = [
@@ -734,6 +801,33 @@ class TestInsightRadar:
 
 class TestKnowledgeDigest:
     """知识消化器测试"""
+
+    def test_devour_any_normalizes_formats(self):
+        """全格式吞噬：异构输入归一并标注来源格式。"""
+        raw = [
+            {"path": "spec.pdf", "content": "PDF 正文"},
+            {"type": "transcript", "transcript": "会议转录文本"},
+            {"path": "main.py", "code": "def f(): pass"},
+            {"messages": [{"content": "你好"}, {"content": "在的"}]},
+            "一段非结构化噪音",
+        ]
+        items = devour_any(raw)
+        fmts = {it["source_format"] for it in items}
+        assert {"pdf", "transcript", "code", "chat", "noise"} <= fmts
+        assert all(it["credibility"] in ("S", "A", "B", "C") for it in items)
+
+    def test_essence_units_and_activation_index(self):
+        """精华输出 + 保鲜激活：高/中消化单元应吐出精华并建立触发索引。"""
+        items = [
+            {"source": "权威", "credibility": "S", "category": "技术方案",
+             "content": "核心结论：实验数据证明缓存预热可降低50%延迟。方法：启动时预加载热点键。"},
+        ]
+        result = KnowledgeDigest(items).digest()
+        assert "essence_units" in result and result["essence_units"]
+        assert result["essence_units"][0]["key_claims"]
+        act = result["activation_index"]
+        assert act["trigger_count"] >= 1
+        assert act["live_units"] + act["dormant_units"] == len(result["knowledge_units"])
 
     def test_credibility_weighting(self):
         """S级可信度应提高消化率"""
@@ -1493,6 +1587,22 @@ class TestCommandFactoryPackets:
 class TestToolForge:
     """工具锻造测试"""
 
+    def test_reusability_ownerless(self):
+        """法器无主：锻造结果声明可被任意 agent 调用、附接口契约。"""
+        result = ToolFactory("生成一个用于校验 JSON 输入并输出结果的 CLI 工具").forge()
+        reuse = result["reusability"]
+        assert reuse["ownerless"] is True
+        assert reuse["callable_by"] == "any-agent"
+        assert reuse["interface"]["entry"]
+
+    def test_forge_speed_instant(self):
+        """瞬间出器：锻造声明零仪式即时成器。"""
+        result = ToolFactory("生成一个用于校验 JSON 输入并输出结果的 CLI 工具").forge()
+        speed = result["forge_speed"]
+        assert speed["instant"] is True
+        assert speed["ritual_steps"] == 0
+        assert speed["latency_class"] in ("instant", "fast")
+
     def test_graft_manifest_auto_transplants_base_template(self):
         """异术移植：锻造结果应记录自动移植的基底模板。"""
         factory = ToolFactory("生成一个用于校验 JSON 输入并输出结果的 CLI 工具")
@@ -2001,6 +2111,22 @@ class TestToolForge:
 
 class TestCommandFactory:
     """任务拆解测试"""
+
+    def test_instant_fu_zero_shot(self):
+        """即时画符：零门槛即兴成符且可直接执行。"""
+        result = FuGenerator("分析竞品数据并生成报告").generate()
+        instant = result["instant_fu"]
+        assert instant["zero_shot"] is True
+        assert instant["no_ritual"] is True
+        assert instant["executable"]["ready_to_dispatch"] is True
+        assert instant["executable"]["action"] in instant["intent"]
+
+    def test_fu_stack_combines(self):
+        """符箓叠加：多符可叠加组合并标注可并行层。"""
+        result = FuGenerator("分析数据 生成内容 验证结果").generate()
+        stack = result["fu_stack"]
+        assert stack["stack_count"] >= 1
+        assert "⊕" in stack["combined_effect"] or stack["stack_count"] == 1
 
     def test_detect_analysis_dimension(self):
         """分析关键词应产生分析箓"""

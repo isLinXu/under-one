@@ -873,7 +873,7 @@ class TestSkillBundleLifecycle:
         assert "__shared__/metrics_collector.py" in parsed.files
         assert "__shared__/_skill_config.py" in parsed.files
         assert "tests/standalone_smoke.py" in parsed.files
-        assert parsed.version == "v6.1"
+        assert parsed.version == "v6.2"
 
     def test_resolve_bundle_version_prefers_skill_metadata(self, tmp_path):
         """bundle 默认版本应跟随 skill metadata，而不是硬编码框架版本。"""

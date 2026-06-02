@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v10.3.0] - 2026-06-02
+
+### Added - 其余五技贴合原著 + 编外身份标注（按差距从大到小）
+
+承接 v10.2，处理批评中其余技能。所有新增能力均为**附加式**（不改既有契约、不破坏既有测试），写/改/读类动作仅做诊断或提案、不私自落盘或自动执行。
+
+- **炁体源流 (v6.2) — 术之尽头·还炁/规则冲突消解/前置校验**（从"上下文保洁"重做为"意图还原+规则冲突消解"）
+  - `distill_intent`：把任意 prompt/instruction/rules **还原为最纯粹的意图本质**——剥离修辞/客套/冗余、合并重复祈使（CLI `--reduce`）
+  - `detect_rule_conflicts`：检测同主题正反冲突的"术之冲突点"并给出消解方案（CLI `--conflicts`）
+  - `preflight_guard`：**众术之先的前置校验层**——他术执行前先过一遍其规则，与全局规则相冲则拦（克制他术，CLI `--preflight`）
+- **大罗洞观 (v5.5) — 因果洞察+预测**（从"关联检索"重构为"穿透因果+预言"）
+  - `blind_spots`：发现实体在**非相邻**片段反复浮现所暴露的认知盲区/反复纠结的症结
+  - `trajectory_prediction`：据实体持续度/异常信号/因果链预测接下来若干轮的冲突/主题走向
+  - `detect_parallel_dependencies`：洞察并行 agent 的隐性依赖与共享资源踩踏（CLI `--parallel`）
+- **通天箓 (v6.0) — 即时画符+符箓叠加**（从"拆解"改为"即时生成+叠加"）
+  - `instant_fu`：看到任务即**零 shot 即兴合成一道可直接执行(executable)的符**，可直接扔给 executor
+  - `fu_stack`：诸符按可并行层**叠加组合**（而非线性 A→B→C）
+- **六库仙贼 (v5.7) — 全格式吞噬+精华输出+保鲜激活**
+  - `devour_any`：PDF/音视频转录/代码仓库/聊天记录/非结构化噪音皆为"食物"，归一并标注 `source_format`（CLI `--devour`）
+  - `essence_units`：消化后直接吐出**可复用知识单元**（要点/出处），而非只给"消化率73%"
+  - `activation_index`：消化的知识按触发词在后续对话**自动激活复现**（live / dormant），不入库吃灰
+- **神机百炼 (v6.7) — 法器无主+瞬间出器**（微调）
+  - `reusability`：锻出之器 `ownerless` 且 `callable_by=any-agent`，附接口契约
+  - `forge_speed`：`ritual_steps=0` 零仪式即时成器
+
+### Changed - 编外身份标注
+
+- **八卦阵 / 修身炉** 明确标注为**编外·非八奇技**：八奇技只有八个（炁体源流/通天箓/风后奇门/神机百炼/六库仙贼/双全手/拘灵遣将/大罗洞观）。八卦阵属武侯奇门范畴；修身炉是神机百炼的造物/实例。
+
+### Verified
+
+- pytest 全量回归 **271 passed**（+14 新增用例；同步修正 bundle 版本快照断言 v6.1→v6.2）
+- `under-one audit` 10/10 skill **0 warning / 0 error**（SKILL.md 与 `_skillhub_meta.json` 版本一致）
+- CLI 冒烟：炁体 `--reduce`/`--conflicts`/`--preflight`、大罗 `--parallel`、六库 `--devour` 均 PASS
+
+### Docs
+
+- `docs/LORE.md`：新增「本轮增强对齐（v10.3）」五技对齐表 + 编外身份表
+- 五技 `SKILL.md` 世界观补充新能力条目并同步 `_skillhub_meta.json` 版本；八卦阵/修身炉补充编外能力标注
+
 ## [v10.2.0] - 2026-06-02
 
 ### Added - 三技深度贴合原著（语义升级）
