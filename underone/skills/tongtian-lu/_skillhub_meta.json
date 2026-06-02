@@ -1,7 +1,7 @@
 {
   "id": "tongtian-lu",
   "name": "通天箓",
-  "version": "v5.9",
+  "version": "v6.0",
   "type": "script",
   "entry": "scripts/fu_generator.py",
   "language": "python",

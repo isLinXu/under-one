@@ -134,6 +134,14 @@ CAPABILITY_MAP = {
     "decision": "planning",
 }
 
+# V6.0 即时画符：零门槛即兴成符所需的动作动词表
+_INSTANT_VERBS = [
+    "分析", "提取", "解析", "拆解", "生成", "写", "创建", "改写", "润色", "翻译",
+    "检查", "验证", "确认", "校对", "测试", "审查", "转换", "格式化", "重组", "搜索",
+    "查找", "查询", "检索", "获取", "对比", "评估", "选择", "排序", "抓取", "清洗",
+    "汇总", "总结", "部署", "发送", "监控", "计算", "归类", "标注",
+]
+
 
 class FuGenerator:
     def __init__(self, task_desc):
@@ -681,6 +689,59 @@ class FuGenerator:
             },
         }
 
+    def _build_instant_fu(self):
+        """即时画符（V6.0）：零门槛即兴生成可执行符——不在预定义模板库匹配。
+
+        呼应陆瑾/郑子布"不需任何前置仪式就能凭空画符"——直接从任务的动作动词与对象
+        即兴合成一道可直接执行(executable)的符，哪怕没有任何预定义维度命中。
+        """
+        task = (self.task or "").strip()
+        hits = [v for v in _INSTANT_VERBS if v in task]
+        primary = hits[0] if hits else "执行"
+        obj = ""
+        if hits:
+            idx = task.find(primary) + len(primary)
+            obj = task[idx:idx + 24].strip(" \t，,。.：:；;")
+        return {
+            "id": f"instant-{primary}",
+            "type": "即兴符",
+            "zero_shot": True,
+            "no_ritual": True,
+            "drawn_from": task[:60],
+            "intent": f"{primary}" + (f"「{obj}」" if obj else ""),
+            "executable": {
+                "kind": "callable",
+                "action": primary,
+                "target": obj or "task_input",
+                "steps": ["读取输入", f"对其即时执行『{primary}』", "产出结果直接交付 executor"],
+                "ready_to_dispatch": True,
+            },
+            "lore": "通天箓·即时画符：零门槛凭空成符，看到任务即出器，可直接扔给 executor",
+        }
+
+    def _build_fu_stack(self):
+        """符箓叠加（V6.0）：多道符可并行叠加组合，而非线性 A→B→C。"""
+        fus = self.fu_list
+        if not fus:
+            return {"stackable": [], "stack_count": 0, "parallel_layers": 0,
+                    "combined_effect": "", "lore": "无符可叠"}
+        layers = {}
+        for fu in fus:
+            group = self._group_for_parallelism(fu)
+            layers.setdefault(group, []).append(fu.get("type", fu.get("dimension", "符")))
+        stackable = [
+            {"layer": key, "fu": names, "parallel": len(names) > 1}
+            for key, names in layers.items()
+        ]
+        combined = " ⊕ ".join(fu.get("type", fu.get("dimension", "符")) for fu in fus)
+        return {
+            "stackable": stackable,
+            "stack_count": len(fus),
+            "parallel_layers": sum(1 for s in stackable if s["parallel"]),
+            "combined_effect": combined,
+            "lore": "通天箓·符箓叠加：诸符可并行叠加组合，威力相生而非线性堆叠",
+        }
+
     def _output(self):
         total_sla = sum(fu.get("avg_sla", 15) for fu in self.fu_list)
         # adapter_insertions: 只有数据流不兼容和格式不匹配需要插入适配器
@@ -733,12 +794,14 @@ class FuGenerator:
         )
         return {
             "generator": "tongtian-lu",
-            "version": "v5.9",
+            "version": "v6.0",
             "task": self.task[:80],
             "orchestration_mode": self.mode_cfg.get("name", "balanced-array"),
             "ritual_intent": ritual_summary["ritual_intent"],
             "dimension_count": len(self.fu_list),
             "talisman_list": self.fu_list,
+            "instant_fu": self._build_instant_fu(),
+            "fu_stack": self._build_fu_stack(),
             "species_catalog": self._build_species_catalog(),
             "curse_level": self.curse_level,
             "risk_alignment": risk_alignment,
