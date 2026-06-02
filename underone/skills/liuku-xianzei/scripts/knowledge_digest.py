@@ -40,6 +40,67 @@ except ImportError:
             return default
 
 
+_CODE_EXTS = (".py", ".js", ".ts", ".go", ".java", ".rs", ".c", ".cpp", ".rb", ".sh", ".kt")
+
+
+def _detect_format(item):
+    """识别一份"食物"的来源格式。"""
+    if not isinstance(item, dict):
+        return "noise" if isinstance(item, str) else "text"
+    t = (item.get("type") or item.get("format") or "").lower()
+    path = str(item.get("path") or item.get("file") or "").lower()
+    if t == "pdf" or path.endswith(".pdf"):
+        return "pdf"
+    if t in ("audio", "video", "transcript") or "transcript" in item:
+        return "transcript"
+    if t in ("code", "repo", "codebase") or path.endswith(_CODE_EXTS) or "code" in item:
+        return "code"
+    if t in ("chat", "messages") or "messages" in item:
+        return "chat"
+    if t in ("noise", "raw"):
+        return "noise"
+    return "text"
+
+
+def devour_any(raw_inputs):
+    """全格式吞噬（V5.7）：任意格式输入都是"食物"——PDF / 音视频转录 / 代码仓库 /
+    聊天记录 / 非结构化噪音，全都能吞。
+
+    呼应漫画六库仙贼"什么都敢吃、吃了就能用"——把异构输入统一归一为可消化的
+    info_items，并标注来源格式 source_format，再交给 KnowledgeDigest 炼化。
+    """
+    if not isinstance(raw_inputs, list):
+        raw_inputs = [raw_inputs]
+    items = []
+    for i, raw in enumerate(raw_inputs):
+        fmt = _detect_format(raw)
+        if isinstance(raw, dict):
+            content = raw.get("content") or raw.get("transcript") or raw.get("text") or ""
+            if not content and isinstance(raw.get("messages"), list):
+                content = "\n".join(
+                    str(m.get("content", m)) if isinstance(m, dict) else str(m)
+                    for m in raw["messages"]
+                )
+            if not content and raw.get("code"):
+                content = str(raw["code"])
+            source = raw.get("source") or raw.get("path") or raw.get("file") or f"input{i}"
+            credibility = raw.get("credibility", "B")
+            category = raw.get("category", fmt)
+        else:
+            content = str(raw)
+            source = f"input{i}"
+            credibility = "C" if fmt == "noise" else "B"
+            category = fmt
+        items.append({
+            "source": str(source),
+            "content": content,
+            "credibility": credibility if credibility in ("S", "A", "B", "C") else "C",
+            "category": category,
+            "source_format": fmt,
+        })
+    return items
+
+
 class KnowledgeDigest:
     """V5.5 知识消化器 — 配置化 + 梯度评分 + 信息密度因子 + 污染风险分层
 
@@ -810,6 +871,49 @@ class KnowledgeDigest:
             "lore": "无痕消化：高质知识气息与天地同化，几乎不扰动既有炁脉",
         }
 
+    def _build_essence_units(self):
+        """精华输出（V5.7）：消化后直接吐出可复用的知识单元，而非只给"消化率73%"。"""
+        essence = []
+        for item, u in zip(self.items, self.units):
+            if u["digestion_level"] == "低":
+                continue
+            text = item.get("content", "")
+            sentences = [s.strip() for s in re.split(r"[。.!！?？\n]+", text) if s.strip()]
+            markers = ["因为", "所以", "导致", "证明", "数据", "结果", "%", "：", ":", "步骤", "方法", "结论", "建议"]
+            key_claims = [s for s in sentences if any(m in s for m in markers)][:3] or sentences[:2]
+            essence.append({
+                "concept": u["concept"],
+                "source": u["source"],
+                "source_format": item.get("source_format", item.get("category", "text")),
+                "digestion_level": u["digestion_level"],
+                "key_claims": key_claims,
+                "reusable": u["digestion_level"] == "高",
+                "provenance": {"source": u["source"], "credibility": u["credibility"]},
+            })
+        return essence
+
+    def _build_activation_index(self):
+        """保鲜激活（V5.7）：消化的知识在后续对话中按触发词自动激活，而非存进向量库吃灰。"""
+        index = {}
+        live = 0
+        today = datetime.now().strftime("%Y-%m-%d")
+        for u in self.units:
+            active = bool(u.get("inheritance_ready")) and str(u.get("expires", today)) >= today
+            toks = [t for t in re.split(r"[^\w\u4e00-\u9fff]+", u["concept"]) if len(t) >= 2][:5]
+            for t in toks:
+                index.setdefault(t, []).append({
+                    "concept": u["concept"], "active": active, "source": u["source"],
+                })
+            if active:
+                live += 1
+        return {
+            "trigger_count": len(index),
+            "live_units": live,
+            "dormant_units": len(self.units) - live,
+            "index": index,
+            "lore": "保鲜激活：消化的知识按触发词在后续对话自动复现，不入库吃灰",
+        }
+
     def _build_report(self):
         rates = [u["digestion_rate"] for u in self.units]
         avg_rate = sum(rates) / len(rates) if rates else 0
@@ -935,7 +1039,7 @@ class KnowledgeDigest:
 
         return {
             "digester": "liuku-xianzei",
-            "version": "v5.6",
+            "version": "v5.7",
             "lore_mapping": {                              # V5.5: 六库仙贼世界观映射
                 "digestion_lore": {"高": "炁化完成", "中": "炼化中", "低": "未入炁"},
                 "contamination_lore": {"高": "尸魔侵蚀", "中": "炁机浑浊", "低": "炁机清朗"},
@@ -947,6 +1051,8 @@ class KnowledgeDigest:
             "avg_digestion_rate": round(avg_rate, 1),
             "distribution": {"高": high_count, "中": medium_count, "低": low_count},
             "knowledge_units": self.units,
+            "essence_units": self._build_essence_units(),
+            "activation_index": self._build_activation_index(),
             "review_schedule": review_schedule,
             "inheritance_queue": self.inheritance_queue,
             "quarantine_queue": self.quarantine_queue,
@@ -979,10 +1085,15 @@ def main():
     if len(sys.argv) < 2:
         print("用法: python knowledge_digest.py <info.json>")
         print('  info: [{"source":"博客","content":"文本","credibility":"A","category":"技术方案"}, ...]')
+        print("  --devour <raw.json>   全格式吞噬：异构输入(PDF/转录/代码/聊天/噪音)归一后消化")
         sys.exit(1)
 
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
-        items = json.load(f)
+    if sys.argv[1] == "--devour":
+        raw = json.load(open(sys.argv[2], encoding="utf-8")) if len(sys.argv) > 2 else []
+        items = devour_any(raw)
+    else:
+        with open(sys.argv[1], "r", encoding="utf-8") as f:
+            items = json.load(f)
 
     # 输入验证
     ok, errs = validate_json_list(items, {"content": str}, "liuku-xianzei")
