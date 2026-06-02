@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "qiti-yuanliu"
-  version: "v6.3"
+  version: "v6.4"
   author: "under-one"
   description: "炁体源流 - 本源自省器 - 自我反思、规则生长、稳态修复与目标锚定"
   language: "zh"
@@ -24,6 +24,7 @@ metadata:
 > - **炁婴自主进化**（`meta_reflect`，V6.2）：呼应漫画"无限炁 + 炁婴自主行动"——炁婴拥有自主意志，能反观"诊断本身"，对诊断结果递归再诊断，直到炁场归一（`meta_entropy` 收敛为 0）
 > - **术之尽头·还炁/规则冲突消解/前置校验**（`distill_intent` / `detect_rule_conflicts` / `preflight_guard`，V6.2）：呼应张怀义"术之尽头——将一切术法还原为最原始的炁"。不止做上下文保洁，更能把任意 prompt/instruction/rules **还原为最纯粹的意图本质**（剥离修辞/冗余/客套，并清理悬空主语）、指出多规则间的"术之冲突点"并给出消解方案，并作为**众术之先的前置校验层**——他术执行前先过一遍，术有相冲则拦（克制他术）。CLI：`--reduce` / `--conflicts` / `--preflight`
 > - **众术之先·统一门**（`gatekeep`，V6.3）：把"还炁 + 规则冲突消解 + 前置校验"合为一个裁决入口，并经框架命令 `under-one preflight <rules.json> [--global ...] [--prompt ...] [--skill ...]` 跨技能调用——任何 skill 执行前先经此门，相冲则拦（退出码非零），真正落地"众术之源、终极克制"
+> - **天条校验 + 自动接规则 + 执行链接入**（`check_will_not`，V6.4）：`gatekeep` 增加天条校验——先验诉求是否逾越目标 skill 的 `control_plane_will_not`（触碰则拦）；`under-one preflight --skill X` 自动从 `under-one.yaml` 加载该 skill 的天条；`under-one scan X --preflight [--preflight-rules f]` 在执行前先经此门，触碰天条/规则相冲则阻断（退出码 3）
 >
 > **悟得者**：张怀义（"术之尽头"）｜ **语录人物**：张怀义
 >

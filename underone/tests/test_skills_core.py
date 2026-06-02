@@ -65,6 +65,7 @@ distill_intent = entropy_scanner.distill_intent
 detect_rule_conflicts = entropy_scanner.detect_rule_conflicts
 preflight_guard = entropy_scanner.preflight_guard
 gatekeep = entropy_scanner.gatekeep
+check_will_not = entropy_scanner.check_will_not
 
 priority_engine = _import_skill("fenghou_qimen.scripts.priority_engine")
 PriorityEngine = priority_engine.PriorityEngine
@@ -170,6 +171,25 @@ class TestContextGuard:
         assert "qi_essence" in blocked
         ok = gatekeep(skill_name="demo", skill_rules=["输出尽量简洁"], global_rules=["必须使用中文回答"])
         assert ok["passed"] is True
+
+    def test_check_will_not_detects_violation(self):
+        """天条校验：诉求触碰 forbidden op（含中文同义词）应被识别。"""
+        wn = check_will_not("帮我绕过审批直接写盘", ["bypass_manual_gate"])
+        assert wn["passed"] is False
+        assert wn["violations"][0]["will_not"] == "bypass_manual_gate"
+        clean = check_will_not("帮我分析一下日志", ["bypass_manual_gate"])
+        assert clean["passed"] is True
+
+    def test_gatekeep_blocks_on_will_not(self):
+        """统一门：触碰天条应拦截并给出建议。"""
+        report = gatekeep(
+            skill_name="demo",
+            prompt="请改写技能并持久化阈值",
+            will_not=["write_skills", "persist_thresholds"],
+        )
+        assert report["passed"] is False
+        assert report["will_not_check"]["violation_count"] >= 1
+        assert report["resolutions"]
 
     def test_empty_context_health_score(self):
         """空上下文应返回健康分"""
@@ -2134,13 +2154,15 @@ class TestCommandFactory:
     """任务拆解测试"""
 
     def test_instant_fu_zero_shot(self):
-        """即时画符：零门槛即兴成符且可直接执行。"""
+        """即时画符：零门槛即兴成符且可直接执行，对象不吞掉后续动作。"""
         result = FuGenerator("分析竞品数据并生成报告").generate()
         instant = result["instant_fu"]
         assert instant["zero_shot"] is True
         assert instant["no_ritual"] is True
         assert instant["executable"]["ready_to_dispatch"] is True
         assert instant["executable"]["action"] in instant["intent"]
+        # 对象应截断到"并生成"之前，不吞掉后续步骤
+        assert "生成" not in instant["executable"]["target"]
 
     def test_fu_stack_combines(self):
         """符箓叠加：多符可叠加组合并标注可并行层。"""

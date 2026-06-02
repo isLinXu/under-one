@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v10.5.0] - 2026-06-02
+
+### Added - 前置校验层接入配置与执行链（天条之门）
+
+承接 v10.4，把炁体源流的前置校验从"手填规则"升级为"自动接规则 + 执行链阻断"。
+
+- **炁体源流 (v6.4) — 天条校验**
+  - `check_will_not(payload, will_not)`：检测诉求是否逾越目标 skill 的 `control_plane_will_not`（天条），内置中文同义词表（如 `bypass_manual_gate`↔"绕过审批"），触碰则拦
+  - `gatekeep` 增加 `will_not` 参数：还炁 + 规则冲突 + **天条**三合一裁决，触碰天条时 `passed=False` 并给出改写建议
+- **框架命令增强**（`under_one/cli.py`）
+  - `under-one preflight --skill X`：**自动接规则**——从 `under-one.yaml`（节名为去连字符的 skill 名）加载该 skill 的天条，无需手填 rules
+  - `under-one scan X --preflight [--preflight-rules f]`：**执行链接入**——执行前先经炁体源流之门，触碰天条/规则相冲则阻断运行（退出码 3），放行则照常执行；默认不开启，零侵入既有 scan
+- **横向打磨**
+  - 通天箓 `instant_fu`：对象截断到下一个连接词/动作动词，避免"分析竞品数据并生成报告"把"并生成报告"吞进对象
+  - 六库 `devour_any`：dict 无显式正文时回退拼接其字符串字段，避免空内容
+
+### Verified
+
+- pytest 全量回归 **275 passed**（+2 新用例：天条校验 `check_will_not`、统一门天条拦截；即时符对象截断断言强化；bundle 版本快照 v6.3→v6.4）
+- `under-one audit` 10/10 skill **0 warning / 0 error**
+- CLI 冒烟：`preflight --skill evolution-engine` 自动天条拦截 / `scan X --preflight` 阻断(exit 3) / 放行(exit 0) / 常规 scan 未受影响(exit 0) 均 PASS
+
+### Docs
+
+- `docs/LORE.md`：新增「本轮增强对齐（v10.5）」天条之门说明
+- `qiti-yuanliu/SKILL.md`：补充 `check_will_not` 与 `--skill 自动接规则`/`scan --preflight` 条目并同步 `_skillhub_meta.json`
+
 ## [v10.4.0] - 2026-06-02
 
 ### Added - 炁体源流落地为真正的跨技能前置校验层

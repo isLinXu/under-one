@@ -1,7 +1,7 @@
 {
   "id": "qiti-yuanliu",
   "name": "炁体源流",
-  "version": "v6.3",
+  "version": "v6.4",
   "type": "script",
   "entry": "scripts/entropy_scanner.py",
   "language": "python",

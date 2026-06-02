@@ -235,11 +235,57 @@ def preflight_guard(skill_rules, global_rules=None):
     }
 
 
-def gatekeep(skill_name=None, skill_rules=None, global_rules=None, prompt=None):
+# 天条 op token → 自然语言同义词（便于在中文诉求中识别逾越天条的请求）
+_WILL_NOT_SYNONYMS = {
+    "write_skills": ["改写技能", "写技能", "修改 skill", "修改skill", "write skill"],
+    "persist_thresholds": ["持久化阈值", "写入阈值", "固化阈值", "persist threshold"],
+    "rewrite_goal_anchor": ["改写目标锚", "重写目标", "篡改目标"],
+    "rewrite_live_context": ["改写实时上下文", "重写上下文", "篡改上下文"],
+    "bypass_manual_gate": ["绕过审批", "跳过问道门", "跳过审批", "bypass gate"],
+    "mutate_without_backup": ["无备份修改", "不备份就改", "免备份写盘"],
+    "override_ecosystem_policy": ["覆盖生态策略", "override policy", "推翻生态规则"],
+    "persist_overrides": ["持久化覆盖", "永久覆盖"],
+}
+
+
+def check_will_not(payload, will_not):
+    """天条校验：检测请求是否触碰目标 skill 的天条（forbidden ops，不可破）。
+
+    payload: 字符串或字符串列表（prompt/rules/输入文本）
+    will_not: 该 skill 的 control_plane_will_not 列表（op token）
+    """
+    if isinstance(payload, (list, tuple)):
+        text = "\n".join(str(x) for x in payload)
+    else:
+        text = str(payload or "")
+    low = text.lower()
+    violations = []
+    for op in (will_not or []):
+        op = str(op).strip()
+        if not op:
+            continue
+        needles = [op.lower(), op.replace("_", " ").lower()] + [s.lower() for s in _WILL_NOT_SYNONYMS.get(op, [])]
+        hit = next((n for n in needles if n and n in low), None)
+        if hit:
+            violations.append({
+                "will_not": op,
+                "matched": hit,
+                "advice": f"该 skill 的天条禁止『{op}』，此请求触碰天条——应改写诉求或改用具备该权限的 skill",
+            })
+    return {
+        "will_not": list(will_not or []),
+        "violations": violations,
+        "violation_count": len(violations),
+        "passed": not violations,
+        "lore": "天条不可破：触碰则拦——炁体源流先验他术是否逾越其天条",
+    }
+
+
+def gatekeep(skill_name=None, skill_rules=None, global_rules=None, prompt=None, will_not=None):
     """炁体源流·众术之先：统一的前置校验入口。
 
-    任何 skill 执行前先过一遍——把意图还原为炁（可选 prompt）、检测规则冲突、给出
-    放行/拦截裁决。这是炁体源流"众术之源、终极克制"的落地：他术先经此门。
+    任何 skill 执行前先过一遍——把意图还原为炁（可选 prompt）、检测规则冲突、校验天条，
+    给出放行/拦截裁决。这是炁体源流"众术之源、终极克制"的落地：他术先经此门。
     """
     report = {
         "gate": "炁体源流·众术之先",
@@ -250,9 +296,14 @@ def gatekeep(skill_name=None, skill_rules=None, global_rules=None, prompt=None):
     pf = preflight_guard(skill_rules or [], global_rules or [])
     report["preflight"] = pf
     report["rule_conflicts"] = detect_rule_conflicts(list(global_rules or []) + list(skill_rules or []))
-    report["passed"] = pf["passed"]
-    report["verdict"] = pf["verdict"]
-    report["resolutions"] = [c["resolution"] for c in pf["conflicts"]]
+    wn = check_will_not([prompt or ""] + list(skill_rules or []), will_not or [])
+    report["will_not_check"] = wn
+    report["passed"] = pf["passed"] and wn["passed"]
+    if not wn["passed"] and pf["passed"]:
+        report["verdict"] = "拦截：触碰天条，需改写诉求或换用有权限的 skill"
+    else:
+        report["verdict"] = pf["verdict"]
+    report["resolutions"] = [c["resolution"] for c in pf["conflicts"]] + [v["advice"] for v in wn["violations"]]
     report["lore"] = "众术之源、终极克制——他术执行前先经炁体源流之门"
     return report
 

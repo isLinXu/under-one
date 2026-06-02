@@ -101,7 +101,22 @@ def cmd_scan(args):
     if not script_path.exists():
         print(f"ERROR: 脚本不存在: {script_path}")
         sys.exit(1)
-    
+
+    # 执行链接入（可选）：执行前先经炁体源流之门，触碰天条/规则相冲则阻断
+    if getattr(args, "preflight", False):
+        mod = _load_entropy_scanner()
+        will_not = _resolve_skill_will_not(skill_name)
+        rules = json.load(open(args.preflight_rules, encoding="utf-8")) if getattr(args, "preflight_rules", None) else []
+        payload_text = ""
+        if args.input and Path(args.input).exists():
+            payload_text = Path(args.input).read_text(encoding="utf-8")
+        report = mod.gatekeep(skill_name=skill_name, skill_rules=rules, prompt=payload_text, will_not=will_not)
+        if not report["passed"]:
+            _print_gate_report(report, payload_text)
+            print("-" * 40)
+            print("✗ 炁体源流拦截：未经此门，他术不执行（如确需强行执行，去掉 --preflight）")
+            sys.exit(3)
+
     import subprocess
     cmd = [sys.executable, str(script_path)]
     if args.input:
@@ -199,8 +214,37 @@ def _load_entropy_scanner():
     return mod
 
 
+def _resolve_skill_will_not(cli_name):
+    """从 under-one.yaml 读取目标 skill 的天条（control_plane_will_not）。"""
+    if not cli_name or cli_name not in SKILL_MAP:
+        return []
+    dir_name = SKILL_MAP[cli_name][0]
+    section = dir_name.replace("-", "")
+    return get_config(section, "control_plane_will_not", []) or []
+
+
+def _print_gate_report(report, prompt=None):
+    print("\n炁体源流 · 众术之先 · 前置校验")
+    print("-" * 40)
+    if report.get("skill"):
+        print(f"  目标 skill: {report['skill']}")
+    wn = report.get("will_not_check", {})
+    if wn.get("will_not"):
+        print(f"  天条: {wn['will_not']}")
+    print(f"  裁决: {report['verdict']}")
+    print(f"  放行: {'是' if report['passed'] else '否'}")
+    for c in report["preflight"]["conflicts"]:
+        print(f"  术之冲突: {c['rule_a']}  ⟂  {c['rule_b']}")
+        print(f"            消解: {c['resolution']}")
+    for v in wn.get("violations", []):
+        print(f"  触碰天条: {v['will_not']} (命中 '{v['matched']}')")
+        print(f"            建议: {v['advice']}")
+    if prompt and report.get("qi_essence"):
+        print(f"  意图本质: {report['qi_essence']['qi_essence']}")
+
+
 def cmd_preflight(args):
-    """炁体源流·众术之先：他术执行前先过一遍规则，检测冲突并裁决放行/拦截。"""
+    """炁体源流·众术之先：他术执行前先过一遍规则与天条，检测冲突并裁决放行/拦截。"""
     mod = _load_entropy_scanner()
     skill_rules = json.load(open(args.rules, encoding="utf-8")) if args.rules else []
     global_rules = json.load(open(args.global_rules, encoding="utf-8")) if args.global_rules else []
@@ -209,27 +253,21 @@ def cmd_preflight(args):
         print("ERROR: 规则文件必须是 JSON 字符串数组")
         sys.exit(2)
 
+    # 自动接规则：--skill 给定时自动加载该 skill 的天条
+    will_not = _resolve_skill_will_not(args.skill)
+
     report = mod.gatekeep(
         skill_name=args.skill,
         skill_rules=skill_rules,
         global_rules=global_rules,
         prompt=prompt,
+        will_not=will_not,
     )
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
-        print("\n炁体源流 · 众术之先 · 前置校验")
-        print("-" * 40)
-        if args.skill:
-            print(f"  目标 skill: {args.skill}")
-        print(f"  裁决: {report['verdict']}")
-        print(f"  放行: {'是' if report['passed'] else '否'}")
-        for c in report["preflight"]["conflicts"]:
-            print(f"  术之冲突: {c['rule_a']}  ⟂  {c['rule_b']}")
-            print(f"            消解: {c['resolution']}")
-        if prompt and report.get("qi_essence"):
-            print(f"  意图本质: {report['qi_essence']['qi_essence']}")
+        _print_gate_report(report, prompt)
     sys.exit(0 if report["passed"] else 1)
 
 
@@ -576,6 +614,8 @@ def main():
     p_scan = subparsers.add_parser("scan", help="运行指定skill")
     p_scan.add_argument("skill", help="skill名称 (如 priority-engine)")
     p_scan.add_argument("input", nargs="?", help="输入文件路径")
+    p_scan.add_argument("--preflight", action="store_true", help="执行前先经炁体源流前置校验，触碰天条/规则相冲则阻断")
+    p_scan.add_argument("--preflight-rules", help="前置校验用的规则 JSON（字符串数组）")
     p_scan.set_defaults(func=cmd_scan)
 
     # audit

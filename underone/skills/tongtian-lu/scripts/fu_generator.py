@@ -701,7 +701,14 @@ class FuGenerator:
         obj = ""
         if hits:
             idx = task.find(primary) + len(primary)
-            obj = task[idx:idx + 24].strip(" \t，,。.：:；;")
+            obj = task[idx:idx + 24]
+            # 截断到下一个连接词/其他动作动词，避免对象吞掉后续步骤
+            cuts = [obj.find(c) for c in ("并", "然后", "再", "，", ",", "、")]
+            cuts += [obj.find(v) for v in _INSTANT_VERBS if v != primary]
+            cuts = [c for c in cuts if c > 0]
+            if cuts:
+                obj = obj[:min(cuts)]
+            obj = obj.strip(" \t，,。.：:；;")
         return {
             "id": f"instant-{primary}",
             "type": "即兴符",

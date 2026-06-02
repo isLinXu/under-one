@@ -83,6 +83,8 @@ def devour_any(raw_inputs):
                 )
             if not content and raw.get("code"):
                 content = str(raw["code"])
+            if not content:
+                content = " ".join(str(v) for v in raw.values() if isinstance(v, str))
             source = raw.get("source") or raw.get("path") or raw.get("file") or f"input{i}"
             credibility = raw.get("credibility", "B")
             category = raw.get("category", fmt)
