@@ -1,7 +1,7 @@
 {
   "id": "juling-qianjiang",
   "name": "拘灵遣将",
-  "version": "v9.8",
+  "version": "v9.9",
   "type": "script",
   "entry": "scripts/dispatcher.py",
   "language": "python",

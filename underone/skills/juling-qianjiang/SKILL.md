@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "juling-qianjiang"
-  version: "v9.8"
+  version: "v9.9"
   author: "under-one"
   description: "拘灵遣将 - 灵体统御中枢 - 主副灵编组、权限控制、反叛风险与阵型调度"
   language: "zh"
@@ -23,6 +23,7 @@ metadata:
 > - **天条**（`avoid_constraints`）：灵体本身不得触犯的禁忌，违则自毁
 > - **灵契·服灵永久强化**（`record_soul_pact` / `soul_pact_bonus`，V9.9）：呼应漫画"服灵=吃灵获永久强化"——某灵反复成功使用后积累灵契经验值，永久提升对该类任务的匹配精度（有上限，区别于一次性的 `possess` 内化替代）
 > - **灵体弱点识别**（`identify_spirit_weakness`，V9.9）：呼应"灵体本质上是不完整的"——从能力缺口/可用性/历史质量刻画灵体的不完整之处，扬长避短
+> - **服灵·抽魂/聚魂/吞并**（`extract_soul_essence` / `aggregate_souls` / `absorb_souls`，V9.9）：呼应"拘灵=把灵的本质抽出来为己所用"——抽取 agent/expert 的 `soul.md` 本质（身份/系统提示摘要/能力边界/行为模式），聚合成"魂库"（能力倒排索引 + 并集 + 魂相冲检测，附于 `dispatch` 报告的 `soul_registry`），并可以一灵为宿主吞并其余灵的能力（CLI `--absorb <host_id>`）；天条(`will_not`)所禁与宿主禁忌冲突者一律"拒食"，吞并越多、冲突越多反噬风险越高
 >
 > **悟得者**：风天养 ｜ **语录人物**：风正豪（风家·不完整版）
 >

@@ -782,6 +782,139 @@ def identify_spirit_weakness(spirit, required_capabilities=None):
     }
 
 
+def extract_soul_essence(spirit: dict) -> dict:
+    """服灵·抽魂：抽取一个 agent/expert 灵魂的本质。
+
+    呼应漫画"拘灵遣将"的核心——不是简单调度，而是把灵的本质（身份、
+    系统提示/人设、能力边界、行为模式）抽出来为己所用。soul.md 来源抽取最完整，
+    普通灵体退化抽取。
+    """
+    profile = spirit.get("soul_profile", {}) or {}
+    caps = sorted(dict.fromkeys(spirit.get("capabilities", []) or []))
+    traits = list(profile.get("traits", []) or [])
+    limits = list(profile.get("limits", []) or [])
+    invocation = list(profile.get("invocation_rules", []) or [])
+    summary = (profile.get("summary") or spirit.get("summary") or "").strip()
+    return {
+        "spirit_id": spirit.get("id", "unknown"),
+        "agent_family": spirit.get("agent_family", "generic"),
+        "identity": {"summary": summary[:240], "traits": traits[:8]},
+        "system_prompt_digest": summary[:240],
+        "capabilities": caps,
+        "boundaries": {"limits": limits, "invocation_rules": invocation},
+        "behavior_patterns": traits[:8],
+        "essence_quality": round(float(spirit.get("quality_score", 0.0) or 0.0), 3),
+        "extractable": spirit.get("source_type") == "soul_markdown" or bool(caps),
+    }
+
+
+def aggregate_souls(spirits: list) -> dict:
+    """服灵·聚魂：把多个 agent/expert 的灵魂聚合成"魂库"。
+
+    建立能力→来源灵体的倒排索引（provenance），合并能力并集与边界并集，
+    检测"某灵能力恰为他灵明令禁忌"的魂相冲。呼应"魂库"——抽取的灵魂归档备役。
+    """
+    essences = [extract_soul_essence(s) for s in (spirits or [])]
+    capability_index = {}
+    boundary_union = []
+    seen_boundaries = set()
+    for ess in essences:
+        for cap in ess["capabilities"]:
+            capability_index.setdefault(cap, []).append(ess["spirit_id"])
+        for limit in ess["boundaries"]["limits"]:
+            key = limit.strip().lower()
+            if key and key not in seen_boundaries:
+                seen_boundaries.add(key)
+                boundary_union.append(limit)
+    unified = sorted(capability_index.keys())
+    conflicts = []
+    for cap in unified:
+        cap_low = cap.lower()
+        for limit in boundary_union:
+            if cap_low and cap_low in limit.lower():
+                conflicts.append({
+                    "capability": cap,
+                    "violates_boundary": limit,
+                    "provided_by": capability_index[cap],
+                })
+                break
+    return {
+        "soul_count": len(essences),
+        "souls": [e["spirit_id"] for e in essences],
+        "unified_capabilities": unified,
+        "capability_index": capability_index,
+        "boundary_union": boundary_union,
+        "conflicts": conflicts,
+        "coverage": len(unified),
+        "lore": "聚魂入库：抽取诸灵之本质归档备役，能力并集即'拘灵遣将'之兵备",
+    }
+
+
+def absorb_souls(host_id: str, spirits: list, will_not: Optional[list] = None) -> dict:
+    """服灵·吞并：以一个灵为宿主，吞并其余灵的能力为己所用。
+
+    呼应漫画"服灵=吃掉灵获得永久强化"。被天条(will_not)禁止、或与宿主自身禁忌
+    冲突的能力不会被吞并，只列入 rejected；吞并越多、冲突越多，反噬风险越高。
+    """
+    will_not_low = [str(w).lower() for w in (will_not or []) if str(w).strip()]
+    spirits = spirits or []
+    by_id = {s.get("id", f"spirit-{i}"): s for i, s in enumerate(spirits)}
+    host = by_id.get(host_id)
+    if host is None and spirits:
+        host = max(spirits, key=lambda s: s.get("quality_score", 0) or 0)
+        host_id = host.get("id", "host")
+    if host is None:
+        return {
+            "host": None, "absorbed": [], "absorbed_count": 0, "rejected": [],
+            "composite_capabilities": [], "provenance": {},
+            "backlash_risk": {"level": "low", "score": 0.0, "note": "无灵可吞"},
+            "lore": "无灵可吞",
+        }
+
+    host_ess = extract_soul_essence(host)
+    host_caps = set(host_ess["capabilities"])
+    host_limits = [l.lower() for l in host_ess["boundaries"]["limits"]]
+
+    absorbed, rejected, provenance = [], [], {}
+    for s in spirits:
+        if s.get("id") == host_id:
+            continue
+        ess = extract_soul_essence(s)
+        for cap in ess["capabilities"]:
+            if cap in host_caps:
+                continue
+            cap_low = cap.lower()
+            forbidden_by = next((w for w in will_not_low if w in cap_low), None)
+            conflict = next((l for l in host_limits if l and (l in cap_low or cap_low in l)), None)
+            if forbidden_by:
+                rejected.append({"capability": cap, "from": ess["spirit_id"],
+                                 "reason": "天条禁止(will_not)", "rule": forbidden_by})
+            elif conflict:
+                rejected.append({"capability": cap, "from": ess["spirit_id"],
+                                 "reason": "与宿主禁忌冲突", "rule": conflict})
+            else:
+                host_caps.add(cap)
+                absorbed.append({"capability": cap, "from": ess["spirit_id"]})
+                provenance[cap] = ess["spirit_id"]
+
+    score = min(1.0, len(absorbed) * 0.08 + len(rejected) * 0.12)
+    level = "high" if score >= 0.6 else "medium" if score >= 0.3 else "low"
+    return {
+        "host": host_id,
+        "absorbed": absorbed,
+        "absorbed_count": len(absorbed),
+        "rejected": rejected,
+        "composite_capabilities": sorted(host_caps),
+        "provenance": provenance,
+        "backlash_risk": {
+            "level": level,
+            "score": round(score, 3),
+            "note": "吞并越多、冲突越多，人格越不稳，反噬风险越高" if level != "low" else "吞并稳健，反噬可控",
+        },
+        "lore": "服灵·吞并：化他灵之能为己用，然天条所禁者不可食，食之必反噬",
+    }
+
+
 def rank_spirits(task: dict, spirits: list, cfg: dict = None) -> list:
     """返回按综合得分排序的 spirit 列表。"""
     if not spirits:
@@ -1036,7 +1169,7 @@ def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: O
     governance_summary = _build_governance_summary(plan, command_plan, fallback_log)
     
     return {
-        "version": "v9.8",
+        "version": "v9.9",
         "plan": plan,
         "fallback_log": fallback_log,
         "fallback_count": len(fallback_log),
@@ -1047,6 +1180,7 @@ def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: O
         "match_details": match_details,
         "load_balance_state": dict(_call_counts),
         "soul_bindings": soul_bindings,
+        "soul_registry": aggregate_souls(spirits),
         "command_plan": command_plan,
         "rebellion_alerts": rebellion_alerts,
         "recovery_queue": recovery_queue,
@@ -1056,15 +1190,23 @@ def dispatch(tasks: list, spirits: list, strategy: str = "protect", formation: O
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python dispatcher.py <tasks.json> <spirits.json|soul.md|souls/> [strategy:protect|possess] [formation]")
+        print("Usage: python dispatcher.py <tasks.json> <spirits.json|soul.md|souls/> [strategy:protect|possess] [formation] [--absorb <host_id>]")
         sys.exit(1)
-    
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
+
+    # 解析 --absorb <host_id>（服灵·吞并）
+    argv = list(sys.argv)
+    absorb_host = None
+    if "--absorb" in argv:
+        idx = argv.index("--absorb")
+        absorb_host = argv[idx + 1] if idx + 1 < len(argv) else ""
+        del argv[idx:idx + 2]
+
+    with open(argv[1], "r", encoding="utf-8") as f:
         tasks = json.load(f)
-    spirits = load_spirits_source(sys.argv[2])
-    
-    strategy = sys.argv[3] if len(sys.argv) > 3 else "protect"
-    formation = sys.argv[4] if len(sys.argv) > 4 else None
+    spirits = load_spirits_source(argv[2])
+
+    strategy = argv[3] if len(argv) > 3 else "protect"
+    formation = argv[4] if len(argv) > 4 else None
     
     # 输入验证
     ok, errs = validate_json_list(tasks, {"type": str}, "juling-qianjiang")
@@ -1111,6 +1253,21 @@ def main():
         print(f"\n反叛警报:")
         for alert in result['rebellion_alerts']:
             print(f"   {alert['spirit_id']} [{alert['level']}] {'; '.join(alert['reasons'])}")
+
+    registry = result.get('soul_registry', {})
+    if registry.get('soul_count'):
+        print(
+            f"\n魂库(聚魂): {registry['soul_count']} 灵 · 能力并集 {registry['coverage']} 项 · "
+            f"魂相冲 {len(registry.get('conflicts', []))} 处"
+        )
+
+    if absorb_host is not None:
+        absorption = absorb_souls(absorb_host, spirits, will_not=None)
+        result["absorption"] = absorption
+        print(
+            f"\n服灵·吞并 → 宿主 {absorption['host']}: 吞并 {absorption['absorbed_count']} 能力, "
+            f"拒食 {len(absorption['rejected'])} 项, 反噬风险 {absorption['backlash_risk']['level']}"
+        )
 
     if result.get('governance_summary'):
         summary = result['governance_summary']
