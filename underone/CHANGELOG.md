@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v10.2.0] - 2026-06-02
+
+### Added - 三技深度贴合原著（语义升级）
+
+针对"拘灵/双全手/风后奇门语义偏浅"的批评，把三技从"功能近似"推进到"原著本义"。所有"写/改/覆盖"动作一律由控制面协议（问道门 `mutation_gate` + 天条 `will_not`）把关，绝不静默落盘或覆盖系统约束。
+
+- **拘灵遣将 (v9.9) — 服灵·抽魂/聚魂/吞并**
+  - `extract_soul_essence`：抽取 agent/expert 的 `soul.md` 本质（身份/系统提示摘要/能力边界/行为模式）
+  - `aggregate_souls`：聚合成"魂库"（能力倒排索引 + 并集 + 魂相冲检测），附于 `dispatch` 报告的 `soul_registry`
+  - `absorb_souls`：以一灵为宿主吞并其余灵能力（CLI `--absorb <host_id>`）；天条所禁与宿主禁忌冲突者拒食，吞并越多反噬风险越高
+- **双全手 (v5.4) — 蓝手·改魂**
+  - `parse_memory_markdown` / `render_memory_markdown`：读写 `memory.md`
+  - `_build_memory_rewrite`：真正"读取→编辑→回写"记忆，报告输出 `memory_rewrite`（before/after 全文 + 操作差异 + 回滚令牌 + 门控状态）
+  - `apply_memory_rewrite`：问道门把关——核心 DNA 违背→`blocked`、漂移→`review`、仅 `planned` 且 `approved=True` 才写盘并生成 `.bak` 回滚
+- **风后奇门 (v5.3) — 定中宫·改局**
+  - `build_domain_override` / `cast_domain`（CLI `--cast-domain`）：在声明的"领域(中宫)"内对规则/约束层生成改局提案——规则增量、阈值调整、带 TTL 自动回退的临时覆盖 + `rollback` 快照
+  - 天条所禁目标拒绝；系统级/override 改局 `approval_status=pending` 必须人工审批，`applied=False`
+
+### Verified
+
+- pytest 全量回归 **258 passed**（+11 新增用例）
+- `under-one audit` 10/10 skill **0 warning**（版本一致性同步：juling v9.9 / shuangquanshou v5.4 / fenghou v5.3）
+- CLI 冒烟：风后 `--cast-domain`、拘灵 `--absorb`、双全手 `memory_rewrite` 均 PASS
+
+### Docs
+
+- `docs/LORE.md`：新增「本轮增强对齐（v10.2）」三技深度对齐表与安全取向说明
+- 三技 `SKILL.md` 世界观补充新能力条目并同步 `_skillhub_meta.json` 版本
+
 ## [v10.1.0] - 2026-06-01
 
 ### Fixed - 设定与文档一致性

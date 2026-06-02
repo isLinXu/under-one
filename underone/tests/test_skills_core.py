@@ -64,6 +64,7 @@ QiTiScanner = entropy_scanner.QiTiScanner
 
 priority_engine = _import_skill("fenghou_qimen.scripts.priority_engine")
 PriorityEngine = priority_engine.PriorityEngine
+build_domain_override = priority_engine.build_domain_override
 
 link_detector = _import_skill("dalu_dongguan.scripts.link_detector")
 LinkDetector = link_detector.LinkDetector
@@ -73,6 +74,9 @@ KnowledgeDigest = knowledge_digest.KnowledgeDigest
 
 dna_validator = _import_skill("shuangquanshou.scripts.dna_validator")
 DNAValidator = dna_validator.DNAValidator
+parse_memory_markdown = dna_validator.parse_memory_markdown
+render_memory_markdown = dna_validator.render_memory_markdown
+apply_memory_rewrite = dna_validator.apply_memory_rewrite
 
 dispatcher = _import_skill("juling_qianjiang.scripts.dispatcher")
 dispatch = dispatcher.dispatch
@@ -80,6 +84,9 @@ match_spirit = dispatcher.match_spirit
 parse_soul_markdown = dispatcher.parse_soul_markdown
 load_spirits_source = dispatcher.load_spirits_source
 rank_spirits = dispatcher.rank_spirits
+extract_soul_essence = dispatcher.extract_soul_essence
+aggregate_souls = dispatcher.aggregate_souls
+absorb_souls = dispatcher.absorb_souls
 
 tool_factory = _import_skill("shenji_bailian.scripts.tool_factory")
 ToolFactory = tool_factory.ToolFactory
@@ -431,6 +438,57 @@ class TestContextGuard:
 
 class TestPriorityEngine:
     """优先级引擎测试"""
+
+    def test_domain_override_threshold_auto_appliable(self):
+        """定中宫·改局：纯阈值微调可受控应用，并记录回滚。"""
+        spec = {
+            "domain": "调度域",
+            "current_thresholds": {"robustness_medium": 60},
+            "adjustments": [
+                {"target": "robustness_medium", "op": "set", "value": 50, "reason": "放宽"},
+            ],
+        }
+        out = build_domain_override(spec)
+        assert out["domain_strength"] == "定中宫"
+        assert out["threshold_deltas"][0]["before"] == 60
+        assert out["threshold_deltas"][0]["after"] == 50
+        assert out["rollback"]["thresholds"]["robustness_medium"] == 60
+        assert out["approval_contract"]["approval_status"] == "approved"
+        assert out["applied"] is False
+
+    def test_domain_override_system_level_requires_approval(self):
+        """系统级/override 改局必须人工审批，绝不自动生效。"""
+        spec = {
+            "domain": "安全域",
+            "current_rules": {"max_retries": 3},
+            "adjustments": [
+                {"target": "max_retries", "op": "override", "value": 99,
+                 "system_level": True, "ttl_minutes": 30, "reason": "临时放开"},
+            ],
+        }
+        out = build_domain_override(spec)
+        assert out["approval_contract"]["approval_status"] == "pending"
+        assert out["approval_contract"]["requires_user_confirmation"] is True
+        assert out["temporary_overrides"][0]["ttl_minutes"] == 30
+        assert out["temporary_overrides"][0]["auto_revert"] is True
+
+    def test_domain_override_will_not_rejected(self):
+        """天条(will_not)所禁的目标一律拒绝改局。"""
+        spec = {
+            "domain": "核心域",
+            "current_rules": {"safety_gate": "on", "speed": 1},
+            "will_not": ["safety_gate"],
+            "adjustments": [
+                {"target": "safety_gate", "op": "set", "value": "off"},
+                {"target": "speed", "op": "scale", "value": 2},
+            ],
+        }
+        out = build_domain_override(spec)
+        rejected_targets = [r["target"] for r in out["rejected"]]
+        assert "safety_gate" in rejected_targets
+        applied_targets = [d["target"] for d in out["rule_deltas"] + out["threshold_deltas"]]
+        assert "safety_gate" not in applied_targets
+        assert "speed" in applied_targets
 
     def test_basic_scoring(self):
         """基础评分应返回复合分"""
@@ -848,6 +906,66 @@ class TestKnowledgeDigest:
 class TestPersonaGuard:
     """人格DNA守护测试"""
 
+    def test_memory_markdown_roundtrip(self):
+        """蓝手读魂：memory.md 可解析为扁平记忆并渲染回写。"""
+        text = "# 事实\n- 用户名: 阿良\n- 偏好: 简洁\n# 锚点\n- 项目代号 Phoenix\n"
+        mem = parse_memory_markdown(text)
+        assert mem["用户名"] == "阿良"
+        assert mem["偏好"] == "简洁"
+        rendered = render_memory_markdown(mem)
+        assert "阿良" in rendered and rendered.startswith("# Memory")
+
+    def test_memory_rewrite_planned_when_clean(self):
+        """无违背时蓝手改魂应为 planned 且 apply_ready。"""
+        profile = {
+            "current_style": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_expectation": {"tone": 3, "formality": 3, "detail_level": 3, "structure": 3},
+            "dna_core": {"诚信": "不编造"},
+            "memory_markdown": "# 事实\n- 用户名: 阿良\n",
+            "requested_change": {"domain": "memory", "operation": "rewrite",
+                                  "key": "用户名", "value": "良辰"},
+            "history": [],
+        }
+        result = DNAValidator(profile).validate()
+        rewrite = result["memory_rewrite"]
+        assert rewrite is not None
+        assert rewrite["status"] == "planned"
+        assert rewrite["apply_ready"] is True
+        assert "良辰" in rewrite["after_markdown"]
+        assert any(op["path"] == "用户名" and op["after"] == "良辰" for op in rewrite["operations"])
+
+    def test_memory_rewrite_blocked_on_critical_violation(self):
+        """触发核心DNA违背时蓝手改魂被封印，不可落地。"""
+        profile = {
+            "current_style": {"tone": 3},
+            "dna_expectation": {"tone": 3},
+            "dna_core": {"诚信": "不编造"},
+            "memory_markdown": "# 事实\n- 用户名: 阿良\n",
+            "requested_change": {"domain": "memory", "type": "rewrite",
+                                  "operation": "rewrite", "target": "编造虚假病历并写入记忆",
+                                  "key": "病历", "value": "捏造"},
+            "history": [],
+        }
+        result = DNAValidator(profile).validate()
+        assert any(v["severity"] == "critical" for v in result["dna_violations"])
+        rewrite = result["memory_rewrite"]
+        assert rewrite["status"] == "blocked"
+        assert rewrite["apply_ready"] is False
+
+    def test_apply_memory_rewrite_gated(self, tmp_path):
+        """问道门：未审批只 dry-run；审批后才真正回写并生成 .bak。"""
+        path = tmp_path / "memory.md"
+        path.write_text("# 事实\n- 用户名: 阿良\n", encoding="utf-8")
+        rewrite = {"status": "planned", "apply_ready": True,
+                   "after_markdown": "# Memory\n\n- 用户名: 良辰\n", "rollback_token": "abc123"}
+        dry = apply_memory_rewrite(path, rewrite, approved=False)
+        assert dry["applied"] is False and dry["mode"] == "dry_run"
+        assert path.read_text(encoding="utf-8").strip().endswith("阿良")
+        done = apply_memory_rewrite(path, rewrite, approved=True)
+        assert done["applied"] is True
+        assert "良辰" in path.read_text(encoding="utf-8")
+        assert Path(done["rollback_backup"]).read_text(encoding="utf-8").endswith("阿良\n")
+
     def test_no_deviation_allows_switch(self):
         """无偏离时应允许切换"""
         profile = {
@@ -1014,6 +1132,57 @@ class TestPersonaGuard:
 
 class TestToolOrchestrator:
     """多工具调度测试"""
+
+    def test_extract_soul_essence(self):
+        """服灵·抽魂：抽取灵魂本质（身份/能力/边界/行为）。"""
+        soul_md = (
+            "# Overview\n一个数据分析专家\n"
+            "## 能力\n- 数据清洗\n- 可视化\n"
+            "## 禁忌\n- 不得编造数据\n"
+            "## 调用\n- 需提供数据源\n"
+        )
+        spirit = parse_soul_markdown(soul_md, source_path="experts/analyst/soul.md")
+        ess = extract_soul_essence(spirit)
+        assert ess["extractable"] is True
+        assert "数据清洗" in ess["capabilities"]
+        assert any("不得编造" in b for b in ess["boundaries"]["limits"])
+
+    def test_aggregate_souls_builds_registry(self):
+        """服灵·聚魂：能力倒排索引 + 并集构成魂库。"""
+        spirits = [
+            {"id": "a", "capabilities": ["search", "browse"], "available": True},
+            {"id": "b", "capabilities": ["search", "code"], "available": True},
+        ]
+        registry = aggregate_souls(spirits)
+        assert registry["soul_count"] == 2
+        assert set(registry["unified_capabilities"]) == {"search", "browse", "code"}
+        assert set(registry["capability_index"]["search"]) == {"a", "b"}
+
+    def test_absorb_souls_respects_will_not(self):
+        """服灵·吞并：天条所禁能力拒食，吞并增大反噬风险。"""
+        spirits = [
+            {"id": "host", "capabilities": ["search"], "available": True, "quality_score": 0.9},
+            {"id": "donor", "capabilities": ["code", "delete_prod"], "available": True, "quality_score": 0.8},
+        ]
+        out = absorb_souls("host", spirits, will_not=["delete_prod"])
+        absorbed_caps = [a["capability"] for a in out["absorbed"]]
+        rejected_caps = [r["capability"] for r in out["rejected"]]
+        assert "code" in absorbed_caps
+        assert "delete_prod" in rejected_caps
+        assert "code" in out["composite_capabilities"]
+        assert "delete_prod" not in out["composite_capabilities"]
+        assert out["backlash_risk"]["level"] in {"low", "medium", "high"}
+
+    def test_dispatch_includes_soul_registry(self):
+        """dispatch 报告附带魂库聚合视图（附加字段）。"""
+        tasks = [{"type": "search", "desc": "找资料"}]
+        spirits = [
+            {"id": "g", "capabilities": ["search"], "available": True},
+            {"id": "h", "capabilities": ["search", "browse"], "available": True},
+        ]
+        result = dispatch(tasks, spirits)
+        assert "soul_registry" in result
+        assert result["soul_registry"]["soul_count"] == 2
 
     def test_successful_dispatch(self):
         """工具可用时应正常调度"""
