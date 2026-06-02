@@ -57,6 +57,7 @@ UnderOne 是 10 个独立 agent skills 的工程化集合。中文名和八奇�
 4. [docs/LORE.md](./docs/LORE.md) - **世界观深度对齐手册**：十技 × 《一人之下》原著设定完整映射、术语词典、隐喻体系。命名/描述/注释时以此为参考源。
 5. [docs/HOST_ADAPTERS.md](./docs/HOST_ADAPTERS.md) - 宿主适配策略。
 6. [docs/SKILL_OPTIMIZATION_PLAYBOOK.md](./docs/SKILL_OPTIMIZATION_PLAYBOOK.md) - 单 skill 优化手册。
+7. [underone/CHANGELOG.md](./underone/CHANGELOG.md) - 版本变更记录；**当前基线 v10.1.0**（风后七门统一、大罗语录归属修正、十技贴合度增强）。
 
 ## 标准动作
 
@@ -117,16 +118,16 @@ python /tmp/underone-custom/fenghou-qimen/skillctl.py self-test
 
 | Stable ID | Capability | Source Dir |
 |---|---|---|
-| `qiti-yuanliu` | 上下文漂移、自省、修复阈值 | `underone/skills/qiti-yuanliu` |
-| `shuangquanshou` | 人设一致性、记忆改写边界 | `underone/skills/shuangquanshou` |
-| `liuku-xianzei` | 信息消化、可信度、保鲜期 | `underone/skills/liuku-xianzei` |
-| `tongtian-lu` | 任务拆解、执行计划、冲突检测 | `underone/skills/tongtian-lu` |
-| `fenghou-qimen` | 优先级排序、鲁棒性评估 | `underone/skills/fenghou-qimen` |
-| `dalu-dongguan` | 关联检测、异常感知、幻觉拦截 | `underone/skills/dalu-dongguan` |
-| `juling-qianjiang` | 多工具/多代理调度、降级策略 | `underone/skills/juling-qianjiang` |
-| `shenji-bailian` | skill/tool 生成、测试脚手架 | `underone/skills/shenji-bailian` |
+| `qiti-yuanliu` | 上下文漂移、递归自省（炁婴进化）、修复阈值 | `underone/skills/qiti-yuanliu` |
+| `shuangquanshou` | 人设一致性、性手/命手分区、记忆改写边界 | `underone/skills/shuangquanshou` |
+| `liuku-xianzei` | 信息消化、可信度、信息腐蚀/无痕消化、保鲜期 | `underone/skills/liuku-xianzei` |
+| `tongtian-lu` | 任务拆解、执行计划、符种细分、冲突检测 | `underone/skills/tongtian-lu` |
+| `fenghou-qimen` | 优先级排序、七门排盘、鲁棒性评估 | `underone/skills/fenghou-qimen` |
+| `dalu-dongguan` | 关联检测、时序/命运干涉、异常感知、幻觉拦截 | `underone/skills/dalu-dongguan` |
+| `juling-qianjiang` | 多工具/多代理调度、灵契/弱点识别、降级策略 | `underone/skills/juling-qianjiang` |
+| `shenji-bailian` | skill/tool 生成、异术移植、测试脚手架 | `underone/skills/shenji-bailian` |
 | `bagua-zhen` | 生态监控、互斥仲裁、全局协调 | `underone/skills/bagua-zhen` |
-| `xiushen-lu` | 自适应阈值、进化建议、回滚保护 | `underone/skills/xiushen-lu` |
+| `xiushen-lu` | 自适应阈值、赋能、进化建议、回滚保护 | `underone/skills/xiushen-lu` |
 
 ## Change Protocol
 
