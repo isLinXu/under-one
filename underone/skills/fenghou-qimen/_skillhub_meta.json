@@ -1,7 +1,7 @@
 {
   "id": "fenghou-qimen",
   "name": "风后奇门",
-  "version": "v5.1",
+  "version": "v5.3",
   "type": "script",
   "entry": "scripts/priority_engine.py",
   "language": "python",

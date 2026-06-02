@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "fenghou-qimen"
-  version: "v5.1"
+  version: "v5.3"
   author: "under-one"
   description: "风后奇门 - 优先级引擎 - 九维度评分、八门映射、蒙特卡洛鲁棒性评估与动态权重模板"
   language: "zh"
@@ -23,6 +23,7 @@ metadata:
 > - **动态权重模板**：不同局势下可切换奇门排盘策略（紧急型/质量型/资源型/团队型/平衡型）
 > - **乱金柝**（`luan_jin_tuo`，V5.2）：扭曲局部时空 → 气运逆或存在死门/杜门任务时，冻结低优先任务的资源分配，集中力量于关键命脉
 > - **龟蝇体**（`gui_ying_ti`，V5.2）：燃烧生命换爆发 → `run(burn=True)` / CLI `--burn` 点燃燃烧模式，紧急下仅保留高优先任务、牺牲质量与验证尾阵全力冲刺
+> - **定中宫·改局**（`build_domain_override` / `cast_domain` / CLI `--cast-domain`，V5.3）：呼应王也"我站在这，这方天地的规则我说了算"——不止做优先级排序，而是在声明的"领域(中宫)"内对**规则/约束层**生成改局提案：规则增量(`rule_deltas`)、阈值调整(`threshold_deltas`)、临时覆盖(`temporary_overrides`，带 TTL 自动回退)，并附 `rollback` 快照。天条(`will_not`)所禁目标一律拒绝；系统级/override 改局 `approval_status=pending` 必须人工经**问道门(mutation_gate)**审批，绝不自动生效（`applied=False`）
 >
 > **悟得者**：周圣 ｜ **语录人物**：王也（武当道士）
 >

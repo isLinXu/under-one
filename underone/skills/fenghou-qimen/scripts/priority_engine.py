@@ -323,7 +323,7 @@ class PriorityEngine:
 
         return {
             "engine": "fenghou-qimen",
-            "version": "v5.2",
+            "version": "v5.3",
             "task_count": len(self.tasks),
             "active_template": self.active_template,
             "weights_used": self.weights,
@@ -494,6 +494,105 @@ class PriorityEngine:
             return "containment-first"
         return "steady-advance"
 
+    def cast_domain(self, domain_spec):
+        """风后奇门·定中宫改局（V5.3）：见模块级 build_domain_override。"""
+        return build_domain_override(domain_spec)
+
+
+def build_domain_override(domain_spec: dict) -> dict:
+    """风后奇门·定中宫改局：在声明的"领域(中宫)"内对规则/约束层生成改局提案。
+
+    呼应漫画王也"我站在这，这方天地的规则我说了算"——但不是直接改写现实，而是产出
+    一份经问道门(mutation_gate)把关的提案：规则增量、阈值调整、临时覆盖(带 TTL 自动回退)。
+    天条(will_not)所禁的目标一律拒绝；系统级/override 改局必须人工审批，绝不自动生效。
+
+    domain_spec: {
+        "domain": "<中宫/作用域>",
+        "current_rules": {name: value, ...},
+        "current_thresholds": {name: number, ...},
+        "adjustments": [
+            {"target": str, "op": "set|scale|override", "value": any,
+             "ttl_minutes": int?, "system_level": bool?, "reason": str?}
+        ],
+        "will_not": ["<禁止触碰的目标关键词>", ...]
+    }
+    """
+    domain = domain_spec.get("domain", "中宫")
+    current_rules = dict(domain_spec.get("current_rules", {}) or {})
+    current_thresholds = dict(domain_spec.get("current_thresholds", {}) or {})
+    will_not = [str(w).lower() for w in (domain_spec.get("will_not", []) or []) if str(w).strip()]
+    adjustments = domain_spec.get("adjustments", []) or []
+
+    rule_deltas, threshold_deltas, temporary_overrides, rejected = [], [], [], []
+    rollback = {"rules": {}, "thresholds": {}}
+    requires_manual = False
+
+    for adj in adjustments:
+        target = str(adj.get("target", "")).strip()
+        if not target:
+            continue
+        op = adj.get("op", "set")
+        value = adj.get("value")
+        ttl = adj.get("ttl_minutes")
+        system_level = bool(adj.get("system_level"))
+        reason = adj.get("reason", "")
+
+        forbidden = next((w for w in will_not if w in target.lower()), None)
+        if forbidden:
+            rejected.append({"target": target, "reason": "天条禁止(will_not)", "rule": forbidden})
+            continue
+
+        in_rules = target in current_rules
+        in_thresholds = target in current_thresholds
+        before = current_rules.get(target) if in_rules else current_thresholds.get(target)
+
+        if op == "scale" and isinstance(before, (int, float)) and isinstance(value, (int, float)):
+            after = round(before * value, 6)
+        else:
+            after = value
+
+        delta = {"target": target, "op": op, "before": before, "after": after, "reason": reason}
+        if in_thresholds or (not in_rules and isinstance(after, (int, float))):
+            rollback["thresholds"][target] = before
+            threshold_deltas.append(delta)
+        else:
+            rollback["rules"][target] = before
+            rule_deltas.append(delta)
+
+        if ttl is not None:
+            temporary_overrides.append({
+                "target": target, "after": after, "ttl_minutes": ttl,
+                "auto_revert": True, "revert_to": before,
+                "note": f"临时覆盖 {ttl} 分钟后自动回退",
+            })
+        if system_level or op == "override":
+            requires_manual = True
+
+    approval_status = "pending" if requires_manual else "approved"
+    approval_contract = {
+        "approval_status": approval_status,
+        "requires_user_confirmation": requires_manual,
+        "auto_appliable": approval_status == "approved",
+        "gate": "问道门(mutation_gate)",
+        "reason": ("含系统级/override 改局，必须人工审批后方可生效"
+                   if requires_manual else "仅领域内阈值微调，受控可应用"),
+    }
+    domain_strength = "定中宫" if (rule_deltas or threshold_deltas) else "空盘"
+    return {
+        "engine": "fenghou-qimen",
+        "capability": "定中宫·改局",
+        "domain": domain,
+        "domain_strength": domain_strength,
+        "rule_deltas": rule_deltas,
+        "threshold_deltas": threshold_deltas,
+        "temporary_overrides": temporary_overrides,
+        "rejected": rejected,
+        "rollback": rollback,
+        "approval_contract": approval_contract,
+        "applied": False,
+        "lore": "风后奇门·定中宫：这方天地规则由我暂定，然天条不可改，系统级改局须叩问道门",
+    }
+
 
 def main():
     if len(sys.argv) < 2:
@@ -501,7 +600,21 @@ def main():
         print('  tasks: [{"name":"任务A","urgency":5,"importance":5,...}, ...]')
         print('  template: balanced | urgency_priority | quality_priority | resource_limited | team_driven')
         print('  --burn: 点燃龟蝇体燃烧模式（紧急下牺牲质量换速度）')
+        print('  --cast-domain <spec.json>: 定中宫·改局——产出规则/约束层改局提案（经问道门把关）')
         sys.exit(1)
+
+    # 定中宫·改局：python priority_engine.py --cast-domain <spec.json>
+    if "--cast-domain" in sys.argv:
+        idx = sys.argv.index("--cast-domain")
+        spec_path = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
+        if not spec_path:
+            print("错误: --cast-domain 需要一个 spec.json 路径")
+            sys.exit(2)
+        with open(spec_path, "r", encoding="utf-8") as f:
+            spec = json.load(f)
+        proposal = build_domain_override(spec)
+        print(json.dumps(proposal, ensure_ascii=False, indent=2))
+        return
 
     burn = "--burn" in sys.argv[2:]
     rest = [a for a in sys.argv[2:] if a != "--burn"]
