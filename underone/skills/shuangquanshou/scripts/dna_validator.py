@@ -38,6 +38,85 @@ except ImportError:
             return len(missing) == 0, missing
 
 
+def parse_memory_markdown(text: str) -> dict:
+    """蓝手·读魂：把 memory.md 解析为可改写的扁平记忆字典。
+
+    支持 `key: value` / `- key: value`（中英文冒号）；纯条目归入 `<section>#<n>`。
+    """
+    memory = {}
+    section = "general"
+    idx = 0
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            section = line.lstrip("# ").strip().lower() or "general"
+            idx = 0
+            continue
+        body = line[1:].strip() if line.startswith(("-", "*")) else line
+        if not body:
+            continue
+        kv = None
+        for sep in (":", "："):
+            if sep in body:
+                k, v = body.split(sep, 1)
+                if k.strip():
+                    kv = (k.strip(), v.strip())
+                break
+        if kv:
+            memory[kv[0]] = kv[1]
+        else:
+            idx += 1
+            memory[f"{section}#{idx}"] = body
+    return memory
+
+
+def render_memory_markdown(memory: dict) -> str:
+    """蓝手·回写：把记忆字典渲染回 memory.md 文本。"""
+    if not isinstance(memory, dict) or not memory:
+        return "# Memory\n"
+    lines = ["# Memory", ""]
+    for k, v in memory.items():
+        if "#" in k and str(k).split("#")[0] != "general" and v:
+            lines.append(f"- {v}")
+        else:
+            lines.append(f"- {k}: {v}")
+    return "\n".join(lines) + "\n"
+
+
+def apply_memory_rewrite(path, rewrite: dict, approved: bool = False) -> dict:
+    """蓝手·改魂落地：审批通过且未封印时把改写写回 memory.md（带 .bak 回滚）。
+
+    问道门(mutation_gate)：approved=False 或 apply_ready=False 时只做 dry-run，绝不静默写盘。
+    """
+    p = Path(path)
+    rewrite = rewrite or {}
+    status = rewrite.get("status")
+    apply_ready = rewrite.get("apply_ready", False)
+    if not approved or not apply_ready or status == "blocked":
+        return {
+            "applied": False,
+            "mode": "dry_run",
+            "reason": ("未审批(approved=False)" if not approved
+                       else "封印/待复核，禁止落地" if not apply_ready
+                       else "已封锁"),
+            "would_write_to": str(p),
+        }
+    backup = None
+    if p.exists():
+        backup = str(p) + ".bak"
+        Path(backup).write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+    p.write_text(rewrite.get("after_markdown", ""), encoding="utf-8")
+    return {
+        "applied": True,
+        "mode": "applied",
+        "written_to": str(p),
+        "rollback_backup": backup,
+        "rollback_token": rewrite.get("rollback_token"),
+    }
+
+
 class DNAValidator:
     # 双全手两手分工（V5.3）：
     #   性手·蓝手 → 精神层：读取/影响/改写记忆与认知
@@ -52,6 +131,9 @@ class DNAValidator:
         self.surgery_plan = []
         # V5.2: 从 under-one.yaml 加载配置
         self._load_config()
+        # V5.4: 若提供 memory.md 原文，解析为可改写的记忆状态（蓝手读魂）
+        if self.profile.get("memory_markdown") and not self.profile.get("memory_state"):
+            self.profile["memory_state"] = parse_memory_markdown(self.profile["memory_markdown"])
 
     def _hand_for_domain(self, domain):
         """判定手术域归属性手（精神层）还是命手（物理层）。"""
@@ -476,6 +558,56 @@ class DNAValidator:
             },
         }
 
+    def _build_memory_rewrite(self):
+        """蓝手·改魂（V5.4）：读取 memory.md → 计算改写 → 产出可回写方案。
+
+        呼应漫画"双全手"蓝手的"改魂"——不止只读校验，而是真正读取、编辑、回写记忆。
+        问道门(mutation_gate)把关：critical 违背→blocked，漂移/摇摆→review，仅 planned 可落地。
+        """
+        request = self.profile.get("requested_change", {}) or {}
+        has_memory_doc = bool(self.profile.get("memory_markdown")) or bool(self.profile.get("memory_state"))
+        if self._infer_domain() != "memory" and not (has_memory_doc and request):
+            return None
+        if not request and not has_memory_doc:
+            return None
+
+        raw_text = self.profile.get("memory_markdown")
+        before_mem = (parse_memory_markdown(raw_text) if raw_text
+                      else dict(self.profile.get("memory_state") or {}))
+        patch = self._infer_patch(request, "memory")
+        after_mem = self._preview_state(before_mem, patch)
+        ops = self._patch_operations(before_mem, patch)
+
+        critical = any(v.get("severity") == "critical" for v in self.violations)
+        warning = any(v.get("severity") == "warning" for v in self.violations)
+        if critical:
+            status = "blocked"
+        elif warning or self.deviation >= self.DRIFT_THRESHOLDS["yellow"]:
+            status = "review"
+        else:
+            status = "planned"
+
+        patch_preview = {"target_path": "memory.md", "operations": ops, "preview_state": after_mem}
+        rollback_token = self._build_rollback_token("memory", patch_preview)
+        before_md = raw_text if raw_text else render_memory_markdown(before_mem)
+        after_md = render_memory_markdown(after_mem)
+        return {
+            "hand": "性手·蓝手",
+            "intent": "读取/编辑/回写记忆（改魂）",
+            "status": status,
+            "apply_ready": status == "planned",
+            "requires_confirmation": status != "planned",
+            "operations": ops,
+            "before_markdown": before_md,
+            "after_markdown": after_md,
+            "rollback_token": rollback_token,
+            "reason": ("触发核心DNA保护，禁止改魂" if status == "blocked"
+                       else "存在漂移/摇摆，需人工复核后改魂" if status == "review"
+                       else "改写范围受控，可回写 memory.md"),
+            "apply_hint": "apply_memory_rewrite(path, memory_rewrite, approved=True) 落地（带 .bak 回滚）",
+            "lore": "蓝手改魂：红手只能修肉身，蓝手方能改灵魂——直接读写记忆本质",
+        }
+
     def generate_repair_patch(self):
         """命手积极修复（治疗/恢复，V5.3）。
 
@@ -706,7 +838,7 @@ class DNAValidator:
         drift_trend = getattr(self, "drift_trend", {"trend": "insufficient_data", "early_avg": 0.0, "recent_avg": 0.0, "delta": 0.0})
         return {
             "validator": "shuangquanshou",
-            "version": "v5.3",
+            "version": "v5.4",
             "deviation_score": round(self.deviation, 3),
             "drift_level": level,
             "drift_trend": drift_trend,
@@ -717,6 +849,7 @@ class DNAValidator:
             "surgery_plan": self.surgery_plan,
             "hand_division": self._build_hand_division(),
             "ming_hand_repair": self.generate_repair_patch(),
+            "memory_rewrite": self._build_memory_rewrite(),
             "rewrite_patch": self._rewrite_patch_bundle(),
             "contamination_index": contamination_index,
             "identity_integrity": round(max(0.0, 1.0 - contamination_index), 3),

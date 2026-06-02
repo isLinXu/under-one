@@ -1,7 +1,7 @@
 ---
 metadata:
   name: "shuangquanshou"
-  version: "v5.2"
+  version: "v5.4"
   author: "under-one"
   description: "双全手 - 记忆与人格手术台 - 记忆/人格/情绪/感知改写与污染控制"
   language: "zh"
@@ -21,6 +21,7 @@ metadata:
 > - **手术四域**：记忆（memory）/ 人格（persona）/ 情绪（emotion）/ 感知（perception）
 > - **性手·蓝手**（精神层）：记忆/人格/情绪——读取/影响/改写认知与记忆
 > - **命手·红手**（物理层）：感知/行为修复——`generate_repair_patch()` 主动生成可应用的修复 patch，将偏离风格复原至灵魂烙印基线（治疗/恢复，而非仅检测）
+> - **蓝手·改魂**（`parse_memory_markdown` / `_build_memory_rewrite` / `apply_memory_rewrite`，V5.4）：呼应"蓝手改灵魂"——不止只读校验，而是真正**读取 `memory.md` → 计算改写 → 回写**。`profile.memory_markdown` 提供记忆原文，报告输出 `memory_rewrite`（before/after 全文 + 操作差异 + 回滚令牌）；落地经**问道门(mutation_gate)**把关：核心 DNA 违背→`blocked`、漂移/摇摆→`review`、仅 `planned` 且 `approved=True` 才真正写盘并生成 `.bak` 回滚备份
 > - **阴阳双手**：一手守护（校验/拦截）/ 一手修复（命手积极治疗）；触犯核心 DNA（封印）时禁止积极修复，防走火入魔
 >
 > **悟得者**：端木瑛 ｜ **语录人物**：吕良（不完整版·性手）
